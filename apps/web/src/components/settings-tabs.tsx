@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { href: '/settings', label: 'General' },
   { href: '/settings/profile', label: 'Profile' },
+  { href: '/settings/agent-access', label: 'Agent access' },
 ] as const;
 
 /** Sub-navigation inside Settings. */

@@ -9,7 +9,7 @@ export type ArticleStatus = (typeof ARTICLE_STATUSES)[number];
 export const ARTICLE_SOURCE_KINDS = ['manual', 'file', 'url', 'folder'] as const;
 export type ArticleSourceKind = (typeof ARTICLE_SOURCE_KINDS)[number];
 
-export const VERSION_REASONS = ['autosave', 'manual', 'import', 'restore'] as const;
+export const VERSION_REASONS = ['autosave', 'manual', 'import', 'restore', 'agent', 'ai_accept'] as const;
 export type VersionReason = (typeof VERSION_REASONS)[number];
 
 export const STATUS_LABELS: Record<ArticleStatus, string> = {
@@ -36,6 +36,8 @@ export const REASON_LABELS: Record<VersionReason, string> = {
   manual: 'Saved by you',
   import: 'Import',
   restore: 'Restored',
+  agent: 'Saved by an agent',
+  ai_accept: 'AI change you accepted',
 };
 
 /** Hard limits, enforced by the action layer and mirrored in the editor. */

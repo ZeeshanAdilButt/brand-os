@@ -3,12 +3,14 @@ import { getDb } from '../db';
 import type { AuditInput } from './audit';
 import { scopedAudit } from './audit';
 import { scopedArticles, scopedAssets, scopedStudioSettings } from './articles';
+import { scopedCredentials } from './agent-credentials';
 import { scopedItems, scopedSources } from './knowledge';
 import { scopedPreferences, scopedProfile } from './profile';
 import { makeScope, type DbSource, type Scope } from './scope';
 
 export { NotFoundError, SlugTakenError } from './scope';
 export { ConflictError } from './articles';
+export { findCredentialBySecretHash } from './agent-credentials';
 
 /**
  * THE data-access entry point for tenant tables. `forOwner(ownerId)` returns repositories whose
@@ -31,6 +33,7 @@ export function forOwner(ownerId: string, db?: AppDb) {
     articles: scopedArticles(scope),
     assets: scopedAssets(scope),
     studioSettings: scopedStudioSettings(scope),
+    credentials: scopedCredentials(scope),
     audit: {
       async record(input: AuditInput) {
         return scopedAudit(await scope.db(), scope.ownerId).record(input);

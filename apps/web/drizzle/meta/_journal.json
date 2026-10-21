@@ -29,6 +29,13 @@
       "when": 1792573324161,
       "tag": "0003_graceful_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792593267875,
+      "tag": "0004_easy_skin",
+      "breakpoints": true
     }
   ]
 }

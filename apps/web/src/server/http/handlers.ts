@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ActionError, sessionToOwner, type OwnerContext } from '../actions/owner';
+import { ACTION_ERROR_STATUS, ActionError, sessionToOwner, type OwnerContext } from '../actions/owner';
 import { exportMyData } from '../actions/export';
 import {
   createItem,
@@ -62,12 +62,19 @@ export async function withOwner(
     return await run(sessionToOwner(user, ctx), ctx);
   } catch (err) {
     if (err instanceof ActionError) {
-      const status = { not_found: 404, conflict: 409, too_large: 413, invalid: 400 }[err.code];
-      return json({ error: err.message, code: err.code, fields: err.fields, ...(err.data === undefined ? {} : { data: err.data }) }, status);
+      return actionErrorResponse(err);
     }
     console.error('api handler failed', err instanceof Error ? err.name : 'unknown error');
     return json({ error: 'Something went wrong.' }, 500);
   }
+}
+
+/** The JSON answer for a failed action. Messages are written for people and never carry secrets. */
+export function actionErrorResponse(err: ActionError): NextResponse {
+  return json(
+    { error: err.message, code: err.code, fields: err.fields, ...(err.data === undefined ? {} : { data: err.data }) },
+    ACTION_ERROR_STATUS[err.code],
+  );
 }
 
 export function handleExport(request: Request, deps: HandlerDeps = {}) {

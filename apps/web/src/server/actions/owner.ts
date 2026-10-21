@@ -10,13 +10,25 @@ import { forOwner, type OwnerData } from '../data/tenant';
  */
 export interface OwnerContext {
   readonly ownerId: string;
-  readonly actor: 'owner' | 'mcp' | 'ai';
+  readonly actor: 'owner' | 'agent' | 'ai';
   readonly data: OwnerData;
 }
 
 export function sessionToOwner(user: Pick<SessionUser, 'userId'>, ctx: Pick<AppContext, 'db'>, actor: OwnerContext['actor'] = 'owner'): OwnerContext {
   return { ownerId: user.userId, actor, data: forOwner(user.userId, ctx.db) };
 }
+
+/** HTTP status for each kind of action failure. 'limit' is a usage cap the person set; 'unavailable' means a needed setup is missing. */
+export const ACTION_ERROR_STATUS = {
+  invalid: 400,
+  forbidden: 403,
+  not_found: 404,
+  conflict: 409,
+  too_large: 413,
+  limit: 429,
+  unavailable: 503,
+} as const;
+export type ActionErrorCode = keyof typeof ACTION_ERROR_STATUS;
 
 /**
  * A failure the caller can show: bad input, something that does not exist for this owner, a save
@@ -25,7 +37,7 @@ export function sessionToOwner(user: Pick<SessionUser, 'userId'>, ctx: Pick<AppC
  */
 export class ActionError extends Error {
   constructor(
-    readonly code: 'invalid' | 'not_found' | 'conflict' | 'too_large',
+    readonly code: ActionErrorCode,
     message: string,
     readonly fields: Record<string, string> = {},
     readonly data?: unknown,

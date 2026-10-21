@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { AGENT_SCOPES } from '../../lib/agent';
 import { ARTICLE_SOURCE_KINDS, ARTICLE_STATUSES, VERSION_REASONS } from '../../lib/articles';
 import {
   CONFIDENCE_LEVELS,
@@ -92,7 +93,7 @@ export const auditEvents = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     /** Who caused it: the signed-in person, the system, an MCP client or an AI provider. */
-    actor: text('actor', { enum: ['owner', 'system', 'mcp', 'ai'] }).notNull(),
+    actor: text('actor', { enum: ['owner', 'system', 'agent', 'ai'] }).notNull(),
     action: text('action').notNull(),
     entityType: text('entity_type'),
     entityId: text('entity_id'),
@@ -349,6 +350,35 @@ export const studioSettings = pgTable(
   (table) => [uniqueIndex('studio_settings_owner_idx').on(table.ownerId)],
 );
 
+/*
+ * Agent access (Day 4). A credential belongs to one owner and is the only thing the agent API uses to
+ * decide whose data a request touches. Only a SHA-256 hash of the secret is stored; the secret itself
+ * is shown once, when it is created.
+ */
+export const agentCredentials = pgTable(
+  'agent_credentials',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /** First characters of the secret, for display only. */
+    prefix: text('prefix').notNull(),
+    /** Hex SHA-256 of the whole secret. The secret is 256 random bits, so a fast hash is enough. */
+    secretHash: text('secret_hash').notNull(),
+    scopes: text('scopes', { enum: AGENT_SCOPES }).array().notNull().default(sql`'{}'::text[]`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('agent_credentials_hash_idx').on(table.secretHash),
+    index('agent_credentials_owner_idx').on(table.ownerId, table.createdAt),
+  ],
+);
+
+export type AgentCredential = typeof agentCredentials.$inferSelect;
 export type Article = Omit<typeof articles.$inferSelect, 'search'>;
 export type ArticleVersion = typeof articleVersions.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
