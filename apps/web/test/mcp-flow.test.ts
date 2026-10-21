@@ -13,6 +13,16 @@ import { GET as articlesGet, POST as articlesPost } from '../src/app/api/agent/a
 import { GET as knowledgeGet } from '../src/app/api/agent/knowledge/route';
 import { GET as meGet } from '../src/app/api/agent/me/route';
 import { forOwner } from '../src/server/data/tenant';
+import {
+  handleAgentDraftCreate,
+  handleAgentDraftGet,
+  handleAgentDraftRequestApproval,
+  handleAgentDraftsGet,
+  handleAgentDraftStage,
+  handleAgentDraftStatus,
+} from '../src/server/http/agent-handlers';
+import { handleConnectionCreate } from '../src/server/http/publishing-handlers';
+import { createFakeDevto, type FakeDevto } from './helpers/fake-devto';
 import { handleProviderCreate, handleTaskAccept, handleTaskCreate } from '../src/server/http/ai-handlers';
 import { hostedHarness, HOSTED_URL, type HostedHarness, type TestUser } from './hosted-harness';
 
@@ -34,6 +44,9 @@ let aArticle: string;
 let bArticle: string;
 let aTask: string;
 let bTask: string;
+let fake: FakeDevto;
+const FAKE_KEY = ['fake', 'devto', 'key', 'mcp', '77aa88bb'].join('-');
+const publishDeps = () => ({ publish: { fetchFn: fake.fetch, sleep: async () => undefined, timeoutMs: 2000 } });
 
 /** The agent API as the MCP server's HTTP client sees it, served by the real route handlers in this process. */
 const bridge = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
@@ -52,6 +65,11 @@ const bridge = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) =
   if (seg[0] === 'ai-tasks' && !seg[1]) return tasksGet(request);
   if (seg[0] === 'ai-tasks' && seg[2] === 'result') return taskResultPost(request, ctx);
   if (seg[0] === 'ai-tasks') return taskResultGet(request, ctx);
+  if (seg[0] === 'platform-drafts' && !seg[1]) return method === 'POST' ? handleAgentDraftCreate(request, publishDeps()) : handleAgentDraftsGet(request, publishDeps());
+  if (seg[0] === 'platform-drafts' && seg[2] === 'stage') return handleAgentDraftStage(request, id, publishDeps());
+  if (seg[0] === 'platform-drafts' && seg[2] === 'request-approval') return handleAgentDraftRequestApproval(request, id, publishDeps());
+  if (seg[0] === 'platform-drafts' && seg[2] === 'status') return handleAgentDraftStatus(request, id, publishDeps());
+  if (seg[0] === 'platform-drafts') return handleAgentDraftGet(request, id, publishDeps());
   return new Response('not found', { status: 404 });
 }) as typeof fetch;
 
@@ -79,7 +97,8 @@ beforeAll(async () => {
   h = await hostedHarness({ appSecret: 'a-long-test-app-secret-0123456789abcdefghijklmnop' });
   a = await h.signUp('mcp.a@example.test', 'Writer A');
   b = await h.signUp('mcp.b@example.test', 'Writer B');
-  aCred = (await mint(a, ['read', 'write_articles', 'ai_tasks'])).secret;
+  fake = createFakeDevto({ apiKey: FAKE_KEY });
+  aCred = (await mint(a, ['read', 'write_articles', 'ai_tasks', 'platform_drafts'])).secret;
   aReadOnly = (await mint(a, ['read'])).secret;
 
   const aData = forOwner(a.userId, h.ctx.db);
@@ -203,6 +222,50 @@ describe('Claude Code over MCP, end to end against the real routes', () => {
     const accepted = await handleTaskAccept(h.request(a, 'POST', `/api/ai/tasks/${aTask}/accept`, { expectedRevision: article!.revision }), aTask, {});
     expect(accepted.status).toBe(200);
     expect((await forOwner(a.userId, h.ctx.db).articles.get(aArticle))?.bodyMarkdown).toContain(proposed);
+  });
+
+  it('prepares, stages privately and asks for approval over MCP, and publishes nothing', async () => {
+    expect((await handleConnectionCreate(h.request(a, 'POST', '/api/connections', { platform: 'devto', secret: FAKE_KEY }), publishDeps())).status).toBe(201);
+    const client = await connect(aCred);
+    const made = await call(client, 'create_article', { title: 'MCP publishing flow', bodyMarkdown: 'Some text about queues.', tags: ['go'] });
+    const articleId = made.data?.id as string;
+    expect(articleId).toBeTruthy();
+    const draft = await call(client, 'create_platform_draft', { articleId, platform: 'devto' });
+    expect(draft.isError).toBe(false);
+    const draftId = draft.data?.id as string;
+    expect(draft.data).toMatchObject({ status: 'draft', platform: 'devto' });
+    expect(draft.data?.lint.some((i: Json) => i.code === 'canonical_missing')).toBe(true);
+
+    const staged = await call(client, 'stage_remote_draft', { draftId });
+    expect(staged.data).toMatchObject({ ok: true });
+    expect(fake.articles.size).toBe(1);
+    expect([...fake.articles.values()][0]!.published).toBe(false);
+
+    const asked = await call(client, 'request_publish_approval', { draftId });
+    expect(asked.data?.link).toContain(`/articles/${articleId}`);
+    expect(asked.data?.note).toMatch(/Only the owner can approve/);
+
+    const status = await call(client, 'get_publication_status', { draftId });
+    expect(status.data).toMatchObject({ status: 'pending_approval', approval: { status: 'pending' } });
+    const listed = await call(client, 'list_platform_drafts', { articleId });
+    expect(listed.data?.drafts).toHaveLength(1);
+    expect((await call(client, 'get_platform_draft', { id: draftId })).data?.requestPreview).toContain('"published": true');
+
+    // Nothing is public: the only writes were the private create.
+    expect(fake.requests.filter((r) => (r.body as { article?: { published?: boolean } } | null)?.article?.published === true)).toHaveLength(0);
+    expect([...fake.articles.values()].every((x) => !x.published)).toBe(true);
+  });
+
+  it('cannot see another account’s drafts over MCP', async () => {
+    const client = await connect(aCred);
+    const bClient = await connect((await mint(b, ['read', 'platform_drafts'])).secret);
+    const mine = await call(client, 'list_platform_drafts', {});
+    expect(mine.data?.drafts.length).toBeGreaterThan(0);
+    const theirs = await call(bClient, 'list_platform_drafts', {});
+    expect(theirs.data?.drafts).toEqual([]);
+    const id = mine.data?.drafts[0].id as string;
+    for (const tool of ['get_platform_draft']) expect((await call(bClient, tool, { id })).isError).toBe(true);
+    for (const tool of ['stage_remote_draft', 'request_publish_approval', 'get_publication_status']) expect((await call(bClient, tool, { draftId: id })).isError, tool).toBe(true);
   });
 
   it('stops working the moment the owner revokes the credential', async () => {

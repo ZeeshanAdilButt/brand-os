@@ -47,6 +47,12 @@ export interface BrandApi {
   listAiTasks(query: { status?: string; limit?: number }): Promise<unknown>;
   getAiTask(id: string): Promise<unknown>;
   submitAiTaskResult(id: string, operations: unknown[]): Promise<unknown>;
+  createPlatformDraft(input: { articleId: string; platform: string; coverImageUrl?: string | null; series?: string | null }): Promise<unknown>;
+  listPlatformDrafts(query: { articleId?: string; status?: string; limit?: number }): Promise<unknown>;
+  getPlatformDraft(id: string): Promise<unknown>;
+  stageRemoteDraft(id: string): Promise<unknown>;
+  requestPublishApproval(id: string): Promise<unknown>;
+  getPublicationStatus(id: string): Promise<unknown>;
 }
 
 /** Remove the credential, and anything shaped like an auth header, from text that may be shown. */
@@ -121,5 +127,11 @@ export function createBrandApi(options: BrandApiOptions): BrandApi {
     listAiTasks: (q) => call('GET', `/api/agent/ai-tasks${query({ status: q.status, limit: q.limit })}`),
     getAiTask: (id) => call('GET', `/api/agent/ai-tasks/${encodeURIComponent(id)}`),
     submitAiTaskResult: (id, operations) => call('POST', `/api/agent/ai-tasks/${encodeURIComponent(id)}/result`, { operations }),
+    createPlatformDraft: (input) => call('POST', '/api/agent/platform-drafts', input),
+    listPlatformDrafts: (q) => call('GET', `/api/agent/platform-drafts${query({ articleId: q.articleId, status: q.status, limit: q.limit })}`),
+    getPlatformDraft: (id) => call('GET', `/api/agent/platform-drafts/${encodeURIComponent(id)}`),
+    stageRemoteDraft: (id) => call('POST', `/api/agent/platform-drafts/${encodeURIComponent(id)}/stage`, {}),
+    requestPublishApproval: (id) => call('POST', `/api/agent/platform-drafts/${encodeURIComponent(id)}/request-approval`, {}),
+    getPublicationStatus: (id) => call('GET', `/api/agent/platform-drafts/${encodeURIComponent(id)}/status`),
   };
 }

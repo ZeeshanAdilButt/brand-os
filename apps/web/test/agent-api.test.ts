@@ -178,13 +178,20 @@ describe('agent API: writing', () => {
 });
 
 describe('agent API: surface', () => {
-  it('has no publishing, platform draft or approval routes', async () => {
+  it('has no route that approves, declines, publishes, checks, marks or connects (platform drafts only prepare, stage and ask)', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const root = path.resolve(import.meta.dirname, '../src/app/api/agent');
     const walk = (dir: string): string[] =>
       fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
     const routes = walk(root).map((f) => path.relative(root, f).split(path.sep).join('/'));
-    expect(routes.join(' ')).not.toMatch(/publish|approve|approval|platform|draft/i);
+    expect(routes.join(' ')).not.toMatch(/approve|decline|publish|hand-?off|connect|mark|check|resolve/i);
+    expect(routes.filter((r) => /platform-drafts/.test(r)).sort()).toEqual([
+      'platform-drafts/[id]/request-approval/route.ts',
+      'platform-drafts/[id]/route.ts',
+      'platform-drafts/[id]/stage/route.ts',
+      'platform-drafts/[id]/status/route.ts',
+      'platform-drafts/route.ts',
+    ]);
   });
 });

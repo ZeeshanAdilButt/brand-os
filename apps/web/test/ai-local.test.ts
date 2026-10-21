@@ -117,7 +117,7 @@ describe('source rules for AI code', () => {
   });
 
   it('keeps the encrypted key out of every module except the ones that store, read or seal it', () => {
-    const allowed = ['server/actions/ai-providers.ts', 'server/actions/ai-tasks.ts', 'server/ai/runtime.ts', 'server/data/ai-providers.ts', 'server/db/schema.ts', 'server/ai/crypto.ts'];
+    const allowed = ['server/actions/ai-providers.ts', 'server/actions/ai-tasks.ts', 'server/ai/runtime.ts', 'server/data/ai-providers.ts', 'server/db/schema.ts', 'server/ai/crypto.ts', 'server/actions/publishing.ts', 'server/data/publishing.ts', 'server/publishing/registry.ts'];
     const users = all.filter((f) => /encryptedKey/.test(f.text)).map((f) => f.file);
     expect(users.filter((f) => !allowed.includes(f))).toEqual([]);
   });

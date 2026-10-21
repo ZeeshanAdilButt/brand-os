@@ -1,5 +1,6 @@
 import type { AgentScope } from '../../lib/agent';
 import type { AiEnv } from '../ai/runtime';
+import type { PublishEnv } from '../publishing/registry';
 import { ActionError, sessionToOwner, type OwnerContext } from '../actions/owner';
 import { defaultLimiters, type AgentLimiters } from '../agent/rate-limit';
 import { bearerFrom, hashSecret, looksLikeSecret } from '../agent/secret';
@@ -13,6 +14,8 @@ export interface AgentHandlerDeps extends HandlerDeps {
   limiters?: AgentLimiters;
   /** Overrides for the AI environment (clock). Tests only. */
   ai?: Partial<Omit<AiEnv, 'config'>>;
+  /** Overrides for the publishing environment (network, clock). Tests only. */
+  publish?: Partial<Omit<PublishEnv, 'config'>>;
 }
 
 /** Who is calling: facts about the credential, never an owner id a caller could pass in. */

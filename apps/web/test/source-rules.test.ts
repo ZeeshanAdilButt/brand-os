@@ -38,7 +38,7 @@ const TENANT_TABLES = [
   'publishAttempts',
 ];
 const TENANT_TABLE_SQL =
-  /\b(knowledge_items|knowledge_sources|brand_preferences|audit_events|profiles|article_versions|studio_settings|platform_connections|platform_drafts|publish_attempts)\b|\b(from|join|into|update)\s+"?(articles|assets|agent_credentials|ai_providers|ai_tasks|approvals)\b/;
+  /\b(knowledge_items|knowledge_sources|brand_preferences|audit_events|profiles|article_versions|studio_settings)\b|\b(from|join|into|update)\s+"?(articles|assets|agent_credentials|ai_providers|ai_tasks|approvals|platform_connections|platform_drafts|publish_attempts)\b/;
 
 /** Names imported from the schema module in a piece of source text. */
 export function schemaImports(text: string): string[] {

@@ -4,7 +4,7 @@
  */
 
 /** What a credential may do. A credential holds a list of these; nothing is implied by another. */
-export const AGENT_SCOPES = ['read', 'write_articles', 'ai_tasks'] as const;
+export const AGENT_SCOPES = ['read', 'write_articles', 'ai_tasks', 'platform_drafts'] as const;
 export type AgentScope = (typeof AGENT_SCOPES)[number];
 
 export const SCOPE_LABELS: Record<AgentScope, { label: string; hint: string }> = {
@@ -15,6 +15,10 @@ export const SCOPE_LABELS: Record<AgentScope, { label: string; hint: string }> =
   write_articles: {
     label: 'Write articles',
     hint: 'Create articles and save changes to them. Every save is a new version you can restore.',
+  },
+  platform_drafts: {
+    label: 'Platform drafts',
+    hint: 'Prepare drafts for DEV.to and Hashnode, stage private copies there and ask for your approval. It can never approve or publish: only you can, in the app.',
   },
   ai_tasks: {
     label: 'AI tasks',

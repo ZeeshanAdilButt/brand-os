@@ -7,6 +7,7 @@ import {
   type ErrorKind,
   type PlatformDraftDTO,
 } from '../../lib/publishing';
+import type { PublicConnection } from '../data/publishing';
 import type { Approval, PlatformConnection, PlatformDraft, PublishAttempt } from '../db/schema';
 import type { PlatformAdapter } from './adapters/types';
 import { PlatformError } from './errors';
@@ -14,7 +15,7 @@ import { waitText } from './http';
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 
-export function toConnectionDTO(row: Omit<PlatformConnection, 'encryptedKey'>): ConnectionDTO {
+export function toConnectionDTO(row: PublicConnection): ConnectionDTO {
   return {
     id: row.id,
     platform: row.platform,

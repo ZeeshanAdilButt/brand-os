@@ -2,8 +2,10 @@ import { createArticle, getArticle, listArticles, saveArticle } from '../actions
 import { agentListTasks, agentTaskView, submitTaskResult } from '../actions/ai-tasks';
 import { listItems } from '../actions/knowledge';
 import { ActionError } from '../actions/owner';
+import { getDraft, listDrafts, prepareDraft, requestApproval, stageDraft } from '../actions/publishing';
+import { publishEnvFrom } from '../publishing/registry';
 import { getProfile } from '../actions/profile';
-import { articleRowView, articleView, itemView, preferencesView, profileView } from '../agent/views';
+import { articleRowView, articleView, itemView, platformDraftStatusView, platformDraftView, preferencesView, profileView } from '../agent/views';
 import { aiEnvFrom } from '../ai/runtime';
 import { withAgent, type AgentHandlerDeps } from './agent-auth';
 import { json, readJson } from './handlers';
@@ -12,8 +14,9 @@ import { MARK_END, MARK_START } from '../../lib/knowledge';
 /**
  * The agent API (/api/agent/*). Every handler goes through withAgent, so the key alone chooses the
  * owner, and calls the same actions the UI calls: validation, concurrency and audit are identical.
- * No handler reads an owner id from the request. There are deliberately no publishing, platform
- * draft or approval routes here; those arrive on later days and stay behind the approval gate.
+ * No handler reads an owner id from the request. Platform drafts can be prepared, staged privately and put
+ * up for approval here, and that is all: there is deliberately no route that approves, declines, publishes,
+ * checks, marks or connects anything. Those are the signed-in owner's acts in the app.
  */
 
 /** Strip the search highlight markers: an agent wants plain text. */
@@ -97,5 +100,58 @@ export function handleAgentTaskResult(request: Request, id: string, deps: AgentH
   return withAgent(request, deps, { scope: 'ai_tasks', action: 'agent.ai_tasks.submit_result' }, async (owner) => {
     const task = await submitTaskResult(owner, id, await readJson(request));
     return json({ id: task.id, status: task.status });
+  });
+}
+
+/* ---------- platform drafts: prepare, stage privately, ask. Never approve or publish. ---------- */
+
+export function handleAgentDraftsGet(request: Request, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'read', action: 'agent.platform_drafts.list' }, async (owner, _agent, ctx) => {
+    const params = Object.fromEntries(new URL(request.url).searchParams);
+    const drafts = await listDrafts(owner, publishEnvFrom(ctx, deps.publish), params);
+    return json({ drafts: drafts.map(platformDraftStatusView) });
+  });
+}
+
+export function handleAgentDraftGet(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'read', action: 'agent.platform_drafts.get' }, async (owner, _agent, ctx) =>
+    json(platformDraftView(await getDraft(owner, publishEnvFrom(ctx, deps.publish), id))),
+  );
+}
+
+/** Where a draft stands: the status, the link once published, any failure and the approval, if one is open. */
+export function handleAgentDraftStatus(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'read', action: 'agent.platform_drafts.status' }, async (owner, _agent, ctx) =>
+    json(platformDraftStatusView(await getDraft(owner, publishEnvFrom(ctx, deps.publish), id))),
+  );
+}
+
+export function handleAgentDraftCreate(request: Request, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'platform_drafts', action: 'agent.platform_drafts.create' }, async (owner, _agent, ctx) =>
+    json(platformDraftView(await prepareDraft(owner, publishEnvFrom(ctx, deps.publish), await readJson(request))), 201),
+  );
+}
+
+/** Creates or updates the PRIVATE copy on the platform. It cannot publish and refuses to touch a live post. */
+export function handleAgentDraftStage(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'platform_drafts', action: 'agent.platform_drafts.stage' }, async (owner, _agent, ctx) => {
+    const result = await stageDraft(owner, publishEnvFrom(ctx, deps.publish), id);
+    return json({ ok: result.ok, message: result.message, draft: platformDraftView(result.draft) });
+  });
+}
+
+/** Opens a pending approval and returns the link where the owner decides. Opening the link approves nothing. */
+export function handleAgentDraftRequestApproval(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'platform_drafts', action: 'agent.platform_drafts.request_approval' }, async (owner, _agent, ctx) => {
+    const result = await requestApproval(owner, publishEnvFrom(ctx, deps.publish), id);
+    return json(
+      {
+        status: result.draft.status,
+        approval: result.draft.approval ? { status: result.draft.approval.status, tag: result.draft.approval.tag, expiresAt: result.draft.approval.expiresAt } : null,
+        link: result.link,
+        note: 'Only the owner can approve, by opening the link in the app and signing in. Poll get_publication_status to see the outcome.',
+      },
+      201,
+    );
   });
 }

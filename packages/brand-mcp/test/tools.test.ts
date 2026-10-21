@@ -19,12 +19,37 @@ const EXPECTED_TOOLS = [
   'list_ai_tasks',
   'get_ai_task',
   'submit_ai_task_result',
+  'create_platform_draft',
+  'list_platform_drafts',
+  'get_platform_draft',
+  'stage_remote_draft',
+  'request_publish_approval',
+  'get_publication_status',
 ];
+
+/** Verbs that act as the owner. No tool may be named like one. */
+const OWNER_ONLY_VERBS = /^(approve|decline|deny|publish|hand_?off|mark|check_on|connect|disconnect|resolve|post|schedule|send)/;
 
 type Fake = { [K in keyof BrandApi]: ReturnType<typeof vi.fn> } & BrandApi;
 
 function fakeApi(overrides: Partial<BrandApi> = {}): Fake {
-  const names: (keyof BrandApi)[] = ['me', 'searchKnowledge', 'listArticles', 'getArticle', 'createArticle', 'updateArticle', 'listAiTasks', 'getAiTask', 'submitAiTaskResult'];
+  const names: (keyof BrandApi)[] = [
+    'me',
+    'searchKnowledge',
+    'listArticles',
+    'getArticle',
+    'createArticle',
+    'updateArticle',
+    'listAiTasks',
+    'getAiTask',
+    'submitAiTaskResult',
+    'createPlatformDraft',
+    'listPlatformDrafts',
+    'getPlatformDraft',
+    'stageRemoteDraft',
+    'requestPublishApproval',
+    'getPublicationStatus',
+  ];
   const fake: Record<string, unknown> = {};
   for (const name of names) fake[name] = vi.fn(overrides[name] ?? (() => Promise.reject(new Error(`unexpected call to ${name}`))));
   return fake as Fake;
@@ -50,17 +75,18 @@ async function call(client: Client, name: string, args: Record<string, unknown> 
 }
 
 describe('the tool list', () => {
-  it('has exactly the nine tools and no way to publish, stage platform drafts or approve', async () => {
+  it('has exactly the fifteen tools and no way to approve, decline, publish or hand off', async () => {
     const client = await connect(createBrandServer({ api: fakeApi(), credential: CREDENTIAL }));
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
-    expect(tools.map((t) => t.name).join(' ')).not.toMatch(/publish|approve|approval|stage|draft|connect|credential|provider|setting/i);
+    for (const tool of tools) expect(tool.name, tool.name).not.toMatch(OWNER_ONLY_VERBS);
+    expect(tools.map((t) => t.name).join(' ')).not.toMatch(/approve_|decline|hand_off|connect|credential|provider|setting|mark_|check_on/i);
   });
 
   it('marks reads as read-only and writes as non-destructive, never open-world', async () => {
     const client = await connect(createBrandServer({ api: fakeApi(), credential: CREDENTIAL }));
     const { tools } = await client.listTools();
-    const reads = ['get_my_profile', 'search_knowledge', 'list_articles', 'get_article', 'list_ai_tasks', 'get_ai_task'];
+    const reads = ['get_my_profile', 'search_knowledge', 'list_articles', 'get_article', 'list_ai_tasks', 'get_ai_task', 'list_platform_drafts', 'get_platform_draft', 'get_publication_status'];
     for (const tool of tools) {
       expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
       expect(tool.annotations?.destructiveHint, tool.name).toBe(false);
@@ -77,7 +103,8 @@ describe('the tool list', () => {
   });
 
   it('says plainly in its instructions what it cannot do', () => {
-    expect(INSTRUCTIONS).toMatch(/cannot do, by design: publish/);
+    expect(INSTRUCTIONS).toMatch(/cannot do, by design: approve, decline or publish/);
+    expect(INSTRUCTIONS).toMatch(/Only the owner can approve/);
     expect(INSTRUCTIONS).toMatch(/data/);
     expect(INSTRUCTIONS.length).toBeLessThan(4096);
   });
