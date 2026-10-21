@@ -33,6 +33,33 @@ export function WordDiff({ original, proposed }: { original: string; proposed: s
   );
 }
 
+/**
+ * A proposal for one destination: each field it would change, as a word diff when the destination's current
+ * value is known. Without it (the studio's task list) only the proposed values are shown.
+ */
+export function ProposalView({ op, current }: { op: Extract<Operation, { type: 'adapt_proposal' }>; current?: { title: string; description: string; tags: string[]; bodyMarkdown: string } | undefined }) {
+  const rows: { label: string; node: React.ReactNode }[] = [];
+  if (op.title !== undefined) rows.push({ label: 'Title', node: current ? <WordDiff original={current.title} proposed={op.title} /> : <p className="break-words rounded-md border bg-background px-3 py-2 text-sm">{op.title}</p> });
+  if (op.description !== undefined) rows.push({ label: 'Description', node: current ? <WordDiff original={current.description} proposed={op.description} /> : <p className="break-words rounded-md border bg-background px-3 py-2 text-sm">{op.description}</p> });
+  if (op.tags !== undefined) rows.push({ label: 'Tags', node: current ? <WordDiff original={current.tags.join(', ')} proposed={op.tags.join(', ')} /> : <p className="break-words rounded-md border bg-background px-3 py-2 font-mono text-xs">{op.tags.join(', ') || 'none'}</p> });
+  if (op.intro) rows.push({ label: 'Opening', node: <WordDiff original={op.intro.original} proposed={op.intro.proposed} /> });
+  if (op.body !== undefined) {
+    rows.push({ label: 'Whole body', node: current ? <WordDiff original={current.bodyMarkdown} proposed={op.body} /> : <p className="rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">A new body of {op.body.length.toLocaleString('en')} characters.</p> });
+  }
+  return (
+    <div className="grid gap-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Proposal for this destination</p>
+      {rows.map((row) => (
+        <div key={row.label} className="grid gap-1">
+          <p className="text-xs font-semibold">{row.label}</p>
+          {row.node}
+        </div>
+      ))}
+      {op.rationale ? <p className="text-sm leading-relaxed text-muted-foreground">{op.rationale}</p> : null}
+    </div>
+  );
+}
+
 const SEVERITY = {
   info: { label: 'Note', icon: Info, cls: 'text-muted-foreground' },
   warning: { label: 'Check', icon: AlertTriangle, cls: 'text-warning' },
@@ -85,6 +112,7 @@ function OperationView({ op, titleIndex, onTitleIndex, name }: { op: Operation; 
       </div>
     );
   }
+  if (op.type === 'adapt_proposal') return <ProposalView op={op} />;
   if (op.type === 'insert_after') {
     return (
       <div className="grid gap-2">
@@ -97,7 +125,7 @@ function OperationView({ op, titleIndex, onTitleIndex, name }: { op: Operation; 
     <div className="grid gap-2">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Outline to add</p>
       <ul className="grid gap-1 rounded-md border border-success/40 bg-success/10 px-3 py-2.5 text-sm">
-        {op.headings.map((h, i) => (
+        {(op as Extract<Operation, { type: 'outline' }>).headings.map((h, i) => (
           <li key={i} style={{ paddingLeft: `${(h.level - 1) * 0.875}rem` }} className={cn(h.level <= 2 && 'font-medium')}>
             {h.text}
           </li>
@@ -123,6 +151,7 @@ export function ResultView({ result, titleIndex, onTitleIndex }: { result: TaskR
 export function acceptLabel(result: TaskResult): { label: string; needsTitle: boolean; rejectLabel: string } {
   const types = new Set(result.operations.map((o) => o.type));
   if (types.has('suggest_titles')) return { label: 'Use this title', needsTitle: true, rejectLabel: 'Reject' };
+  if (types.has('adapt_proposal')) return { label: 'Apply to the destination', needsTitle: false, rejectLabel: 'Reject' };
   if (types.size === 1 && types.has('review_notes')) return { label: 'Mark as read', needsTitle: false, rejectLabel: 'Dismiss' };
   return { label: 'Accept change', needsTitle: false, rejectLabel: 'Reject' };
 }

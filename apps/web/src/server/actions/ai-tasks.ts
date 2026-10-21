@@ -1,16 +1,19 @@
 import { z } from 'zod';
+import { PLATFORMS } from '../../lib/catalog';
 import { TASK_KINDS, TASK_LIMITS, type TaskDTO, type TaskKind, type TaskStatus, type Trust } from '../../lib/ai';
 import { ALLOWED_OPERATIONS, operationHelp, ResultRejected, validateResult, type TaskResult } from '../../lib/ai-ops';
-import { originalsInsideExcerpt, planChanges, staleReason, StaleResultError } from '../ai/apply';
-import { buildContext, estimateTokens, sha256Hex, taskBrief, type BuiltContext, type KnowledgeCandidate } from '../ai/context';
+import { locate, originalsInsideExcerpt, planChanges, staleReason, StaleResultError } from '../ai/apply';
+import { buildContext, estimateTokens, sha256Hex, taskBrief, type BuiltContext, type DestinationContext, type KnowledgeCandidate } from '../ai/context';
 import { publishTaskEvent } from '../ai/events';
 import { abortActive, activeTaskIds } from '../ai/active';
 import { executesTasks, notReadyReason, type AiEnv } from '../ai/runtime';
 import { monthStart } from '../data/ai-tasks';
 import type { PublicProvider } from '../data/ai-providers';
 import { NotFoundError } from '../data/scope';
-import type { AiTask, Article } from '../db/schema';
+import type { AiTask, Article, PlatformDraft } from '../db/schema';
+import { adapterFor } from '../publishing/registry';
 import { saveAcceptedAiChange } from './articles';
+import { editDraft, type EditOutcome } from './composer';
 import { ActionError, parseId, parseInput, type OwnerContext } from './owner';
 
 /** What the task actions need beyond the owner: the AI environment and a way to run work after the response. */
@@ -42,6 +45,8 @@ export const taskInputSchema = z.object({
   providerId: z.uuid().nullable().optional(),
   /** Private knowledge items the person is willing to send for this one task. */
   approvePrivateItemIds: z.array(z.uuid()).max(5).default([]),
+  /** For a task made for one destination in the composer: the draft it is for. Required for "adapt for this destination". */
+  draftId: z.uuid().nullable().optional(),
   /** Hash of the exact text the person was shown. Required with an approval; a different text is refused. */
   approvedPromptSha256: z
     .string()
@@ -68,6 +73,8 @@ export function toTaskDTO(row: AiTask, options: { staleReason?: string | null; t
     status: row.status,
     articleId: row.articleId,
     articleRevision: row.articleRevision,
+    draftId: row.draftId,
+    platform: row.platform,
     selection: row.selStart !== null && row.selEnd !== null ? { start: row.selStart, end: row.selEnd } : null,
     excerpt: truncated ? row.excerpt.slice(0, EXCERPT_PREVIEW) : row.excerpt,
     excerptTruncated: truncated,
@@ -102,7 +109,10 @@ async function dtosFor(owner: OwnerContext, rows: AiTask[], truncate: boolean): 
   const out: TaskDTO[] = [];
   for (const row of rows) {
     let reason: string | null = null;
-    if (row.status === 'needs_review' && row.result) {
+    if (row.status === 'needs_review' && row.result && row.draftId) {
+      const draft = await owner.data.platformDrafts.get(row.draftId);
+      reason = !draft ? 'The destination was removed.' : draft.payloadSha256 !== row.draftHash ? 'The destination was edited after this was made. Run it again on the current text.' : null;
+    } else if (row.status === 'needs_review' && row.result) {
       if (!bodies.has(row.articleId)) bodies.set(row.articleId, (await owner.data.articles.get(row.articleId))?.bodyMarkdown ?? null);
       const body = bodies.get(row.articleId);
       reason = body === null || body === undefined ? 'The article no longer exists.' : staleReason(body, { selStart: row.selStart, excerpt: row.excerpt }, row.result);
@@ -144,7 +154,33 @@ async function findCandidates(owner: OwnerContext, text: string): Promise<Knowle
   return hits.map((h) => ({ id: h.item.id, title: h.item.title, body: h.item.body, publicUsePermitted: h.item.publicUsePermitted }));
 }
 
+/** The limits of a destination in words, for the model. */
+function limitsText(platform: PlatformDraft['platform']): string {
+  const info = PLATFORMS[platform];
+  const l = info.limits;
+  const parts: string[] = [];
+  if (l.title) parts.push(`title at most ${l.title} characters`);
+  if (l.body) parts.push(`text at most ${l.body} ${l.unit === 'graphemes' ? 'graphemes' : 'characters'}${l.thread ? ' per post (a thread is allowed)' : ''}`);
+  if (l.tagsMax) parts.push(`at most ${l.tagsMax} tags`);
+  if (info.kind === 'short_form') parts.push('plain text, no Markdown headings');
+  return parts.length > 0 ? parts.join('; ') : 'no fixed limits';
+}
+
+function destinationContextOf(draft: PlatformDraft): DestinationContext {
+  const info = PLATFORMS[draft.platform];
+  return {
+    name: info.name,
+    kind: info.kind.replace('_', ' '),
+    limits: limitsText(draft.platform),
+    title: draft.payload.title,
+    description: draft.payload.description,
+    tags: draft.payload.tags,
+    textStart: draft.payload.bodyMarkdown.slice(0, 1500),
+  };
+}
+
 interface Prepared {
+  draft: PlatformDraft | null;
   article: Article;
   provider: PublicProvider;
   trust: Trust;
@@ -203,6 +239,14 @@ async function prepare(owner: OwnerContext, input: TaskInput): Promise<Prepared>
   }
   if (input.kind === 'custom' && !input.instruction) throw new ActionError('invalid', 'Type what you would like done.', { instruction: 'Type what you would like done.' });
 
+  let draft: PlatformDraft | null = null;
+  if (input.draftId) {
+    draft = await owner.data.platformDrafts.get(input.draftId);
+    if (!draft || draft.articleId !== article.id) throw new ActionError('not_found', 'Destination not found for this article.');
+  } else if (input.kind === 'adapt_for_platform') {
+    throw new ActionError('invalid', 'Choose the destination to adapt for.', { draftId: 'Choose a destination.' });
+  }
+
   const provider = await pickProvider(owner, input.providerId);
   const [candidates, preferences] = await Promise.all([
     findCandidates(owner, `${excerpt.slice(0, 1500)} ${input.instruction} ${article.title}`),
@@ -218,8 +262,9 @@ async function prepare(owner: OwnerContext, input: TaskInput): Promise<Prepared>
     candidates,
     approvedPrivateIds: input.approvePrivateItemIds,
     preferences: preferences ? { tone: preferences.tone, audience: preferences.audience, writingStyle: preferences.writingStyle, avoid: preferences.avoid } : null,
+    destination: draft ? destinationContextOf(draft) : undefined,
   });
-  return { article, provider, trust: provider.trust, excerpt, selStart, selEnd, built, candidates };
+  return { draft, article, provider, trust: provider.trust, excerpt, selStart, selEnd, built, candidates };
 }
 
 export interface ContextPreview {
@@ -305,7 +350,10 @@ export async function createTask(owner: OwnerContext, deps: TaskDeps, input: unk
       articleRevision: prepared.article.revision,
       promptText: built.prompt,
       promptSha256: built.promptSha256,
-      requestHash: runs ? sha256Hex(`${provider.id}|${provider.model ?? ''}|${values.kind}|${built.promptSha256}`) : null,
+      requestHash: runs ? sha256Hex(`${provider.id}|${provider.model ?? ''}|${values.kind}|${built.promptSha256}|${prepared.draft?.payloadSha256 ?? ''}`) : null,
+      draftId: prepared.draft?.id ?? null,
+      draftHash: prepared.draft?.payloadSha256 ?? null,
+      platform: prepared.draft?.platform ?? null,
       approvedItemIds: approved,
       contextNotes: built.included.map((i) => ({ id: i.id, title: i.title, body: prepared.candidates.find((c) => c.id === i.id)?.body.slice(0, 800) ?? '', viaApproval: i.viaApproval })),
       withheldCount: built.withheld.length,
@@ -368,12 +416,74 @@ async function reapAbandoned(owner: OwnerContext, env: AiEnv): Promise<void> {
 export interface AcceptResult {
   task: TaskDTO;
   article: Article;
+  /** For a task made for a destination: what applying it did to that draft. */
+  edit?: EditOutcome;
 }
+
+/**
+ * Apply a proposal to ONE destination's draft because the owner accepted it. The draft must still be the one the
+ * proposal was made for (same payload hash); a changed draft makes the proposal stale and nothing is applied. The
+ * change goes through the same edit as typing it, so it is a new hash and any approval is void.
+ */
+async function acceptForDestination(owner: OwnerContext, task: AiTask, values: z.infer<typeof acceptSchema>): Promise<EditOutcome> {
+  const draft = task.draftId ? await owner.data.platformDrafts.get(task.draftId) : null;
+  if (!draft) throw new ActionError('conflict', 'The destination was removed, so there is nothing to apply this to.', {}, { stale: true });
+  if (draft.payloadSha256 !== task.draftHash) {
+    throw new ActionError('conflict', 'This destination was edited after the proposal was made, so it was not applied. Run it again on the current text.', {}, { stale: true });
+  }
+  const wanted = new Set<string>(values.fields ?? PROPOSAL_FIELDS);
+  const patch: Record<string, unknown> = { expectedHash: draft.payloadSha256 };
+  let applied = 0;
+
+  for (const op of task.result?.operations ?? []) {
+    if (op.type === 'suggest_titles') {
+      const index = values.titleIndex;
+      if (index === undefined || index < 0 || index >= op.titles.length) throw new ActionError('invalid', 'Choose one of the suggested titles to use.', { titleIndex: 'Choose a title.' });
+      patch.title = op.titles[index];
+      applied += 1;
+    } else if (op.type === 'adapt_proposal') {
+      if (op.title !== undefined && wanted.has('title')) {
+        patch.title = op.title;
+        applied += 1;
+      }
+      if (op.description !== undefined && wanted.has('description')) {
+        patch.description = op.description;
+        applied += 1;
+      }
+      if (op.tags !== undefined && wanted.has('tags')) {
+        patch.tags = op.tags;
+        applied += 1;
+      }
+      if (op.intro && wanted.has('intro')) {
+        const at = locate(draft.payload.bodyMarkdown, op.intro.original, null);
+        if (at === null) throw new ActionError('conflict', 'The opening this was made for is no longer in the destination’s text, so it was not applied.', {}, { stale: true });
+        patch.bodyMarkdown = draft.payload.bodyMarkdown.slice(0, at) + op.intro.proposed + draft.payload.bodyMarkdown.slice(at + op.intro.original.length);
+        applied += 1;
+      }
+      if (op.body !== undefined && wanted.has('body')) {
+        const adapter = adapterFor(draft.platform);
+        const article = await owner.data.articles.get(draft.articleId);
+        // A long article keeps the platform's own additions (DEV.to's "Originally published at" footer); other kinds take the text as written.
+        patch.bodyMarkdown =
+          PLATFORMS[draft.platform].kind === 'long_form' && article
+            ? adapter.adapt({ title: draft.payload.title, description: draft.payload.description, tags: article.tags, canonicalUrl: draft.payload.canonicalUrl, coverImageUrl: draft.payload.coverImageUrl, series: draft.payload.series, bodyMarkdown: op.body }).payload.bodyMarkdown
+            : op.body;
+        applied += 1;
+      }
+    }
+  }
+  if (applied === 0) throw new ActionError('invalid', 'Nothing in this proposal applies to the parts you chose.', { fields: 'Choose at least one part.' });
+  return editDraft(owner, {}, draft.id, patch);
+}
+
+const PROPOSAL_FIELDS = ['title', 'description', 'tags', 'intro', 'body'] as const;
 
 const acceptSchema = z.object({
   expectedRevision: z.number().int().min(1),
   /** For a list of titles: which one to use. */
   titleIndex: z.number().int().min(0).optional(),
+  /** For a destination proposal: which of its parts to apply. All of them when left out. */
+  fields: z.array(z.enum(PROPOSAL_FIELDS)).min(1).optional(),
 });
 
 /**
@@ -392,6 +502,22 @@ export async function acceptTask(owner: OwnerContext, id: unknown, input: unknow
   if (!article) throw new ActionError('not_found', 'Article not found');
   if (article.revision !== values.expectedRevision) {
     throw new ActionError('conflict', 'The article changed while you were reviewing. Save your editor, then accept again.', {}, { currentRevision: article.revision });
+  }
+
+  // A proposal for one destination edits that destination's draft, never the article.
+  if (task.draftId && task.result.operations.some((op) => op.type === 'adapt_proposal' || op.type === 'suggest_titles')) {
+    const edit = await acceptForDestination(owner, task, values);
+    const accepted = await owner.data.tasks.transition(taskId, ['needs_review'], { status: 'accepted', finished: true });
+    if (!accepted) throw new ActionError('conflict', 'This result was already decided.');
+    await owner.data.audit.record({
+      actor: owner.actor,
+      action: 'ai_task.accepted',
+      entityType: 'ai_task',
+      entityId: taskId,
+      metadata: { kind: task.kind, destination: task.platform, fields: edit.fields, voidedApproval: edit.voidedApproval },
+    });
+    await announce(owner, accepted);
+    return { task: toTaskDTO(accepted), article, edit };
   }
 
   let plan;
@@ -466,7 +592,9 @@ export async function agentTaskView(owner: OwnerContext, id: unknown) {
   const row = await owner.data.tasks.get(parseId(id, 'Task'));
   if (!row) throw new ActionError('not_found', 'Task not found');
   const article = await owner.data.articles.get(row.articleId);
+  const draft = row.draftId ? await owner.data.platformDrafts.get(row.draftId) : null;
   return {
+    destination: draft ? { platform: draft.platform, name: PLATFORMS[draft.platform].name, limits: limitsText(draft.platform), current: { title: draft.payload.title, description: draft.payload.description, tags: draft.payload.tags, textStart: draft.payload.bodyMarkdown.slice(0, 1500) } } : null,
     id: row.id,
     kind: row.kind,
     status: row.status,

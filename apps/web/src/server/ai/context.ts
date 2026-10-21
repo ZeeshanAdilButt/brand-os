@@ -36,6 +36,20 @@ export interface ContextInput {
   /** Items the person approved for this one task. Ids that are not candidates are ignored. */
   approvedPrivateIds: readonly string[];
   preferences: { tone: string | null; audience: string | null; writingStyle: string | null; avoid: string[] } | null;
+  /** For a task made for one destination in the composer: what that destination is and what its draft says now. */
+  destination?: DestinationContext | undefined;
+}
+
+export interface DestinationContext {
+  name: string;
+  kind: string;
+  /** The destination's limits in words, for the model. */
+  limits: string;
+  title: string;
+  description: string;
+  tags: string[];
+  /** The start of the destination's current text. An intro proposal must quote it exactly. */
+  textStart: string;
 }
 
 export interface BuiltContext {
@@ -62,6 +76,10 @@ const TASK_BRIEF: Record<TaskKind, string> = {
   suggest_titles: 'Suggest 5 to 8 specific, honest titles for this article. No clickbait, no invented claims.',
   outline: 'Propose a heading outline (levels 1 to 4) for this article, based on the material given.',
   custom: 'Do what the author’s instruction asks, using only the allowed operations.',
+  review_notes:
+    'Review the whole article as an editor would: structure, clarity, claims that are not supported, missing context, and anything a reader on another platform would trip over. Return review_notes only. Do not rewrite the text. Quote the exact words each note is about.',
+  adapt_for_platform:
+    'Adapt this article for the destination described in DESTINATION. Return one adapt_proposal operation with only the fields that should change: a title and description in that destination’s style and limits, tags, and optionally either an intro (copy the destination’s current opening exactly into "original") or a whole new body. Keep every technical claim. Do not invent facts, numbers or experience. Respect the destination’s limits.',
 };
 
 export function taskBrief(kind: TaskKind): string {
@@ -116,7 +134,7 @@ export function buildContext(input: ContextInput): BuiltContext {
 
   // The nonce comes from the content itself, so the same request always produces the same text (needed for
   // caching) while text inside the data cannot guess the marker that will fence it.
-  const nonce = sha256Hex(`${input.kind}\n${input.instruction}\n${input.excerpt}`).slice(0, 10);
+  const nonce = sha256Hex(`${input.kind}\n${input.instruction}\n${input.excerpt}\n${input.destination?.textStart ?? ''}`).slice(0, 10);
   const block = (label: string, body: string) => `<<<BEGIN DATA ${label} ${nonce}>>>\n${defang(body)}\n<<<END DATA ${label} ${nonce}>>>`;
 
   const prefs = input.trust === 'local' && input.preferences ? input.preferences : null;
@@ -139,6 +157,21 @@ export function buildContext(input: ContextInput): BuiltContext {
         .filter((line): line is string => line !== null)
         .join('\n'),
     ),
+    input.destination
+      ? block(
+          'DESTINATION',
+          [
+            `Platform: ${input.destination.name} (${input.destination.kind})`,
+            `Limits: ${input.destination.limits}`,
+            `Current title: ${input.destination.title}`,
+            input.destination.description ? `Current description: ${input.destination.description}` : null,
+            input.destination.tags.length > 0 ? `Current tags: ${input.destination.tags.join(', ')}` : null,
+            `Current text, start:\n${input.destination.textStart}`,
+          ]
+            .filter((line): line is string => line !== null)
+            .join('\n'),
+        )
+      : null,
     block(input.selected ? 'SELECTED TEXT' : 'ARTICLE START', input.excerpt),
     notes.length > 0 ? block('REFERENCE NOTES', notes.join('\n\n')) : null,
     'Reply now with the JSON object only.',
