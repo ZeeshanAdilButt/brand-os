@@ -98,6 +98,10 @@ export const devtoAdapter: PlatformAdapter = {
     return { payload, tagReport };
   },
 
+  tags(original: string[]) {
+    return sanitizeTags(original, (raw) => devtoTag(raw, PUBLISHING_LIMITS.devtoTagChars));
+  },
+
   validate(payload: DraftPayload): LintIssue[] {
     const issues = lintPayload(payload, { hasLocalCover: false, maxBodyChars: PUBLISHING_LIMITS.devtoBodyChars, platformName: 'DEV.to' });
     const max = PLATFORMS.devto.capabilities.tagsMax;

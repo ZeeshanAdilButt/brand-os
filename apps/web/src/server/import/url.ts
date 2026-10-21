@@ -41,6 +41,8 @@ export class UrlImportError extends Error {
   constructor(
     readonly code: UrlImportErrorCode,
     message: string,
+    /** The HTTP status, for `bad_status`. */
+    readonly status?: number,
   ) {
     super(message);
     this.name = 'UrlImportError';
@@ -234,7 +236,7 @@ export async function fetchPage(rawUrl: string, deps: UrlImportDeps = {}): Promi
 
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.location;
-      if (!location) throw new UrlImportError('bad_status', `The site answered ${response.status} without saying where to go.`);
+      if (!location) throw new UrlImportError('bad_status', `The site answered ${response.status} without saying where to go.`, response.status);
       if (hop === MAX_REDIRECTS) throw new UrlImportError('too_many_redirects', 'That address redirects too many times.');
       let next: URL;
       try {
@@ -247,7 +249,7 @@ export async function fetchPage(rawUrl: string, deps: UrlImportDeps = {}): Promi
       continue;
     }
     if (response.status !== 200) {
-      throw new UrlImportError('bad_status', `The site answered ${response.status}, so there is nothing to import.`);
+      throw new UrlImportError('bad_status', `The site answered ${response.status}, so there is nothing to import.`, response.status);
     }
     const type = mediaType(response.headers['content-type'] ?? '');
     if (!ACCEPTED_TYPES.includes(type)) {

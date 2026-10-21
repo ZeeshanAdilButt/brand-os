@@ -1,14 +1,17 @@
 import {
   PLATFORMS,
   approvalTag,
+  diffPayload,
   type ApprovalDTO,
   type AttemptDTO,
+  type CanonicalCheckDTO,
   type ConnectionDTO,
+  type DraftPayload,
   type ErrorKind,
   type PlatformDraftDTO,
 } from '../../lib/publishing';
 import type { PublicConnection } from '../data/publishing';
-import type { Approval, PlatformConnection, PlatformDraft, PublishAttempt } from '../db/schema';
+import type { Approval, CanonicalCheck, PlatformConnection, PlatformDraft, PublishAttempt } from '../db/schema';
 import type { PlatformAdapter } from './adapters/types';
 import { PlatformError } from './errors';
 import { waitText } from './http';
@@ -44,7 +47,11 @@ export function toAttemptDTO(row: PublishAttempt): AttemptDTO {
   };
 }
 
-export function toApprovalDTO(row: Approval): ApprovalDTO {
+export function toCanonicalDTO(row: CanonicalCheck): CanonicalCheckDTO {
+  return { url: row.url, state: row.state, httpStatus: row.httpStatus, title: row.title, finalUrl: row.finalUrl, message: row.message, checkedAt: row.checkedAt.toISOString() };
+}
+
+export function toApprovalDTO(row: Approval, checklist: string[]): ApprovalDTO {
   return {
     id: row.id,
     status: row.status,
@@ -54,13 +61,25 @@ export function toApprovalDTO(row: Approval): ApprovalDTO {
     createdAt: row.createdAt.toISOString(),
     invalidReason: row.invalidReason,
     requestedBy: row.requestedBy,
+    kind: row.kind,
+    checklist,
   };
 }
 
 /** The draft as the browser and the agent API see it. `config` is the connection's non-secret settings. */
 export function toDraftDTO(
   row: PlatformDraft,
-  parts: { approval: Approval | null; attempts: PublishAttempt[]; adapter: PlatformAdapter; config: PlatformConnection['config'] },
+  parts: {
+    approval: Approval | null;
+    attempts: PublishAttempt[];
+    adapter: PlatformAdapter;
+    config: PlatformConnection['config'];
+    /** What a rebuild from the article would produce now, or null when the article is gone. */
+    fresh: DraftPayload | null;
+    canonical: CanonicalCheck | null;
+    /** The boxes for the open approval, if any. */
+    checklist: string[];
+  },
 ): PlatformDraftDTO {
   return {
     id: row.id,
@@ -70,7 +89,7 @@ export function toDraftDTO(
     stale: row.stale,
     payload: row.payload,
     payloadSha256: row.payloadSha256,
-    requestPreview: JSON.stringify(parts.adapter.preview(row.payload, true, parts.config, row.remoteId), null, 2),
+    requestPreview: JSON.stringify(parts.adapter.preview(row.payload, true, parts.config, row.remoteId, { extras: row.extras, payloadSha256: row.payloadSha256 }), null, 2),
     tagReport: row.tagReport,
     lint: row.lint,
     account: row.account,
@@ -85,8 +104,19 @@ export function toDraftDTO(
     updatedAt: row.updatedAt.toISOString(),
     stagedAt: iso(row.stagedAt),
     publishedAt: iso(row.publishedAt),
-    approval: parts.approval ? toApprovalDTO(parts.approval) : null,
+    approval: parts.approval ? toApprovalDTO(parts.approval, parts.checklist) : null,
     attempts: parts.attempts.map(toAttemptDTO),
+    generated: row.generatedPayload && Object.keys(row.generatedPayload).length > 0 ? row.generatedPayload : row.payload,
+    divergence: {
+      edited: diffPayload(row.payload, row.generatedPayload && Object.keys(row.generatedPayload).length > 0 ? row.generatedPayload : row.payload),
+      fromSource: parts.fresh ? diffPayload(row.payload, parts.fresh) : [],
+    },
+    extras: row.extras,
+    remoteInfo: row.remoteInfo,
+    publishedVia: row.publishedVia,
+    editedAt: iso(row.editedAt),
+    editCount: row.editCount,
+    canonical: parts.canonical ? toCanonicalDTO(parts.canonical) : null,
   };
 }
 
@@ -102,10 +132,11 @@ export interface FailureText {
  */
 export function describeFailure(platform: keyof typeof PLATFORMS, error: PlatformError, operation: 'stage' | 'publish' | 'check' | 'health'): FailureText {
   const name = PLATFORMS[platform].name;
+  const isSite = platform === 'site';
   const base = error.message;
   switch (error.kind) {
     case 'auth':
-      return { kind: error.kind, message: base, nextAction: `Reconnect ${name} in Settings with a new key.` };
+      return { kind: error.kind, message: base, nextAction: isSite ? 'Replace the GitHub token in Settings > Connections with one that has Contents and Pull requests write access to the repository.' : `Reconnect ${name} in Settings with a new key.` };
     case 'forbidden_plan':
       return { kind: error.kind, message: base, nextAction: 'Upgrade the publication to Pro on Hashnode, then try again.' };
     case 'validation':
@@ -122,7 +153,7 @@ export function describeFailure(platform: keyof typeof PLATFORMS, error: Platfor
       if (operation === 'publish' && error.ambiguous) {
         return {
           kind: error.kind,
-          message: `${base} The post may or may not be live.`,
+          message: isSite ? `${base} The pull request may or may not exist.` : `${base} The post may or may not be live.`,
           nextAction: 'Use “Check on platform”. It will not be retried automatically, and it cannot be approved again until you have checked.',
         };
       }

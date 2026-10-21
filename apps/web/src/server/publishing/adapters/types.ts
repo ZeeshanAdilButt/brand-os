@@ -1,4 +1,4 @@
-import type { DraftPayload, LintIssue, PlatformId, PlatformInfo, TagReport } from '../../../lib/publishing';
+import type { DraftExtras, DraftPayload, LintIssue, PlatformId, PlatformInfo, RemoteInfo, TagReport } from '../../../lib/publishing';
 import type { PlatformConnection } from '../../db/schema';
 
 /** What an adapter needs for one call. The key is in memory only for the length of the call. */
@@ -11,6 +11,8 @@ export interface AdapterContext {
   now: () => Date;
   baseUrl: string;
   timeoutMs: number;
+  /** For the personal site: the repository a probe reads. Everything else a call needs is in the draft's extras. */
+  site?: { repo: string; baseBranch: string } | undefined;
 }
 
 /** The part of a draft an adapter sees. */
@@ -19,6 +21,10 @@ export interface AdapterDraft {
   payload: DraftPayload;
   /** The private copy on the platform, if one exists. */
   remoteId: string | null;
+  /** Options bound to the payload (the personal site's path and file layout). */
+  extras?: DraftExtras;
+  /** The hash the owner approved. The personal site derives its branch name from it. */
+  payloadSha256?: string;
 }
 
 /** What the person typed or the article holds, before the platform's rules are applied. */
@@ -43,6 +49,8 @@ export interface StageResult {
   remoteId: string;
   /** Where the owner can look at the private copy, when the platform gives a link. */
   previewUrl: string | null;
+  /** What a read-only look found (the personal site: whether the target file exists). Not part of the payload. */
+  info?: RemoteInfo | null;
 }
 
 export interface PublishResult {
@@ -68,9 +76,14 @@ export interface PlatformAdapter {
   /** Apply the platform's rules to the article text: tag form and count, footers, series. Pure. */
   adapt(input: AdaptInput): { payload: DraftPayload; tagReport: TagReport };
   /** Platform-specific problems in an adapted payload. Pure. */
-  validate(payload: DraftPayload): LintIssue[];
-  /** The JSON that will be sent, so the approval card shows it exactly. `published` is what the call will set. Pure. */
-  preview(payload: DraftPayload, published: boolean, config: PlatformConnection['config'], remoteId?: string | null): unknown;
+  validate(payload: DraftPayload, extras?: DraftExtras): LintIssue[];
+  /** The tags as this platform takes them, with a line for every change. Pure. Used when the owner edits tags. */
+  tags(original: string[]): TagReport;
+  /**
+   * The JSON that will be sent, so the approval card shows it exactly. `published` is what the call will set.
+   * `info` carries the draft's options and hash for the destinations whose request depends on them. Pure.
+   */
+  preview(payload: DraftPayload, published: boolean, config: PlatformConnection['config'], remoteId?: string | null, info?: { extras: DraftExtras; payloadSha256: string }): unknown;
   /** Read-only probe: who is this key, and can it reach what we need? */
   health(ctx: AdapterContext): Promise<HealthResult>;
   /**

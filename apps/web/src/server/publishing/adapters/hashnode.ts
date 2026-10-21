@@ -122,6 +122,10 @@ export const hashnodeAdapter: PlatformAdapter = {
     return { payload, tagReport };
   },
 
+  tags(original: string[]) {
+    return sanitizeTags(original, (raw) => hashnodeSlug(raw, PUBLISHING_LIMITS.hashnodeTagChars));
+  },
+
   validate(payload: DraftPayload): LintIssue[] {
     const issues = lintPayload(payload, { hasLocalCover: false, maxBodyChars: PUBLISHING_LIMITS.hashnodeBodyChars, platformName: 'Hashnode' });
     const max = PLATFORMS.hashnode.capabilities.tagsMax;
