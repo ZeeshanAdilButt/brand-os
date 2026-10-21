@@ -1,4 +1,5 @@
 import { createAuth } from '../src/server/auth';
+import type { AppConfig } from '../src/server/config';
 import type { AppContext } from '../src/server/context';
 import { installContext } from '../src/server/context';
 import type { DbHandle } from '../src/server/db/client';
@@ -32,9 +33,9 @@ export interface HostedHarness {
 }
 
 /** A hosted-mode app on in-memory PGlite with real Better Auth sessions. The context is installed globally. */
-export async function hostedHarness(): Promise<HostedHarness> {
+export async function hostedHarness(overrides: Partial<AppConfig> = {}): Promise<HostedHarness> {
   const handle = await memoryDb();
-  const config = testConfig({ mode: 'hosted', authSecret: HOSTED_SECRET, appUrl: HOSTED_URL });
+  const config = testConfig({ mode: 'hosted', authSecret: HOSTED_SECRET, appUrl: HOSTED_URL, ...overrides });
   const auth = createAuth(handle.db, config);
   const ctx: AppContext = { config, db: handle.db, auth };
   const uninstall = installContext(ctx);

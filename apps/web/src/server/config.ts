@@ -17,6 +17,7 @@ const envSchema = z.object({
   APP_URL: z.url().default('http://localhost:3100'),
   AUTH_SECRET: z.string().min(1).optional(),
   OWNER_USER_ID: z.uuid().optional(),
+  APP_SECRET: z.string().min(1).optional(),
 });
 
 export interface AppConfig {
@@ -31,6 +32,11 @@ export interface AppConfig {
   authSecret: string | undefined;
   /** Hosted mode: the user id designated as owner (the only user the private seed may write to). */
   ownerUserId: string | undefined;
+  /**
+   * Master secret for encrypting stored provider keys (at least 32 characters). Required in hosted mode
+   * before a key can be saved. Local mode uses it when set, otherwise an auto-generated key file in DATA_DIR.
+   */
+  appSecret: string | undefined;
 }
 
 /** Parse the process environment into a validated config. Throws ConfigError with an actionable message. */
@@ -42,12 +48,13 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     APP_URL: emptyToUndefined(env.APP_URL),
     AUTH_SECRET: emptyToUndefined(env.AUTH_SECRET),
     OWNER_USER_ID: emptyToUndefined(env.OWNER_USER_ID),
+    APP_SECRET: emptyToUndefined(env.APP_SECRET),
   });
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new ConfigError(`Invalid environment (${problems}). See .env.example.`);
   }
-  const { MODE, DATABASE_URL, DATA_DIR, APP_URL, AUTH_SECRET, OWNER_USER_ID } = parsed.data;
+  const { MODE, DATABASE_URL, DATA_DIR, APP_URL, AUTH_SECRET, OWNER_USER_ID, APP_SECRET } = parsed.data;
   if (MODE === 'hosted' && !DATABASE_URL) {
     throw new ConfigError('MODE=hosted requires DATABASE_URL (a PostgreSQL connection string). See .env.example.');
   }
@@ -59,6 +66,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     appUrl: APP_URL.replace(/\/+$/, ''),
     authSecret: MODE === 'hosted' ? AUTH_SECRET : undefined,
     ownerUserId: MODE === 'hosted' ? OWNER_USER_ID : undefined,
+    appSecret: APP_SECRET,
   };
 }
 

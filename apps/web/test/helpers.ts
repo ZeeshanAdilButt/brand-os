@@ -36,6 +36,7 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appUrl: 'http://localhost:3100',
     authSecret: undefined,
     ownerUserId: undefined,
+    appSecret: undefined,
     ...overrides,
   };
 }

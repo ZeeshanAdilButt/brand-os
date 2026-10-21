@@ -19,9 +19,22 @@ const sources = walk(srcRoot).map((file) => ({ file: rel(file), text: fs.readFil
 const inside = (file: string, ...dirs: string[]) => dirs.some((d) => file.startsWith(d));
 
 /** Tables whose rows belong to one owner. Only src/server/data may query them. */
-const TENANT_TABLES = ['profiles', 'brandPreferences', 'knowledgeSources', 'knowledgeItems', 'auditEvents', 'articles', 'articleVersions', 'assets', 'studioSettings'];
+const TENANT_TABLES = [
+  'profiles',
+  'brandPreferences',
+  'knowledgeSources',
+  'knowledgeItems',
+  'auditEvents',
+  'articles',
+  'articleVersions',
+  'assets',
+  'studioSettings',
+  'agentCredentials',
+  'aiProviders',
+  'aiTasks',
+];
 const TENANT_TABLE_SQL =
-  /\b(knowledge_items|knowledge_sources|brand_preferences|audit_events|profiles|article_versions|studio_settings)\b|\b(from|join|into|update)\s+"?(articles|assets)\b/;
+  /\b(knowledge_items|knowledge_sources|brand_preferences|audit_events|profiles|article_versions|studio_settings)\b|\b(from|join|into|update)\s+"?(articles|assets|agent_credentials|ai_providers|ai_tasks)\b/;
 
 /** Names imported from the schema module in a piece of source text. */
 export function schemaImports(text: string): string[] {

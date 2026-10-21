@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { AGENT_SCOPES } from '../../lib/agent';
+import { PROTOCOLS, PROVIDER_KINDS, TRUST_LEVELS } from '../../lib/ai';
 import { ARTICLE_SOURCE_KINDS, ARTICLE_STATUSES, VERSION_REASONS } from '../../lib/articles';
 import {
   CONFIDENCE_LEVELS,
@@ -379,6 +380,41 @@ export const agentCredentials = pgTable(
 );
 
 export type AgentCredential = typeof agentCredentials.$inferSelect;
+
+/**
+ * AI providers (Day 4), per owner. The API key, when there is one, is stored only as AES-256-GCM
+ * ciphertext bound to this row (see src/server/ai/crypto.ts) and is never sent to the browser.
+ */
+export const aiProviders = pgTable(
+  'ai_providers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: PROVIDER_KINDS }).notNull(),
+    protocol: text('protocol', { enum: PROTOCOLS }),
+    baseUrl: text('base_url'),
+    model: text('model'),
+    /** Where the text goes. Derived by the server from the kind and address, never typed by the person. */
+    trust: text('trust', { enum: TRUST_LEVELS }).notNull().default('external'),
+    encryptedKey: text('encrypted_key'),
+    keyLast4: text('key_last4'),
+    workspaceId: text('workspace_id'),
+    monthlyTokenCap: integer('monthly_token_cap'),
+    isDefault: boolean('is_default').notNull().default(false),
+    enabled: boolean('enabled').notNull().default(true),
+    lastTestAt: timestamp('last_test_at', { withTimezone: true }),
+    lastTestOk: boolean('last_test_ok'),
+    lastTestMessage: text('last_test_message'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('ai_providers_owner_idx').on(table.ownerId, table.createdAt)],
+);
+
+export type AiProvider = typeof aiProviders.$inferSelect;
 export type Article = Omit<typeof articles.$inferSelect, 'search'>;
 export type ArticleVersion = typeof articleVersions.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
