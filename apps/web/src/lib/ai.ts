@@ -131,7 +131,7 @@ export interface ProviderDTO {
 
 /* ---- AI tasks ---- */
 
-export const TASK_KINDS = ['improve_section', 'suggest_titles', 'check_accuracy', 'tighten_intro', 'outline', 'custom'] as const;
+export const TASK_KINDS = ['improve_section', 'suggest_titles', 'check_accuracy', 'tighten_intro', 'outline', 'custom', 'adapt_for_platform', 'review_notes'] as const;
 export type TaskKind = (typeof TASK_KINDS)[number];
 
 export const TASK_STATUSES = ['pending', 'running', 'needs_review', 'accepted', 'rejected', 'failed'] as const;
@@ -144,6 +144,8 @@ export const TASK_KIND_LABELS: Record<TaskKind, string> = {
   tighten_intro: 'Tighten',
   outline: 'Outline',
   custom: 'Ask',
+  adapt_for_platform: 'Adapt for this destination',
+  review_notes: 'Review this article',
 };
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -181,6 +183,9 @@ export interface TaskDTO {
   status: TaskStatus;
   articleId: string;
   articleRevision: number;
+  /** Set for a task made for one destination in the composer. */
+  draftId: string | null;
+  platform: string | null;
   selection: { start: number; end: number } | null;
   excerpt: string;
   excerptTruncated: boolean;

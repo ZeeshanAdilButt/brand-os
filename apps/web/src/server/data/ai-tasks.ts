@@ -1,7 +1,8 @@
 import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { ProviderKind, TaskKind, TaskStatus } from '../../lib/ai';
+import type { PlatformId } from '../../lib/publishing';
 import type { TaskResult } from '../../lib/ai-ops';
-import { aiProviders, aiTasks, articles, type AiTask } from '../db/schema';
+import { aiProviders, aiTasks, articles, platformDrafts, type AiTask } from '../db/schema';
 import { NotFoundError, type Scope } from './scope';
 
 export interface TaskInsert {
@@ -22,6 +23,10 @@ export interface TaskInsert {
   approvedItemIds: string[];
   contextNotes: AiTask['contextNotes'];
   withheldCount: number;
+  /** For a task made for one destination in the composer. */
+  draftId?: string | null;
+  draftHash?: string | null;
+  platform?: PlatformId | null;
 }
 
 /** Fields a transition may set. Everything else on a task is fixed when it is made. */
@@ -84,6 +89,14 @@ export function scopedTasks(scope: Scope) {
           .from(aiProviders)
           .where(and(eq(aiProviders.ownerId, scope.ownerId), eq(aiProviders.id, input.providerId)));
         if (!provider) throw new NotFoundError('provider');
+      }
+      // A task for a destination must point at this owner's draft of this article.
+      if (input.draftId) {
+        const [draft] = await db
+          .select({ id: platformDrafts.id })
+          .from(platformDrafts)
+          .where(and(eq(platformDrafts.ownerId, scope.ownerId), eq(platformDrafts.id, input.draftId), eq(platformDrafts.articleId, input.articleId)));
+        if (!draft) throw new NotFoundError('draft');
       }
       const [row] = await db
         .insert(aiTasks)

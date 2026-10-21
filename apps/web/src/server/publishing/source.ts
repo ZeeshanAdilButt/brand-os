@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { DraftPayload, PlatformId } from '../../lib/publishing';
+import type { DraftExtras, DraftPayload, PlatformId } from '../../lib/publishing';
 
 /** JSON with sorted keys, so equal values always hash equally. */
 export function canonicalJson(value: unknown): string {
@@ -41,9 +41,12 @@ export function sourceHashOf(a: ArticleSource): string {
 }
 
 /**
- * The hash an approval is bound to: the platform, the account it will be posted under and the exact
- * payload. Change any of the three and the hash differs, so the approval no longer applies.
+ * The hash an approval is bound to: the platform, the account it will be posted under, the exact payload and
+ * any options bound to it (the personal site's path and file layout). Change any and the hash differs, so the
+ * approval no longer applies.
  */
-export function payloadHashOf(platform: PlatformId, account: string | null, payload: DraftPayload): string {
-  return sha256(canonicalJson({ platform, account, payload }));
+export function payloadHashOf(platform: PlatformId, account: string | null, payload: DraftPayload, extras: DraftExtras = {}): string {
+  // Extras join the hash only when there are some, so every hash made before they existed stays the same.
+  const hasExtras = Object.keys(extras).length > 0;
+  return sha256(canonicalJson(hasExtras ? { platform, account, payload, extras } : { platform, account, payload }));
 }

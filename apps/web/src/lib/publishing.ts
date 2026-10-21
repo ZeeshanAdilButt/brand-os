@@ -4,12 +4,11 @@
  * and nothing is implied beyond it. Labels and notes are user-facing copy.
  */
 
-export const PLATFORM_IDS = ['devto', 'hashnode'] as const;
-export type PlatformId = (typeof PLATFORM_IDS)[number];
+import { PLATFORM_IDS, PLATFORMS, RECOMMENDED_ORDER, isPlatformId, isPublishable, isSyndication, type PlatformCapabilities, type PlatformId, type PlatformInfo } from './catalog';
+import type { DraftExtras } from './site-export';
 
-export function isPlatformId(value: unknown): value is PlatformId {
-  return typeof value === 'string' && (PLATFORM_IDS as readonly string[]).includes(value);
-}
+export { PLATFORM_IDS, PLATFORMS, RECOMMENDED_ORDER, isPlatformId, isPublishable, isSyndication };
+export type { DraftExtras, PlatformCapabilities, PlatformId, PlatformInfo };
 
 /**
  * draft: built from an article, nothing sent. staged: a private copy exists on the platform.
@@ -46,6 +45,37 @@ export const DRAFT_STATUS_HINTS: Record<DraftStatus, string> = {
   source_changed: 'The article was edited after this draft was built, so any approval is void. Rebuild the draft.',
 };
 
+/** How a published draft went out: by the app's own request, or by the owner's hand (recorded, never claimed). */
+export const PUBLISHED_VIA = ['app', 'manual'] as const;
+export type PublishedVia = (typeof PUBLISHED_VIA)[number];
+
+/**
+ * What the pill says. The personal site never goes "live" through the app: it opens a pull request that the owner
+ * merges, so its words differ. A post recorded by hand says so.
+ */
+export function statusLabel(platform: PlatformId, status: DraftStatus, via: PublishedVia | null = null): string {
+  if (status === 'published' && via === 'manual') return 'Posted by hand';
+  if (platform === 'site') {
+    if (status === 'staged') return 'Target checked';
+    if (status === 'pending_approval') return 'Waiting for your approval';
+    if (status === 'publishing') return 'Opening pull request';
+    if (status === 'published') return 'Pull request opened';
+    if (status === 'unknown') return 'Pull request unknown';
+  }
+  return DRAFT_STATUS_LABELS[status];
+}
+
+export function statusHint(platform: PlatformId, status: DraftStatus, via: PublishedVia | null = null): string {
+  if (status === 'published' && via === 'manual') return 'You posted this by hand and recorded the link. The app did not publish it.';
+  if (platform === 'site') {
+    if (status === 'staged') return 'The repository was read and the target file checked. Nothing was written.';
+    if (status === 'publishing') return 'The branch, the commit and the pull request are being created. Do not close this page until it finishes.';
+    if (status === 'published') return 'Pull request opened; merge it in GitHub to go live.';
+    if (status === 'unknown') return 'The pull request may or may not exist. Check on GitHub before anything else. It will not be retried.';
+  }
+  return DRAFT_STATUS_HINTS[status];
+}
+
 /** Statuses from which a draft can still reach a platform if the owner approves. */
 export const LIVE_STATUSES: readonly DraftStatus[] = ['draft', 'staged', 'pending_approval', 'approved', 'failed'];
 /** In flight or already out: nothing may send this payload again. */
@@ -55,6 +85,10 @@ export const STAGEABLE_STATUSES: readonly DraftStatus[] = ['draft', 'staged', 'f
 
 export const APPROVAL_STATUSES = ['pending', 'used', 'denied', 'expired', 'invalidated'] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+
+/** What an approval is for: sending the exact payload to the platform, or recording that the owner posted it by hand. */
+export const APPROVAL_KINDS = ['publish', 'manual'] as const;
+export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
 
 export const APPROVAL_TTL_MS = 30 * 60_000;
 /** A publish request that has been "publishing" this long without an answer is shown as unknown, never as failed. */
@@ -79,92 +113,6 @@ export const CONNECTION_STATUS_LABELS: Record<ConnectionStatus, string> = {
 export const ERROR_KINDS = ['auth', 'forbidden_plan', 'validation', 'rate_limit', 'not_found', 'server', 'timeout', 'network', 'redirect', 'protocol', 'config'] as const;
 export type ErrorKind = (typeof ERROR_KINDS)[number];
 
-export interface PlatformCapabilities {
-  formats: string[];
-  drafts: boolean;
-  /** Scheduling is not built on Day 5 whatever the platform allows. */
-  scheduling: false;
-  /** What the app can do with images. */
-  media: string;
-  statusRetrieval: boolean;
-  canonicalUrl: boolean;
-  series: boolean;
-  tagsMax: number;
-  restrictions: string[];
-  cost: string;
-}
-
-export interface PlatformInfo {
-  id: PlatformId;
-  name: string;
-  authKind: 'api_key' | 'personal_access_token';
-  /** Label of the secret field, and where the person creates it. */
-  secretLabel: string;
-  secretHelp: string;
-  capabilities: PlatformCapabilities;
-  /** Whether it has been exercised against the real service. Day 5: neither has. */
-  verification: { level: 'docs_and_fake' | 'docs_only'; label: string; detail: string };
-}
-
-export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
-  devto: {
-    id: 'devto',
-    name: 'DEV.to',
-    authKind: 'api_key',
-    secretLabel: 'DEV Community API key',
-    secretHelp: 'Create one at dev.to under Settings, Extensions, “DEV Community API Keys”.',
-    capabilities: {
-      formats: ['Markdown (with Liquid tags)'],
-      drafts: true,
-      scheduling: false,
-      media: 'Images must be public https links. There is no upload through the API, so local images are not sent.',
-      statusRetrieval: true,
-      canonicalUrl: true,
-      series: true,
-      tagsMax: 4,
-      restrictions: [
-        'At most 4 tags, lower-case letters and digits only.',
-        'Your key can only change your own articles.',
-        'DEV asks for disclosure of AI-assisted writing in its guidelines. Check them before you publish.',
-      ],
-      cost: 'Free',
-    },
-    verification: {
-      level: 'docs_and_fake',
-      label: 'Live check pending',
-      detail: 'Built from the official Forem API reference and tested against a fake server. It has not been run against a real account yet.',
-    },
-  },
-  hashnode: {
-    id: 'hashnode',
-    name: 'Hashnode',
-    authKind: 'personal_access_token',
-    secretLabel: 'Hashnode personal access token',
-    secretHelp: 'Create one at Hashnode under Account settings, Developer.',
-    capabilities: {
-      formats: ['Markdown'],
-      drafts: true,
-      scheduling: false,
-      media: 'Cover and images must be public https links. Image upload exists in the API but is not used yet.',
-      statusRetrieval: true,
-      canonicalUrl: true,
-      series: false,
-      tagsMax: 15,
-      restrictions: [
-        'The API needs a Pro plan on the publication you publish to. Without it every write is refused.',
-        'Request bodies are limited to 100 KB, which caps article length.',
-        'Contributors on a team publication cannot publish directly.',
-      ],
-      cost: 'Pro plan: $5 per month or $50 per year per publication (as listed by Hashnode).',
-    },
-    verification: {
-      level: 'docs_only',
-      label: 'Live-unverified',
-      detail: 'Built from the official schema and agent skill and tested against fake responses only. It has never run against a real account; expect to adjust it on first use.',
-    },
-  },
-};
-
 export const PUBLISHING_LIMITS = {
   title: 200,
   description: 500,
@@ -181,14 +129,42 @@ export const PUBLISHING_LIMITS = {
   devtoTitleWarn: 128,
 } as const;
 
+/** The box that must be ticked when a copy is about to go out and the page it points to is not confirmed live. */
+export const CANONICAL_NOT_LIVE_BOX = 'I know the canonical page is not live yet';
+
+export interface ChecklistOptions {
+  /** `pull_request` is the personal site: nothing is public until the owner merges. `manual` records a post made by hand. */
+  kind?: 'publish' | 'pull_request' | 'manual';
+  /** The canonical page was checked and is not (confirmed) live. Adds one required box. */
+  canonicalNotLive?: boolean;
+}
+
 /** The first checklist box is fixed; the rest are about what the payload will do. All must be ticked. */
-export function approvalChecklist(platformName: string, hasCanonical: boolean): string[] {
-  return [
-    'I have read this exact payload',
-    `This will be public on ${platformName} as soon as I confirm`,
-    hasCanonical ? 'The canonical URL points to my own site' : 'I accept that no canonical URL is set',
-    'Publishing is not undone by this app. Removing a post is done on the platform',
-  ];
+export function approvalChecklist(platformName: string, hasCanonical: boolean, options: ChecklistOptions = {}): string[] {
+  const kind = options.kind ?? 'publish';
+  const boxes =
+    kind === 'manual'
+      ? [
+          'I have read this exact payload',
+          `I posted exactly this on ${platformName} myself, outside this app`,
+          'The link I entered is the live post',
+          'This app did not publish it and will not claim it did',
+        ]
+      : kind === 'pull_request'
+        ? [
+            'I have read this exact payload',
+            `This opens a pull request on ${platformName}. Nothing goes live until I merge it`,
+            hasCanonical ? 'The canonical URL points to my own site' : 'I accept that no canonical URL is set',
+            'This app will not merge it and cannot undo it. Closing the pull request is done in GitHub',
+          ]
+        : [
+            'I have read this exact payload',
+            `This will be public on ${platformName} as soon as I confirm`,
+            hasCanonical ? 'The canonical URL points to my own site' : 'I accept that no canonical URL is set',
+            'Publishing is not undone by this app. Removing a post is done on the platform',
+          ];
+  if (options.canonicalNotLive && kind === 'publish') boxes.push(CANONICAL_NOT_LIVE_BOX);
+  return boxes;
 }
 
 export interface LintIssue {
@@ -266,6 +242,38 @@ export interface ApprovalDTO {
   createdAt: string;
   invalidReason: string | null;
   requestedBy: 'owner' | 'agent';
+  kind: ApprovalKind;
+  /** The boxes the owner must tick, worked out by the server from the draft and the canonical check. */
+  checklist: string[];
+}
+
+/** Fields of a payload an owner can edit, and so the fields divergence is reported in. */
+export const PAYLOAD_FIELDS = ['title', 'description', 'tags', 'canonicalUrl', 'coverImageUrl', 'series', 'bodyMarkdown'] as const;
+export type PayloadField = (typeof PAYLOAD_FIELDS)[number];
+
+export const PAYLOAD_FIELD_LABELS: Record<PayloadField, string> = {
+  title: 'Title',
+  description: 'Description',
+  tags: 'Tags',
+  canonicalUrl: 'Canonical URL',
+  coverImageUrl: 'Cover image',
+  series: 'Series',
+  bodyMarkdown: 'Body',
+};
+
+/** Where a draft differs: from what was generated for it (the owner's edits) and from what a rebuild would give now. */
+export interface DraftDivergence {
+  edited: PayloadField[];
+  fromSource: PayloadField[];
+}
+
+/** What the last read-only look at the personal site's repository found. Not part of the approved payload. */
+export interface RemoteInfo {
+  baseSha?: string;
+  fileExists?: boolean;
+  fileSha?: string | null;
+  branch?: string;
+  path?: string;
 }
 
 export interface PlatformDraftDTO {
@@ -294,6 +302,29 @@ export interface PlatformDraftDTO {
   publishedAt: string | null;
   approval: ApprovalDTO | null;
   attempts: AttemptDTO[];
+  /** What the adapter produced from the article when the draft was built. "Reset to generated" returns here. */
+  generated: DraftPayload;
+  divergence: DraftDivergence;
+  /** Options that belong to the payload (the personal site's path and mapping). They are hashed with it. */
+  extras: DraftExtras;
+  remoteInfo: RemoteInfo | null;
+  publishedVia: PublishedVia | null;
+  editedAt: string | null;
+  editCount: number;
+  /** The last look at the canonical page, when the payload has a canonical URL. */
+  canonical: CanonicalCheckDTO | null;
+}
+
+export type CanonicalState = 'live' | 'not_live' | 'unreachable' | 'blocked';
+
+export interface CanonicalCheckDTO {
+  url: string;
+  state: CanonicalState;
+  httpStatus: number | null;
+  title: string | null;
+  finalUrl: string | null;
+  message: string;
+  checkedAt: string;
 }
 
 export interface DestinationDTO {
@@ -301,6 +332,24 @@ export interface DestinationDTO {
   info: PlatformInfo;
   connection: ConnectionDTO | null;
   draft: PlatformDraftDTO | null;
+  /** The owner added this destination to the article. Only added destinations are prepared and published. */
+  added: boolean;
+  position: number;
+  /** For the personal site: whether the settings needed to build a file are in place. */
+  siteReady: boolean | null;
+}
+
+/** Whether two payload fields hold the same thing (null, empty and missing series are the same). */
+function sameField(field: PayloadField, a: DraftPayload, b: DraftPayload): boolean {
+  if (field === 'tags') return a.tags.length === b.tags.length && a.tags.every((tag, i) => tag === b.tags[i]);
+  const x = a[field] ?? '';
+  const y = b[field] ?? '';
+  return x === y;
+}
+
+/** The fields where two payloads differ. */
+export function diffPayload(a: DraftPayload, b: DraftPayload): PayloadField[] {
+  return PAYLOAD_FIELDS.filter((field) => !sameField(field, a, b));
 }
 
 /** Approval tag for display: the first 8 hex characters of the payload hash, upper-cased. */

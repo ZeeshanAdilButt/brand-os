@@ -19,6 +19,10 @@ export const OP_LIMITS = {
   headings: 40,
   heading: 200,
   operations: 5,
+  description: 500,
+  tags: 20,
+  tag: 40,
+  body: 100_000,
 } as const;
 
 /** Remove fenced blocks and inline code, so generics such as Map<String, Integer> in code are not mistaken for markup. */
@@ -78,11 +82,31 @@ export const outlineOp = z.object({
     .max(OP_LIMITS.headings),
 });
 
-export const operationSchema = z.discriminatedUnion('type', [replaceRangeOp, suggestTitlesOp, reviewNotesOp, insertAfterOp, outlineOp]);
+/**
+ * A proposal for one destination's draft: any of a new title, description and tags, and either a rewritten
+ * opening or a whole new body. It is shown as a diff against the draft and applied only when accepted.
+ */
+export const adaptProposalOp = z
+  .object({
+    type: z.literal('adapt_proposal'),
+    title: text(OP_LIMITS.title, 1).optional(),
+    description: text(OP_LIMITS.description).optional(),
+    tags: z.array(z.string().trim().min(1).max(OP_LIMITS.tag).refine(noHtml, NO_HTML)).max(OP_LIMITS.tags).optional(),
+    /** The opening of the destination's body as it is now, and what should replace it. */
+    intro: z.object({ original: z.string().min(1).max(OP_LIMITS.text), proposed: text(OP_LIMITS.text, 1) }).optional(),
+    body: text(OP_LIMITS.body, 1).optional(),
+    rationale: text(OP_LIMITS.rationale).default(''),
+  })
+  .refine((v) => v.title !== undefined || v.description !== undefined || v.tags !== undefined || v.intro !== undefined || v.body !== undefined, {
+    message: 'Propose at least one change: a title, description, tags, intro or body.',
+  })
+  .refine((v) => v.intro === undefined || v.body === undefined, { message: 'Return either an intro or a whole body, not both.' });
+
+export const operationSchema = z.discriminatedUnion('type', [replaceRangeOp, suggestTitlesOp, reviewNotesOp, insertAfterOp, outlineOp, adaptProposalOp]);
 export type Operation = z.infer<typeof operationSchema>;
 export type OperationType = Operation['type'];
 
-export const OPERATION_TYPES = ['replace_range', 'suggest_titles', 'review_notes', 'insert_after', 'outline'] as const satisfies readonly OperationType[];
+export const OPERATION_TYPES = ['replace_range', 'suggest_titles', 'review_notes', 'insert_after', 'outline', 'adapt_proposal'] as const satisfies readonly OperationType[];
 
 /** A result is a short list of operations. */
 export const resultSchema = z.object({
@@ -98,6 +122,8 @@ export const ALLOWED_OPERATIONS: Record<TaskKind, readonly OperationType[]> = {
   check_accuracy: ['review_notes'],
   outline: ['outline'],
   custom: ['replace_range', 'insert_after', 'review_notes', 'suggest_titles', 'outline'],
+  adapt_for_platform: ['adapt_proposal'],
+  review_notes: ['review_notes'],
 };
 
 export class ResultRejected extends Error {
@@ -135,6 +161,8 @@ export function operationHelp(kind: TaskKind): string {
     review_notes: '{"type":"review_notes","notes":[{"severity":"info|warning|error","quote":"<short quote from the text>","note":"<what to check or fix>"}]}',
     insert_after: '{"type":"insert_after","text":"<Markdown to insert right after the selected text>"}',
     outline: '{"type":"outline","headings":[{"level":2,"text":"<heading>"}]}',
+    adapt_proposal:
+      '{"type":"adapt_proposal","title":"<optional new title>","description":"<optional new description>","tags":["<optional tag>"],"intro":{"original":"<the destination body opening, copied exactly>","proposed":"<the rewritten opening>"},"rationale":"<one short sentence>"} (send "body":"<whole new body>" instead of "intro" to replace the whole body; every field except type is optional but at least one change is required)',
   };
   return ALLOWED_OPERATIONS[kind].map((type) => `- ${shapes[type]}`).join('\n');
 }

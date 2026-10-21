@@ -4,6 +4,7 @@ import { PROTOCOLS, PROVIDER_KINDS, TASK_KINDS, TASK_STATUSES, TRUST_LEVELS } fr
 import type { TaskResult } from '../../lib/ai-ops';
 import { ARTICLE_SOURCE_KINDS, ARTICLE_STATUSES, VERSION_REASONS } from '../../lib/articles';
 import {
+  APPROVAL_KINDS,
   APPROVAL_STATUSES,
   ATTEMPT_KINDS,
   ATTEMPT_STATUSES,
@@ -11,11 +12,15 @@ import {
   DRAFT_STATUSES,
   ERROR_KINDS,
   PLATFORM_IDS,
+  PUBLISHED_VIA,
   type ConnectionConfig,
+  type DraftExtras,
   type DraftPayload,
   type LintIssue,
+  type RemoteInfo,
   type TagReport,
 } from '../../lib/publishing';
+import { SITE_PRESETS, type SiteMapping } from '../../lib/site-export';
 import {
   CONFIDENCE_LEVELS,
   CONFIDENTIALITY_LEVELS,
@@ -478,6 +483,11 @@ export const aiTasks = pgTable(
     tokensEstimated: boolean('tokens_estimated').notNull().default(true),
     fromCache: boolean('from_cache').notNull().default(false),
     attempts: integer('attempts').notNull().default(0),
+    /** Set for a task made for one destination in the composer; the result is a proposal for that draft. */
+    draftId: uuid('draft_id').references((): AnyPgColumn => platformDrafts.id, { onDelete: 'set null' }),
+    /** The draft's payload hash when the task was made. A proposal for a draft that has changed since is stale. */
+    draftHash: text('draft_hash'),
+    platform: text('platform', { enum: PLATFORM_IDS }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
@@ -564,6 +574,15 @@ export const platformDrafts = pgTable(
     nextAction: text('next_action'),
     stagedAt: timestamp('staged_at', { withTimezone: true }),
     publishedAt: timestamp('published_at', { withTimezone: true }),
+    /** What the adapter produced from the article. Edits change `payload`; this stays, so "reset to generated" and the diff work. */
+    generatedPayload: jsonb('generated_payload').$type<DraftPayload>().notNull().default(sql`'{}'::jsonb`),
+    /** Options bound to the payload (the personal site's path and mapping). Hashed together with it. */
+    extras: jsonb('extras').$type<DraftExtras>().notNull().default({}),
+    /** What the last read-only look at the target found. Not hashed. */
+    remoteInfo: jsonb('remote_info').$type<RemoteInfo>(),
+    publishedVia: text('published_via', { enum: PUBLISHED_VIA }),
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+    editCount: integer('edit_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -596,6 +615,8 @@ export const approvals = pgTable(
     tag: text('tag').notNull(),
     status: text('status', { enum: APPROVAL_STATUSES }).notNull().default('pending'),
     requestedBy: text('requested_by', { enum: ['owner', 'agent'] }).notNull().default('owner'),
+    /** `publish` sends the payload; `manual` records a post the owner made by hand. */
+    kind: text('kind', { enum: APPROVAL_KINDS }).notNull().default('publish'),
     /** The checklist boxes ticked on the card, verbatim. Empty until the approval is used. */
     checked: text('checked').array().notNull().default(sql`'{}'::text[]`),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -637,3 +658,79 @@ export const publishAttempts = pgTable(
 );
 
 export type PublishAttempt = typeof publishAttempts.$inferSelect;
+
+/*
+ * The composer (Day 6).
+ */
+
+/** A destination the owner added to an article. A draft may or may not exist yet ("not prepared"). */
+export const articleDestinations = pgTable(
+  'article_destinations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    platform: text('platform', { enum: PLATFORM_IDS }).notNull(),
+    /** The order the owner chose; the review queue follows it. */
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('article_destinations_article_platform_idx').on(table.ownerId, table.articleId, table.platform)],
+);
+
+export type ArticleDestination = typeof articleDestinations.$inferSelect;
+
+/**
+ * The personal site: where it lives, which repository a pull request goes to and how a file is laid out. One row
+ * per owner. The GitHub token is not here: it is a `platform_connections` row, encrypted like every other key.
+ */
+export const siteSettings = pgTable(
+  'site_settings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The site's public address. The canonical page must be on this host. */
+    siteUrl: text('site_url'),
+    /** "owner/name" of the one repository a pull request is opened on. */
+    repo: text('repo'),
+    baseBranch: text('base_branch').notNull().default('main'),
+    pathTemplate: text('path_template').notNull().default('content/posts/{slug}.md'),
+    preset: text('preset', { enum: SITE_PRESETS }).notNull().default('generic'),
+    mapping: jsonb('mapping').$type<SiteMapping>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('site_settings_owner_idx').on(table.ownerId)],
+);
+
+export type SiteSettings = typeof siteSettings.$inferSelect;
+
+/** The result of looking at an article's canonical page, kept so the approval checklist can depend on it. */
+export const canonicalChecks = pgTable(
+  'canonical_checks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    state: text('state', { enum: ['live', 'not_live', 'unreachable', 'blocked'] }).notNull(),
+    httpStatus: integer('http_status'),
+    title: text('title'),
+    finalUrl: text('final_url'),
+    message: text('message').notNull(),
+    checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('canonical_checks_article_url_idx').on(table.ownerId, table.articleId, table.url)],
+);
+
+export type CanonicalCheck = typeof canonicalChecks.$inferSelect;

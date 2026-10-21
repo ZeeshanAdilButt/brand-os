@@ -7,6 +7,7 @@ import { scopedCredentials } from './agent-credentials';
 import { scopedProviders } from './ai-providers';
 import { scopedTasks } from './ai-tasks';
 import { scopedItems, scopedSources } from './knowledge';
+import { scopedCanonicalChecks, scopedDestinations, scopedSiteSettings } from './composer';
 import { scopedConnections, scopedPlatformDrafts } from './publishing';
 import { scopedPreferences, scopedProfile } from './profile';
 import { makeScope, type DbSource, type Scope } from './scope';
@@ -42,6 +43,9 @@ export function forOwner(ownerId: string, db?: AppDb) {
     tasks: scopedTasks(scope),
     connections: scopedConnections(scope),
     platformDrafts: scopedPlatformDrafts(scope),
+    destinations: scopedDestinations(scope),
+    siteSettings: scopedSiteSettings(scope),
+    canonicalChecks: scopedCanonicalChecks(scope),
     audit: {
       async record(input: AuditInput) {
         return scopedAudit(await scope.db(), scope.ownerId).record(input);
