@@ -25,7 +25,10 @@ export default async function ReadArticlePage({ params }: { params: Promise<{ id
     if (err instanceof ActionError && err.code === 'not_found') notFound();
     throw err;
   }
-  const rendered = await renderMarkdown(article.bodyMarkdown);
+  // The title is already the page heading: a body that opens with the same heading would show it twice.
+  const lead = /^\s*#\s+(.+?)\s*#*\s*\r?\n/.exec(article.bodyMarkdown);
+  const body = lead && lead[1]?.trim() === article.title.trim() ? article.bodyMarkdown.slice(lead[0].length) : article.bodyMarkdown;
+  const rendered = await renderMarkdown(body);
   const words = countWords(article.bodyMarkdown);
   const minutes = readingMinutes(words);
   const toc = rendered.headings.filter((h) => h.depth === 2 || h.depth === 3);

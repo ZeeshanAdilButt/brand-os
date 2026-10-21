@@ -344,7 +344,7 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
               Preview
             </button>
           </div>
-          <div className="min-w-0 flex-1 basis-40">
+          <div className="order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-40">
             <SaveIndicator status={state} onRetry={() => void controller.retryNow()} />
           </div>
           <Button type="button" size="sm" variant="outline" onClick={saveNow} title="Save now (Ctrl+S)">

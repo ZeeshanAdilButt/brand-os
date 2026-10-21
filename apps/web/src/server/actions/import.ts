@@ -185,7 +185,7 @@ export async function setContentFolder(owner: OwnerContext, mode: 'local' | 'hos
       return folderError(err);
     }
     await owner.data.studioSettings.setContentFolder(resolved);
-    await owner.data.audit.record({ actor: owner.actor, action: 'studio.content_folder_set', entityType: 'studio_settings' });
+    await owner.data.audit.record({ actor: owner.actor, action: 'studio.content_folder_set', entityType: 'content_folder' });
   }
   return getFolderStatus(owner, mode);
 }

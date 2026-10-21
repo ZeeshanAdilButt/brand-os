@@ -152,7 +152,12 @@ function rehypeSanitizeAndReport() {
         // A removed element with a "strip" tag takes its content with it; others leave their children.
         if (strip.has(entry.tag)) gone.add(entry.id);
         const known = SCHEMA.tagNames?.includes(entry.tag);
-        add(`element:${entry.tag}`, known ? `<${entry.tag}> in a place HTML does not allow` : `<${entry.tag}> element (not a supported tag)`);
+        const label = strip.has(entry.tag)
+          ? `<${entry.tag}> element (it can run code or load other pages)`
+          : known
+            ? `<${entry.tag}> in a place HTML does not allow`
+            : `<${entry.tag}> element (not a supported tag)`;
+        add(`element:${entry.tag}`, label);
         continue;
       }
       for (const [prop, value] of Object.entries(entry.props)) {
