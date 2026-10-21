@@ -162,6 +162,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.1
+        version: 1.32.1(zod@4.6.7)
       '@tailwindcss/postcss':
         specifier: 4.3.3
         version: 4.3.3
@@ -204,6 +207,15 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+
+  packages/brand-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.1
+        version: 1.32.1(zod@4.6.7)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/cli:
     dependencies:

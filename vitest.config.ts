@@ -15,7 +15,7 @@ export default defineConfig({
     passWithNoTests: true,
     projects: [
       project('root', '.', ['test/**/*.test.ts']),
-      ...['core', 'daemon', 'client', 'mcp', 'cli'].map((pkg) =>
+      ...['core', 'daemon', 'client', 'mcp', 'brand-mcp', 'cli'].map((pkg) =>
         project(pkg, `packages/${pkg}`, ['test/**/*.test.ts', 'src/**/*.test.ts']),
       ),
       // The Next.js app (apps/web). Component tests opt into jsdom with a per-file docblock.

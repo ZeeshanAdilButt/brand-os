@@ -5,6 +5,7 @@
     { "path": "packages/daemon" },
     { "path": "packages/client" },
     { "path": "packages/mcp" },
+    { "path": "packages/brand-mcp" },
     { "path": "packages/cli" },
     { "path": "test" }
   ]

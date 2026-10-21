@@ -21,10 +21,11 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 // Files this suite checks: the web app plus the repo-level docs and config this task owns.
-const rootDocs = ['ARCHITECTURE.md', 'DECISIONS.md', 'INTEGRATIONS.md', 'CLAUDE.md', 'TODO.md', '.env.example', 'package.json']
+const rootDocs = ['ARCHITECTURE.md', 'DECISIONS.md', 'INTEGRATIONS.md', 'CLAUDE.md', 'TODO.md', 'README.md', '.env.example', 'package.json']
   .map((f) => path.join(repoRoot, f))
   .filter((f) => fs.existsSync(f));
-const files = [...walk(webRoot), ...rootDocs].filter((f) => path.basename(f) !== 'hygiene.test.ts');
+const brandMcp = path.join(repoRoot, 'packages', 'brand-mcp');
+const files = [...walk(webRoot), ...(fs.existsSync(brandMcp) ? walk(brandMcp) : []), ...rootDocs].filter((f) => path.basename(f) !== 'hygiene.test.ts');
 
 const EM_DASH = String.fromCharCode(0x2014);
 // Provider-shaped secrets, assembled from parts so this file never contains a literal match.
