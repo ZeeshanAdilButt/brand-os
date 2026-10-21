@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`devto markdown > matches the snapshot 1`] = `
+"Prometheus is cheap right up to the point where it is not, and the line between the two is almost never the number of samples.
+
+## Part 1: What Prometheus stores
+
+> **Big Word Alert: time series** A time series is one metric name plus one exact set of label values, and the sequence of timestamped numbers collected for it.
+
+![The head block and the blocks on disk](https://www.example-blog.dev/images/blogs/head-block.svg)
+
+## Part 2: Where cardinality costs you
+
+| Label                            | Why it explodes                     | Where it belongs instead            |
+| -------------------------------- | ----------------------------------- | ----------------------------------- |
+| Pod name on an autoscaling fleet | Unique forever, replaced constantly | Logs, with the Pod name in the line |
+| Request or trace ID              | Unique per request                  | Traces or logs                      |
+
+\`\`\`promql
+count by (__name__) ({__name__=~".+"})
+\`\`\`
+
+> **Note:** Aside: this is Prometheus specifically
+>
+> Other time series stores make different trade-offs, but series count is the cost driver everywhere.
+
+> **Interactive diagram: x.** Open it on the original post: https://www.example-blog.dev/blog/prometheus-cardinality-explained#x
+
+---
+
+*Originally published at [example-blog.dev](https://www.example-blog.dev/blog/prometheus-cardinality-explained).*
+"
+`;

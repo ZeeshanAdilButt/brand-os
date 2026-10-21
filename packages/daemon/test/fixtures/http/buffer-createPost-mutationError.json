@@ -1,0 +1,8 @@
+{
+  "data": {
+    "createPost": {
+      "__typename": "MutationError",
+      "message": "The channel is disconnected, so the post could not be created."
+    }
+  }
+}

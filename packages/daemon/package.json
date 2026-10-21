@@ -1,0 +1,67 @@
+{
+  "name": "@cph/daemon",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./api": {
+      "types": "./dist/http/api.d.ts",
+      "default": "./dist/http/api.js"
+    },
+    "./keystore": {
+      "types": "./dist/secrets/keystore.d.ts",
+      "default": "./dist/secrets/keystore.js"
+    },
+    "./redact": {
+      "types": "./dist/secrets/redact.d.ts",
+      "default": "./dist/secrets/redact.js"
+    },
+    "./secret-store": {
+      "types": "./dist/secrets/secret-store.d.ts",
+      "default": "./dist/secrets/secret-store.js"
+    },
+    "./paths": {
+      "types": "./dist/paths.d.ts",
+      "default": "./dist/paths.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./site-reader": {
+      "types": "./dist/site/site-reader.d.ts",
+      "default": "./dist/site/site-reader.js"
+    },
+    "./guarded-fs": {
+      "types": "./dist/site/guarded-fs.d.ts",
+      "default": "./dist/site/guarded-fs.js"
+    },
+    "./main": {
+      "types": "./dist/main.d.ts",
+      "default": "./dist/main.js"
+    }
+  },
+  "scripts": {
+    "postbuild": "node scripts/copy-assets.mjs"
+  },
+  "dependencies": {
+    "@cph/core": "workspace:*",
+    "@hono/node-server": "2.1.5",
+    "@napi-rs/keyring": "2.1.2",
+    "better-sqlite3": "13.0.3",
+    "clipboardy": "5.3.2",
+    "hono": "4.13.13",
+    "node-notifier": "11.0.0",
+    "open": "11.0.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0"
+  }
+}

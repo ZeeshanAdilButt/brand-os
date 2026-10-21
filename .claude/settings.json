@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "ask": [
+      "mcp__content-powerhouse__publish",
+      "mcp__content-powerhouse__schedule",
+      "mcp__content-powerhouse__stage_remote_draft"
+    ]
+  }
+}

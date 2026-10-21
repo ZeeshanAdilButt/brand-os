@@ -1,0 +1,42 @@
+﻿---
+title: "How High Cardinality Hurts Prometheus"
+date: "2026-07-19"
+category: "engineering"
+tags: ["prometheus", "observability", "tsdb", "cardinality", "kubernetes", "sre"]
+description: "Why Prometheus cost follows series count, starting with the head block, WAL, chunks and index rather than the usual advice about labels."
+published: true
+coverImage: "/images/blogs-covers/prometheus-cardinality.svg"
+---
+
+import Callout from '@/components/Callout';
+
+Prometheus is cheap right up to the point where it is not, and the line between the two is almost never the number of samples.
+
+## Part 1: What Prometheus stores
+
+<Callout type="alert" title="Big Word Alert: time series">
+
+A time series is one metric name plus one exact set of label values, and the sequence of timestamped numbers collected for it.
+
+</Callout>
+
+![The head block and the blocks on disk](/images/blogs/head-block.svg)
+
+## Part 2: Where cardinality costs you
+
+| Label | Why it explodes | Where it belongs instead |
+|---|---|---|
+| Pod name on an autoscaling fleet | Unique forever, replaced constantly | Logs, with the Pod name in the line |
+| Request or trace ID | Unique per request | Traces or logs |
+
+```promql
+count by (__name__) ({__name__=~".+"})
+```
+
+<Callout type="note" title="Aside: this is Prometheus specifically">
+
+Other time series stores make different trade-offs, but series count is the cost driver everywhere.
+
+</Callout>
+
+<PacketJourney name="x" />

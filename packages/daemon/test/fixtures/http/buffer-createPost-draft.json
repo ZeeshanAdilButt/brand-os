@@ -1,0 +1,8 @@
+{
+  "data": {
+    "createPost": {
+      "__typename": "PostActionSuccess",
+      "post": { "id": "post-draft-0001", "status": "draft" }
+    }
+  }
+}

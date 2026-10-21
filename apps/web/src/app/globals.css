@@ -1,0 +1,200 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Design tokens. Palette from the personal site (cream, ink, rust, teal, sand), with a warm dark
+ * theme. Foreground/background pairs are checked for WCAG AA in test/design-tokens.test.ts.
+ * Fonts are local stacks only: no network fonts, nothing to download.
+ */
+:root {
+  color-scheme: light;
+
+  /* Brand palette */
+  --cream: #f7f3eb;
+  --cream-dark: #ebe5d9;
+  --ink: #1a1a18;
+  --rust: #c45d35;
+  --teal: #2d5a5a;
+  --sand: #d4c5a9;
+
+  /* Semantic roles (shadcn names) */
+  --background: #f7f3eb;
+  --foreground: #1a1a18;
+  --card: #fcfaf6;
+  --card-foreground: #1a1a18;
+  --popover: #fcfaf6;
+  --popover-foreground: #1a1a18;
+  --primary: #a94a24;
+  --primary-foreground: #fffaf3;
+  --secondary: #ebe5d9;
+  --secondary-foreground: #1a1a18;
+  --muted: #ebe5d9;
+  --muted-foreground: #5c5c54;
+  --accent: #efe9dd;
+  --accent-foreground: #1a1a18;
+  --destructive: #b3261e;
+  --border: #ddd2ba;
+  --input: #bfae8b;
+  --ring: #c45d35;
+
+  /* Text-safe accent colors (the brand rust and teal fail AA as small text on cream) */
+  --link: #a94a24;
+  --teal-text: #2d5a5a;
+  --success: #2d5a5a;
+  --warning: #96600a;
+
+  --sidebar: #f1ebdf;
+  --sidebar-foreground: #1a1a18;
+  --sidebar-border: #ddd2ba;
+
+  --radius: 0.625rem;
+  --shadow-soft: 0 1px 2px rgb(26 26 24 / 0.05), 0 4px 16px -6px rgb(26 26 24 / 0.08);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #141411;
+  --foreground: #ece6d8;
+  --card: #1b1a16;
+  --card-foreground: #ece6d8;
+  --popover: #1b1a16;
+  --popover-foreground: #ece6d8;
+  --primary: #e0794f;
+  --primary-foreground: #1a1a18;
+  --secondary: #26241f;
+  --secondary-foreground: #ece6d8;
+  --muted: #26241f;
+  --muted-foreground: #aaa597;
+  --accent: #2a2823;
+  --accent-foreground: #ece6d8;
+  --destructive: #f07167;
+  --border: #38352d;
+  --input: #5a5546;
+  --ring: #e0794f;
+
+  --link: #ef9a74;
+  --teal-text: #86bdb8;
+  --success: #86bdb8;
+  --warning: #e3b05a;
+
+  --sidebar: #181714;
+  --sidebar-foreground: #ece6d8;
+  --sidebar-border: #38352d;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px -6px rgb(0 0 0 / 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --color-cream: var(--cream);
+  --color-cream-dark: var(--cream-dark);
+  --color-ink: var(--ink);
+  --color-rust: var(--rust);
+  --color-teal: var(--teal);
+  --color-sand: var(--sand);
+  --color-link: var(--link);
+  --color-teal-text: var(--teal-text);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --shadow-soft: var(--shadow-soft);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-serif text-foreground;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--rust) 28%, transparent);
+  }
+
+  /* One focus treatment everywhere: visible, high contrast, never removed. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  button,
+  [role="button"],
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .label-caps {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

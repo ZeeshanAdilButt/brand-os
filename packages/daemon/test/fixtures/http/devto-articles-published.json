@@ -1,0 +1,15 @@
+[
+  {
+    "type_of": "article",
+    "id": 3001,
+    "title": "An article that is already live",
+    "published": true,
+    "slug": "an-article-that-is-already-live-9z8y",
+    "path": "/owner_test/an-article-that-is-already-live-9z8y",
+    "url": "https://dev.to/owner_test/an-article-that-is-already-live-9z8y",
+    "canonical_url": "https://www.example-blog.dev/blog/live",
+    "published_at": "2026-09-01T09:00:00Z",
+    "tag_list": ["typescript"],
+    "user": { "name": "Test Author", "username": "owner_test", "user_id": 1234 }
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "data": {
+    "deletePost": {
+      "__typename": "DeletePostSuccess",
+      "id": "post-queued-0001"
+    }
+  }
+}

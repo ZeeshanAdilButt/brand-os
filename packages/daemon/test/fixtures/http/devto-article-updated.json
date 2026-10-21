@@ -1,0 +1,18 @@
+{
+  "type_of": "article",
+  "id": 2001,
+  "title": "Fixture post title",
+  "description": "Fixture description",
+  "published": false,
+  "slug": "fixture-post-title-temp-slug-1234567",
+  "path": "/owner_test/fixture-post-title-temp-slug-1234567",
+  "url": "https://dev.to/owner_test/fixture-post-title-temp-slug-1234567?preview=fixture-preview",
+  "canonical_url": "https://www.example-blog.dev/blog/fixture",
+  "created_at": "2026-10-19T10:00:00Z",
+  "edited_at": "2026-10-19T10:05:00Z",
+  "published_at": null,
+  "tag_list": "typescript, testing",
+  "tags": ["typescript", "testing"],
+  "body_markdown": "Fixture body",
+  "user": { "name": "Test Author", "username": "owner_test", "user_id": 1234 }
+}

@@ -1,0 +1,13 @@
+{
+  "type_of": "user",
+  "id": 1234,
+  "username": "owner_test",
+  "name": "Test Author",
+  "twitter_username": null,
+  "github_username": "owner_test",
+  "summary": "Fixture user shaped like the Forem GET /api/users/me response.",
+  "location": null,
+  "website_url": null,
+  "joined_at": "Oct 19, 2026",
+  "profile_image": "https://example.test/profile.png"
+}

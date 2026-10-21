@@ -1,0 +1,3 @@
+* text=auto eol=lf
+packages/core/test/fixtures/crlf-bom-post.mdx -text
+packages/core/test/fixtures/*crlf* -text

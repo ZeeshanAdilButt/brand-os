@@ -1,0 +1,8 @@
+{
+  "data": {
+    "channels": [
+      { "id": "chan-linkedin-0001", "name": "The owner", "service": "linkedin", "isDisconnected": false },
+      { "id": "chan-x-0001", "name": "owner_test", "service": "twitter", "isDisconnected": false }
+    ]
+  }
+}

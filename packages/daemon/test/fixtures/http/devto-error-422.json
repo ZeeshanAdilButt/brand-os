@@ -1,0 +1,4 @@
+{
+  "error": "Validation failed: Canonical url has already been taken",
+  "status": 422
+}

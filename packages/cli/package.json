@@ -1,0 +1,24 @@
+{
+  "name": "@cph/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@cph/client": "workspace:*",
+    "@cph/core": "workspace:*",
+    "@cph/daemon": "workspace:*",
+    "commander": "15.0.0",
+    "open": "11.0.4"
+  },
+  "bin": {
+    "cph": "./dist/index.js"
+  }
+}

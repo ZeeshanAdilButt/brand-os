@@ -1,0 +1,7 @@
+{
+  "data": {
+    "account": {
+      "organizations": [{ "id": "org-test-0001", "name": "The owner" }]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "type_of": "article",
+    "id": 2001,
+    "title": "Fixture post title",
+    "published": false,
+    "slug": "fixture-post-title-temp-slug-1234567",
+    "path": "/owner_test/fixture-post-title-temp-slug-1234567",
+    "url": "https://dev.to/owner_test/fixture-post-title-temp-slug-1234567?preview=fixture-preview",
+    "canonical_url": "https://www.example-blog.dev/blog/fixture",
+    "tag_list": ["typescript", "testing"],
+    "user": { "name": "Test Author", "username": "owner_test", "user_id": 1234 }
+  },
+  {
+    "type_of": "article",
+    "id": 2002,
+    "title": "Another unpublished draft",
+    "published": false,
+    "slug": "another-unpublished-draft-temp-slug-7654321",
+    "path": "/owner_test/another-unpublished-draft-temp-slug-7654321",
+    "url": "https://dev.to/owner_test/another-unpublished-draft-temp-slug-7654321?preview=fixture-preview-2",
+    "canonical_url": "https://www.example-blog.dev/blog/another",
+    "tag_list": ["testing"],
+    "user": { "name": "Test Author", "username": "owner_test", "user_id": 1234 }
+  }
+]

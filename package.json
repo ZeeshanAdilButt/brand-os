@@ -1,0 +1,35 @@
+{
+  "name": "content-powerhouse",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b && pnpm --filter @cph/daemon run postbuild",
+    "test": "vitest run",
+    "typecheck": "tsc -b && pnpm --filter @cph/web run typecheck",
+    "web:dev": "pnpm --filter @cph/web run dev",
+    "web:build": "pnpm --filter @cph/web run build",
+    "web:start": "pnpm --filter @cph/web run start",
+    "web:lint": "pnpm --filter @cph/web run lint",
+    "db:migrate": "pnpm --filter @cph/web run db:migrate",
+    "db:generate": "pnpm --filter @cph/web run db:generate",
+    "setup:local": "node scripts/setup-local.mjs",
+    "seed:owner": "pnpm --filter @cph/web run seed:owner"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "undici": "8.12.3",
+    "vitest": "5.0.5"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  }
+}

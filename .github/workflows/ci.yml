@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      # Windows paths on the real machine contain spaces, so CI checks out into
+      # a path with a space too. `path` must be relative to the workspace.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: 'cp space/repo'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: 'cp space/repo/package.json'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'cp space/repo/.nvmrc'
+          cache: pnpm
+          cache-dependency-path: 'cp space/repo/pnpm-lock.yaml'
+
+      - name: Install
+        working-directory: 'cp space/repo'
+        run: pnpm i --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: 'cp space/repo'
+        run: pnpm typecheck
+
+      - name: Test
+        working-directory: 'cp space/repo'
+        run: pnpm test
