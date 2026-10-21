@@ -18,12 +18,17 @@ export function sessionToOwner(user: Pick<SessionUser, 'userId'>, ctx: Pick<AppC
   return { ownerId: user.userId, actor, data: forOwner(user.userId, ctx.db) };
 }
 
-/** A failure the caller can show: bad input, or something that does not exist for this owner. */
+/**
+ * A failure the caller can show: bad input, something that does not exist for this owner, a save
+ * made against an out-of-date copy ('conflict', `data` carries the current copy), or a file that is
+ * too large. Cases that need more than a message put it in `data`.
+ */
 export class ActionError extends Error {
   constructor(
-    readonly code: 'invalid' | 'not_found',
+    readonly code: 'invalid' | 'not_found' | 'conflict' | 'too_large',
     message: string,
     readonly fields: Record<string, string> = {},
+    readonly data?: unknown,
   ) {
     super(message);
     this.name = 'ActionError';

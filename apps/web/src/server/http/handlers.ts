@@ -16,20 +16,23 @@ import { getProfile, preferencesInputSchema, profileInputSchema, savePreferences
 import { parseInput } from '../actions/owner';
 import { resolveSessionUser } from '../auth/resolve';
 import { getAppContext, type AppContext } from '../context';
+import type { StorageAdapter } from '../storage';
 import { checkRequest } from './guard';
 
 /** Optional override of the server context; tests pass one. Production leaves it out. */
 export interface HandlerDeps {
   ctx?: AppContext;
+  /** Where uploaded files live. Tests pass a temp folder; production derives it from the config. */
+  storage?: StorageAdapter;
 }
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
-function json(body: unknown, status = 200, extra: Record<string, string> = {}): NextResponse {
+export function json(body: unknown, status = 200, extra: Record<string, string> = {}): NextResponse {
   return NextResponse.json(body, { status, headers: { ...NO_STORE, ...extra } });
 }
 
-async function readJson(request: Request): Promise<unknown> {
+export async function readJson(request: Request): Promise<unknown> {
   try {
     return await request.json();
   } catch {
@@ -42,7 +45,7 @@ async function readJson(request: Request): Promise<unknown> {
  * session (the only source of the tenant id), run, and turn failures into safe JSON. The request
  * body, query string and path are inputs to the action and can never choose whose data is touched.
  */
-async function withOwner(
+export async function withOwner(
   request: Request,
   deps: HandlerDeps,
   run: (owner: OwnerContext, ctx: AppContext) => Promise<Response>,
@@ -56,7 +59,8 @@ async function withOwner(
     return await run(sessionToOwner(user, ctx), ctx);
   } catch (err) {
     if (err instanceof ActionError) {
-      return json({ error: err.message, fields: err.fields }, err.code === 'not_found' ? 404 : 400);
+      const status = { not_found: 404, conflict: 409, too_large: 413, invalid: 400 }[err.code];
+      return json({ error: err.message, code: err.code, fields: err.fields, ...(err.data === undefined ? {} : { data: err.data }) }, status);
     }
     console.error('api handler failed', err instanceof Error ? err.name : 'unknown error');
     return json({ error: 'Something went wrong.' }, 500);
