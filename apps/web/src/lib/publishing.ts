@@ -221,6 +221,14 @@ export interface DraftPayload {
   bodyMarkdown: string;
 }
 
+/** Non-secret settings found by a connection check. */
+export interface ConnectionConfig {
+  publicationId?: string;
+  publicationTitle?: string;
+  /** Everything the Hashnode token can publish to, so the person can choose. */
+  publications?: { id: string; title: string }[];
+}
+
 export interface ConnectionDTO {
   id: string;
   platform: PlatformId;
@@ -229,7 +237,7 @@ export interface ConnectionDTO {
   who: string | null;
   keyLast4: string;
   /** Platform-specific, non-secret settings (the Hashnode publication). */
-  config: { publicationId?: string; publicationTitle?: string };
+  config: ConnectionConfig;
   lastCheckedAt: string | null;
   lastCheckMessage: string | null;
   createdAt: string;

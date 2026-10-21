@@ -70,7 +70,7 @@ export interface PlatformAdapter {
   /** Platform-specific problems in an adapted payload. Pure. */
   validate(payload: DraftPayload): LintIssue[];
   /** The JSON that will be sent, so the approval card shows it exactly. `published` is what the call will set. Pure. */
-  preview(payload: DraftPayload, published: boolean, config: PlatformConnection['config']): unknown;
+  preview(payload: DraftPayload, published: boolean, config: PlatformConnection['config'], remoteId?: string | null): unknown;
   /** Read-only probe: who is this key, and can it reach what we need? */
   health(ctx: AdapterContext): Promise<HealthResult>;
   /**

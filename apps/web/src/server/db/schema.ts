@@ -11,6 +11,7 @@ import {
   DRAFT_STATUSES,
   ERROR_KINDS,
   PLATFORM_IDS,
+  type ConnectionConfig,
   type DraftPayload,
   type LintIssue,
   type TagReport,
@@ -516,7 +517,7 @@ export const platformConnections = pgTable(
     /** Who the platform says the key belongs to, from the last read-only probe. */
     who: text('who'),
     /** Non-secret settings found by the probe (the Hashnode publication). */
-    config: jsonb('config').$type<{ publicationId?: string; publicationTitle?: string }>().notNull().default({}),
+    config: jsonb('config').$type<ConnectionConfig>().notNull().default({}),
     lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
     lastCheckMessage: text('last_check_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
