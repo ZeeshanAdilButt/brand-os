@@ -102,8 +102,8 @@ The data layer, schema and business logic are identical. Only the database drive
 Requirements: Node 22 or newer and pnpm 10.
 
 ```bash
-git clone https://github.com/ZeeshanAdilButt/content-powerhouse
-cd content-powerhouse
+git clone https://github.com/ZeeshanAdilButt/brand-os
+cd brand-os
 cp .env.example .env
 pnpm install
 pnpm setup:local      # installs, runs migrations, prints how to start

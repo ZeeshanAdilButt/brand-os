@@ -53,7 +53,7 @@
 - State dir: `%LOCALAPPDATA%\content-powerhouse\`, holding `cph.db`, `config.json`, `logs\`, `video\`. Port: 4646. OAuth loopback port (phase 1 and later): 53682.
 - `core` has no I/O: no `fs`, `fetch`, `child_process` or `Date.now()`. The current time is passed in as `now: Date`.
 - Full-text copies (dev.to, Hashnode, Medium) use `authorship: 'reformatted'` and Claude never rewrites them. Lint rejects any number in an adaptation that does not appear in the source.
-- Commits are authored by the owner only, with no Claude attribution anywhere (no `Co-Authored-By` trailer, no "Generated with" line, in commits, PRs or anything GitHub-visible). Commit in small logical steps. Work happens on a branch (`feat/phase-0`, and so on), never on `main`. The repo is public at github.com/ZeeshanAdilButt/content-powerhouse; `main` holds the docs.
+- Commits are authored by the owner only, with no Claude attribution anywhere (no `Co-Authored-By` trailer, no "Generated with" line, in commits, PRs or anything GitHub-visible). Commit in small logical steps. Work happens on a branch (`feat/phase-0`, and so on), never on `main`. The repo is public at github.com/ZeeshanAdilButt/brand-os; `main` holds the docs.
 
 ## Review Focus
 
