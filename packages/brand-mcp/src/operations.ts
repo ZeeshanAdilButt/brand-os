@@ -17,6 +17,10 @@ export const OP_LIMITS = {
   headings: 40,
   heading: 200,
   operations: 5,
+  description: 500,
+  tags: 20,
+  tag: 40,
+  body: 100_000,
 } as const;
 
 function withoutCode(text: string): string {
@@ -66,7 +70,22 @@ export const outlineOp = z.object({
   headings: z.array(z.object({ level: z.number().int().min(1).max(4), text: text(OP_LIMITS.heading, 1) })).min(1).max(OP_LIMITS.headings),
 });
 
-export const operationSchema = z.discriminatedUnion('type', [replaceRangeOp, suggestTitlesOp, reviewNotesOp, insertAfterOp, outlineOp]);
+export const adaptProposalOp = z
+  .object({
+    type: z.literal('adapt_proposal'),
+    title: text(OP_LIMITS.title, 1).optional(),
+    description: text(OP_LIMITS.description).optional(),
+    tags: z.array(z.string().trim().min(1).max(OP_LIMITS.tag).refine((v) => !containsHtml(v), NO_HTML)).max(OP_LIMITS.tags).optional(),
+    intro: z.object({ original: z.string().min(1).max(OP_LIMITS.text), proposed: text(OP_LIMITS.text, 1) }).optional().describe('The destination body’s current opening, copied exactly, and what should replace it.'),
+    body: text(OP_LIMITS.body, 1).optional().describe('A whole new body for this destination. Send either intro or body, not both.'),
+    rationale: text(OP_LIMITS.rationale).default(''),
+  })
+  .refine((v) => v.title !== undefined || v.description !== undefined || v.tags !== undefined || v.intro !== undefined || v.body !== undefined, {
+    message: 'Propose at least one change: a title, description, tags, intro or body.',
+  })
+  .refine((v) => v.intro === undefined || v.body === undefined, { message: 'Return either an intro or a whole body, not both.' });
+
+export const operationSchema = z.discriminatedUnion('type', [replaceRangeOp, suggestTitlesOp, reviewNotesOp, insertAfterOp, outlineOp, adaptProposalOp]);
 export type Operation = z.infer<typeof operationSchema>;
 
 export const operationsSchema = z.array(operationSchema).min(1, 'Return at least one operation.').max(OP_LIMITS.operations);

@@ -1,4 +1,5 @@
-import { DRAFT_STATUS_HINTS, type PlatformDraftDTO } from '../../lib/publishing';
+import { PLATFORMS, isPublishable } from '../../lib/catalog';
+import { DRAFT_STATUS_HINTS, statusHint, type DestinationDTO, type PlatformDraftDTO } from '../../lib/publishing';
 import type { ArticleListRow } from '../data/articles';
 import type { Article, BrandPreferences, KnowledgeItem, Profile } from '../db/schema';
 
@@ -87,10 +88,17 @@ export function platformDraftView(d: PlatformDraftDTO) {
     articleId: d.articleId,
     platform: d.platform,
     status: d.status,
-    statusMeaning: DRAFT_STATUS_HINTS[d.status],
+    statusMeaning: statusHint(d.platform, d.status, d.publishedVia) ?? DRAFT_STATUS_HINTS[d.status],
+    kind: PLATFORMS[d.platform].kind,
+    canPublish: isPublishable(d.platform),
     stale: d.stale,
     account: d.account,
     payload: d.payload,
+    options: d.extras.options ?? {},
+    /** Fields the owner or an agent changed after the text was generated, and fields that differ from a fresh adaptation of the article. */
+    edited: d.divergence.edited,
+    differsFromArticle: d.divergence.fromSource,
+    postedBy: d.publishedVia,
     payloadSha256: d.payloadSha256,
     requestPreview: d.requestPreview,
     tagReport: d.tagReport,
@@ -102,6 +110,21 @@ export function platformDraftView(d: PlatformDraftDTO) {
     approval: d.approval ? { status: d.approval.status, tag: d.approval.tag, expiresAt: d.approval.expiresAt, requestedBy: d.approval.requestedBy } : null,
     attempts: d.attempts.map((a) => ({ kind: a.kind, status: a.status, message: a.message, at: a.startedAt })),
     updatedAt: d.updatedAt,
+  };
+}
+
+/** A destination as an agent lists it: what it is, whether the app can send to it and where its draft stands. No connection details. */
+export function destinationView(d: DestinationDTO) {
+  return {
+    platform: d.platform,
+    name: d.info.name,
+    kind: d.info.kind,
+    added: d.added,
+    canPublish: isPublishable(d.platform),
+    connected: d.connection?.status === 'connected',
+    note: d.info.reason,
+    limits: d.info.limits,
+    draft: d.draft ? platformDraftStatusView(d.draft) : null,
   };
 }
 

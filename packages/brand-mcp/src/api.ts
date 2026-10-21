@@ -36,6 +36,18 @@ export interface ArticleFields {
   bodyMarkdown?: string;
 }
 
+/** What an agent may change in a destination's draft. Every change is a new payload and voids an open approval. */
+export interface DraftFields {
+  title?: string;
+  description?: string;
+  tags?: string[];
+  canonicalUrl?: string | null;
+  coverImageUrl?: string | null;
+  series?: string | null;
+  bodyMarkdown?: string;
+  options?: { subreddit?: string; instance?: string };
+}
+
 /** The calls the tools make. A fake of this is all the tool tests need. */
 export interface BrandApi {
   me(): Promise<unknown>;
@@ -48,6 +60,9 @@ export interface BrandApi {
   getAiTask(id: string): Promise<unknown>;
   submitAiTaskResult(id: string, operations: unknown[]): Promise<unknown>;
   createPlatformDraft(input: { articleId: string; platform: string; coverImageUrl?: string | null; series?: string | null }): Promise<unknown>;
+  listDestinations(articleId: string): Promise<unknown>;
+  updatePlatformDraft(id: string, expectedHash: string, fields: DraftFields): Promise<unknown>;
+  getPublicationPreview(id: string): Promise<unknown>;
   listPlatformDrafts(query: { articleId?: string; status?: string; limit?: number }): Promise<unknown>;
   getPlatformDraft(id: string): Promise<unknown>;
   stageRemoteDraft(id: string): Promise<unknown>;
@@ -128,6 +143,9 @@ export function createBrandApi(options: BrandApiOptions): BrandApi {
     getAiTask: (id) => call('GET', `/api/agent/ai-tasks/${encodeURIComponent(id)}`),
     submitAiTaskResult: (id, operations) => call('POST', `/api/agent/ai-tasks/${encodeURIComponent(id)}/result`, { operations }),
     createPlatformDraft: (input) => call('POST', '/api/agent/platform-drafts', input),
+    listDestinations: (articleId) => call('GET', `/api/agent/articles/${encodeURIComponent(articleId)}/destinations`),
+    updatePlatformDraft: (id, expectedHash, fields) => call('PATCH', `/api/agent/platform-drafts/${encodeURIComponent(id)}`, { expectedHash, ...fields }),
+    getPublicationPreview: (id) => call('GET', `/api/agent/platform-drafts/${encodeURIComponent(id)}/preview`),
     listPlatformDrafts: (q) => call('GET', `/api/agent/platform-drafts${query({ articleId: q.articleId, status: q.status, limit: q.limit })}`),
     getPlatformDraft: (id) => call('GET', `/api/agent/platform-drafts/${encodeURIComponent(id)}`),
     stageRemoteDraft: (id) => call('POST', `/api/agent/platform-drafts/${encodeURIComponent(id)}/stage`, {}),

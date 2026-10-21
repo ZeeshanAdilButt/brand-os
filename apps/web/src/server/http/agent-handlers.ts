@@ -2,10 +2,11 @@ import { createArticle, getArticle, listArticles, saveArticle } from '../actions
 import { agentListTasks, agentTaskView, submitTaskResult } from '../actions/ai-tasks';
 import { listItems } from '../actions/knowledge';
 import { ActionError } from '../actions/owner';
-import { getDraft, listDrafts, prepareDraft, requestApproval, stageDraft } from '../actions/publishing';
+import { editDraft, getPreview } from '../actions/composer';
+import { getDraft, listDestinations, listDrafts, prepareDraft, requestApproval, stageDraft } from '../actions/publishing';
 import { publishEnvFrom } from '../publishing/registry';
 import { getProfile } from '../actions/profile';
-import { articleRowView, articleView, itemView, platformDraftStatusView, platformDraftView, preferencesView, profileView } from '../agent/views';
+import { articleRowView, articleView, destinationView, itemView, platformDraftStatusView, platformDraftView, preferencesView, profileView } from '../agent/views';
 import { aiEnvFrom } from '../ai/runtime';
 import { withAgent, type AgentHandlerDeps } from './agent-auth';
 import { json, readJson } from './handlers';
@@ -18,6 +19,14 @@ import { MARK_END, MARK_START } from '../../lib/knowledge';
  * up for approval here, and that is all: there is deliberately no route that approves, declines, publishes,
  * checks, marks or connects anything. Those are the signed-in owner's acts in the app.
  */
+
+/** Replacing the owner's edits with a fresh adaptation is the owner's choice, so an agent cannot ask for it. */
+function withoutDiscard(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const { discardEdits: _discard, ...rest } = body as Record<string, unknown>;
+  void _discard;
+  return rest;
+}
 
 /** Strip the search highlight markers: an agent wants plain text. */
 const plain = (s: string) => s.split(MARK_START).join('').split(MARK_END).join('');
@@ -120,6 +129,34 @@ export function handleAgentDraftGet(request: Request, id: string, deps: AgentHan
 }
 
 /** Where a draft stands: the status, the link once published, any failure and the approval, if one is open. */
+/** The destinations of an article: which exist, which the app can send to, and where each draft stands. Scope: read. */
+export function handleAgentDestinations(request: Request, articleId: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'read', action: 'agent.destinations.list' }, async (owner, _agent, ctx) => {
+    const all = await listDestinations(owner, publishEnvFrom(ctx, deps.publish), articleId);
+    return json({ destinations: all.map(destinationView) });
+  });
+}
+
+/** Change a destination's text or metadata. It is a new payload hash and voids any approval; nothing is sent. Scope: platform_drafts. */
+export function handleAgentDraftUpdate(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'platform_drafts', action: 'agent.platform_drafts.update' }, async (owner, _agent, ctx) => {
+    const body = await readJson(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ActionError('invalid', 'Send a JSON object with expectedHash and the fields to change.');
+    // An agent edits the text and metadata. The personal site's file options (replace an existing file) are the owner's choice.
+    const { site: _site, ...allowed } = body as Record<string, unknown>;
+    void _site;
+    const result = await editDraft(owner, publishEnvFrom(ctx, deps.publish), id, allowed);
+    return json({ changed: result.changed, fields: result.fields, voidedApproval: result.voidedApproval, message: result.message, draft: platformDraftView(result.draft) });
+  });
+}
+
+/** The exact payload, the checks and an approximate preview as text. Scope: read. */
+export function handleAgentDraftPreview(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'read', action: 'agent.platform_drafts.preview' }, async (owner, _agent, ctx) =>
+    json(await getPreview(owner, publishEnvFrom(ctx, deps.publish), id)),
+  );
+}
+
 export function handleAgentDraftStatus(request: Request, id: string, deps: AgentHandlerDeps = {}) {
   return withAgent(request, deps, { scope: 'read', action: 'agent.platform_drafts.status' }, async (owner, _agent, ctx) =>
     json(platformDraftStatusView(await getDraft(owner, publishEnvFrom(ctx, deps.publish), id))),
@@ -128,7 +165,7 @@ export function handleAgentDraftStatus(request: Request, id: string, deps: Agent
 
 export function handleAgentDraftCreate(request: Request, deps: AgentHandlerDeps = {}) {
   return withAgent(request, deps, { scope: 'platform_drafts', action: 'agent.platform_drafts.create' }, async (owner, _agent, ctx) =>
-    json(platformDraftView(await prepareDraft(owner, publishEnvFrom(ctx, deps.publish), await readJson(request))), 201),
+    json(platformDraftView(await prepareDraft(owner, publishEnvFrom(ctx, deps.publish), withoutDiscard(await readJson(request)))), 201),
   );
 }
 

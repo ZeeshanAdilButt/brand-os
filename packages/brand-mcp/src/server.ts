@@ -12,7 +12,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { ApiError, scrub, type ArticleFields, type BrandApi } from './api.js';
+import { ApiError, scrub, type ArticleFields, type BrandApi, type DraftFields } from './api.js';
 import { operationsSchema } from './operations.js';
 
 export const SERVER_NAME = 'brand-os';
@@ -24,7 +24,7 @@ export const INSTRUCTIONS = [
   '',
   'What you can do: read the profile and brand preferences, search the owner’s knowledge, list and read articles, create and update articles (every update is saved as a version and needs the revision you read), and complete AI tasks the owner left in their inbox.',
   '',
-  'Publishing: you can prepare a platform draft for an article (create_platform_draft), read its checks and the exact payload (get_platform_draft), stage a PRIVATE copy on the platform (stage_remote_draft) and ask the owner to approve it (request_publish_approval). You can read where it stands (get_publication_status).',
+  'Publishing: you can see an article’s destinations (list_destinations), prepare a platform draft (create_platform_draft), read its checks and the exact payload (get_platform_draft, get_publication_preview), edit one destination’s text or metadata (update_platform_draft, which voids any open approval), stage a PRIVATE copy on DEV.to or Hashnode (stage_remote_draft) and ask the owner to approve it (request_publish_approval). You can read where it stands (get_publication_status). Only DEV.to, Hashnode and the personal site can be sent to; the other destinations are preview and posting by hand, and request_publish_approval refuses them.',
   '',
   'What you cannot do, by design: approve, decline or publish anything, post, schedule, connect or disconnect accounts, or touch settings and credentials. There are no tools for those. Only the owner can approve, by opening the link you give them in the app, signed in as themselves. Never tell the owner something is published unless get_publication_status says published.',
   '',
@@ -259,14 +259,14 @@ export function createBrandServer({ api, credential }: BrandServerOptions): McpS
     ({ taskId, operations }) => run(() => api.submitAiTaskResult(taskId, operations)),
   );
 
-  const platform = z.enum(['devto', 'hashnode']);
+  const platform = z.enum(['devto', 'hashnode', 'site', 'medium', 'substack', 'linkedin', 'x', 'bluesky', 'threads', 'mastodon', 'reddit', 'hackernews', 'youtube']);
 
   server.registerTool(
     'create_platform_draft',
     {
       title: 'Create a platform draft',
       description:
-        'Adapts one of the owner’s articles for DEV.to or Hashnode and records the exact payload, its checks (lint) and the sanitized tags. Sends nothing to the platform. Calling it again rebuilds the draft from the current article. Needs the platform account to be connected by the owner already. Needs the platform_drafts scope.',
+        'Adapts one of the owner’s articles for a destination (DEV.to, Hashnode, the personal site, or a preview-only platform such as LinkedIn, X or Hacker News) and records the exact payload, its checks (lint) and the sanitized tags. Sends nothing to any platform. Calling it again rebuilds the draft from the current article, unless the owner edited it (then it is refused: the owner decides). DEV.to and Hashnode need the owner to have connected the account already. Needs the platform_drafts scope.',
       inputSchema: {
         articleId: uuid.describe('The article id from list_articles.'),
         platform: platform,
@@ -277,6 +277,59 @@ export function createBrandServer({ api, credential }: BrandServerOptions): McpS
     },
     ({ articleId, platform: target, coverImageUrl, series }) =>
       run(() => api.createPlatformDraft({ articleId, platform: target, ...(coverImageUrl !== undefined ? { coverImageUrl } : {}), ...(series !== undefined ? { series } : {}) })),
+  );
+
+  server.registerTool(
+    'list_destinations',
+    {
+      title: 'List destinations',
+      description:
+        'Every destination for one article: whether the owner added it, whether the app can send to it at all (canPublish false means preview and posting by hand only), the limits it enforces, and where its draft stands. Needs the read scope.',
+      inputSchema: { articleId: uuid.describe('The article id from list_articles.') },
+      annotations: READ_ONLY,
+    },
+    ({ articleId }) => run(() => api.listDestinations(articleId)),
+  );
+
+  server.registerTool(
+    'update_platform_draft',
+    {
+      title: 'Update a platform draft',
+      description:
+        'Changes the text or metadata of one destination’s draft (title, description, tags, canonical URL, cover, series, body, subreddit or instance). You must pass the payloadSha256 you read (expectedHash). Every change is a new payload hash: it voids any approval that was open, sends nothing, and the draft must be staged and approved again. Other destinations are not touched. Needs the platform_drafts scope.',
+      inputSchema: {
+        draftId: uuid,
+        expectedHash: z.string().regex(/^[0-9a-f]{64}$/).describe('The payloadSha256 from get_platform_draft.'),
+        title: z.string().max(400).optional(),
+        description: z.string().max(2000).optional(),
+        tags: z.array(z.string().trim().min(1).max(80)).max(60).optional(),
+        canonicalUrl: z.string().trim().max(2000).nullable().optional(),
+        coverImageUrl: z.string().trim().max(2000).nullable().optional(),
+        series: z.string().trim().max(100).nullable().optional(),
+        bodyMarkdown: z.string().max(400_000).optional(),
+        options: z.object({ subreddit: z.string().max(100).optional(), instance: z.string().max(100).optional() }).optional(),
+      },
+      annotations: WRITE,
+    },
+    ({ draftId, expectedHash, ...fields }) =>
+      run(async () => {
+        const changes: DraftFields = {};
+        for (const [key, value] of Object.entries(fields)) if (value !== undefined) (changes as Record<string, unknown>)[key] = value;
+        if (Object.keys(changes).length === 0) throw new ApiError(400, 'invalid', 'Send at least one field to change.');
+        return api.updatePlatformDraft(draftId, expectedHash, changes);
+      }),
+  );
+
+  server.registerTool(
+    'get_publication_preview',
+    {
+      title: 'Get a publication preview',
+      description:
+        'The exact payload for one destination, every lint error and warning, its limits and an approximate text preview of how it will look there (post counts, where a feed cuts the text). The preview is approximate; the platform’s own layout may differ. Needs the read scope.',
+      inputSchema: { draftId: uuid },
+      annotations: READ_ONLY,
+    },
+    ({ draftId }) => run(() => api.getPublicationPreview(draftId)),
   );
 
   server.registerTool(
@@ -365,6 +418,9 @@ export function createUnconfiguredServer(): McpServer {
     getAiTask: missing,
     submitAiTaskResult: missing,
     createPlatformDraft: missing,
+    listDestinations: missing,
+    updatePlatformDraft: missing,
+    getPublicationPreview: missing,
     listPlatformDrafts: missing,
     getPlatformDraft: missing,
     stageRemoteDraft: missing,

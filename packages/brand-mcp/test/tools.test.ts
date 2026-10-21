@@ -20,6 +20,9 @@ const EXPECTED_TOOLS = [
   'get_ai_task',
   'submit_ai_task_result',
   'create_platform_draft',
+  'list_destinations',
+  'update_platform_draft',
+  'get_publication_preview',
   'list_platform_drafts',
   'get_platform_draft',
   'stage_remote_draft',
@@ -44,6 +47,9 @@ function fakeApi(overrides: Partial<BrandApi> = {}): Fake {
     'getAiTask',
     'submitAiTaskResult',
     'createPlatformDraft',
+    'listDestinations',
+    'updatePlatformDraft',
+    'getPublicationPreview',
     'listPlatformDrafts',
     'getPlatformDraft',
     'stageRemoteDraft',
@@ -75,7 +81,7 @@ async function call(client: Client, name: string, args: Record<string, unknown> 
 }
 
 describe('the tool list', () => {
-  it('has exactly the fifteen tools and no way to approve, decline, publish or hand off', async () => {
+  it('has exactly the eighteen tools and no way to approve, decline, publish or hand off', async () => {
     const client = await connect(createBrandServer({ api: fakeApi(), credential: CREDENTIAL }));
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
@@ -86,7 +92,7 @@ describe('the tool list', () => {
   it('marks reads as read-only and writes as non-destructive, never open-world', async () => {
     const client = await connect(createBrandServer({ api: fakeApi(), credential: CREDENTIAL }));
     const { tools } = await client.listTools();
-    const reads = ['get_my_profile', 'search_knowledge', 'list_articles', 'get_article', 'list_ai_tasks', 'get_ai_task', 'list_platform_drafts', 'get_platform_draft', 'get_publication_status'];
+    const reads = ['get_my_profile', 'search_knowledge', 'list_articles', 'get_article', 'list_ai_tasks', 'get_ai_task', 'list_platform_drafts', 'get_platform_draft', 'get_publication_status', 'list_destinations', 'get_publication_preview'];
     for (const tool of tools) {
       expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
       expect(tool.annotations?.destructiveHint, tool.name).toBe(false);
