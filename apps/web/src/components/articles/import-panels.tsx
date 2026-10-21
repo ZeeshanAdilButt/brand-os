@@ -2,7 +2,8 @@
 
 import { AlertTriangle, CheckCircle2, FileUp, FolderOpen, Globe, Info } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Field, FormNotice, Input } from '@/components/ui/field';
 import type { ArticleDTO } from '@/lib/articles';
@@ -36,8 +37,13 @@ function Card({ icon, title, intro, children, id }: { icon: ReactNode; title: st
 
 /** What an import did and what to check, with a way into the article. */
 function ImportResult({ result }: { result: ImportResultDTO }) {
+  const root = useRef<HTMLDivElement>(null);
+  // The result sits below the form: bring it into view so the next step is obvious.
+  useEffect(() => {
+    root.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
   return (
-    <div className="grid gap-3 rounded-lg border border-success/40 bg-success/5 p-3 text-sm" role="status">
+    <div ref={root} className="grid gap-3 rounded-lg border border-success/40 bg-success/5 p-3 text-sm" role="status">
       <p className="flex items-start gap-2 font-medium">
         <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
         <span className="min-w-0 break-words">Imported &ldquo;{result.article.title || 'Untitled'}&rdquo; as a draft.</span>
@@ -75,13 +81,14 @@ function ImportResult({ result }: { result: ImportResultDTO }) {
 }
 
 export function ImportFile() {
+  const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResultDTO | null>(null);
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submit(event?: React.FormEvent) {
+    event?.preventDefault();
     const file = input.current?.files?.[0];
     if (!file) {
       setError('Choose a file first.');
@@ -95,8 +102,10 @@ export function ImportFile() {
     const response = await api<ImportResultDTO>('/api/articles/import/file', { method: 'POST', body: form });
     setBusy(false);
     if (response.ok) {
-      setResult(response.data);
       if (input.current) input.current.value = '';
+      // A clean import goes straight to the article; one with warnings stays so they can be read first.
+      if (response.data.warnings.length === 0) router.push(`/articles/${response.data.article.id}`);
+      else setResult(response.data);
     } else setError(response.network ? 'Could not reach the server.' : (response.fields.file ?? response.error));
   }
 
@@ -104,7 +113,14 @@ export function ImportFile() {
     <Card id="import-file" icon={<FileUp className="size-4" />} title="From a file" intro="A Markdown file: .md, .mdx, .markdown or .txt, up to 1 MB. Front matter becomes the title, description, tags and canonical address.">
       <form onSubmit={submit} className="grid gap-3" noValidate>
         <Field label="File" htmlFor="import-file-input" hint="MDX components and imports are kept as text, and you are told which ones.">
-          <Input id="import-file-input" ref={input} type="file" accept=".md,.mdx,.markdown,.txt,text/markdown,text/plain" className="h-auto cursor-pointer py-2 file:mr-3 file:cursor-pointer" />
+          <Input
+            id="import-file-input"
+            ref={input}
+            type="file"
+            accept=".md,.mdx,.markdown,.txt,text/markdown,text/plain"
+            onChange={() => void submit()}
+            className="h-auto cursor-pointer py-2 file:mr-3 file:cursor-pointer"
+          />
         </Field>
         {error ? <FormNotice tone="error">{error}</FormNotice> : null}
         <div>
@@ -119,6 +135,7 @@ export function ImportFile() {
 }
 
 export function ImportUrl() {
+  const router = useRouter();
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,8 +149,9 @@ export function ImportUrl() {
     const response = await api<ImportResultDTO>('/api/articles/import/url', { method: 'POST', json: { url } });
     setBusy(false);
     if (response.ok) {
-      setResult(response.data);
       setUrl('');
+      if (response.data.warnings.length === 0) router.push(`/articles/${response.data.article.id}`);
+      else setResult(response.data);
     } else setError(response.network ? 'Could not reach the server.' : (response.fields.url ?? response.error));
   }
 
