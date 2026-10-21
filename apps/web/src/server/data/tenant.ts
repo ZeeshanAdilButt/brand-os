@@ -2,11 +2,13 @@ import type { AppDb } from '../db/client';
 import { getDb } from '../db';
 import type { AuditInput } from './audit';
 import { scopedAudit } from './audit';
+import { scopedArticles, scopedAssets, scopedStudioSettings } from './articles';
 import { scopedItems, scopedSources } from './knowledge';
 import { scopedPreferences, scopedProfile } from './profile';
-import { makeScope, type DbSource } from './scope';
+import { makeScope, type DbSource, type Scope } from './scope';
 
-export { NotFoundError } from './scope';
+export { NotFoundError, SlugTakenError } from './scope';
+export { ConflictError } from './articles';
 
 /**
  * THE data-access entry point for tenant tables. `forOwner(ownerId)` returns repositories whose
@@ -26,6 +28,9 @@ export function forOwner(ownerId: string, db?: AppDb) {
     preferences: scopedPreferences(scope),
     sources: scopedSources(scope),
     items: scopedItems(scope),
+    articles: scopedArticles(scope),
+    assets: scopedAssets(scope),
+    studioSettings: scopedStudioSettings(scope),
     audit: {
       async record(input: AuditInput) {
         return scopedAudit(await scope.db(), scope.ownerId).record(input);
@@ -37,11 +42,12 @@ export function forOwner(ownerId: string, db?: AppDb) {
 
     /** Everything this owner holds, as plain data. Used by the export endpoint. */
     async exportAll() {
-      const [profile, preferences, sources, items] = await Promise.all([
+      const [profile, preferences, sources, items, articles] = await Promise.all([
         scopedProfile(scope).get(),
         scopedPreferences(scope).get(),
         scopedSources(scope).list(),
         scopedItems(scope).list({ limit: 200 }),
+        allArticles(scope),
       ]);
       // Page through items so the export is complete, not just the first screen.
       const allItems = [...items];
@@ -50,9 +56,21 @@ export function forOwner(ownerId: string, db?: AppDb) {
         if (next.length === 0) break;
         allItems.push(...next);
       }
-      return { profile, preferences, sources, items: allItems };
+      return { profile, preferences, sources, items: allItems, articles };
     },
   };
+}
+
+/** Every article with its body, paged so the export is complete. Assets are listed by the export route, not embedded. */
+async function allArticles(scope: Scope) {
+  const repo = scopedArticles(scope);
+  const all = await repo.listAll(0, 100);
+  while (all.length > 0 && all.length % 100 === 0) {
+    const next = await repo.listAll(all.length, 100);
+    if (next.length === 0) break;
+    all.push(...next);
+  }
+  return all;
 }
 
 export type OwnerData = ReturnType<typeof forOwner>;

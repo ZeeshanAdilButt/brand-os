@@ -11,6 +11,24 @@ export class NotFoundError extends Error {
   }
 }
 
+/** Thrown when a slug is already used by another of this owner's articles. */
+export class SlugTakenError extends Error {
+  constructor(readonly slug: string) {
+    super(`The slug "${slug}" is already used by another article`);
+    this.name = 'SlugTakenError';
+  }
+}
+
+/** True for a Postgres unique-violation, however the driver wrapped it. */
+export function isUniqueViolation(err: unknown): boolean {
+  let current: unknown = err;
+  for (let depth = 0; depth < 4 && current && typeof current === 'object'; depth++) {
+    if ((current as { code?: unknown }).code === '23505') return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 /** Where a scoped repository gets its connection. A function, so a transaction can be passed in. */
 export type DbSource = () => Promise<AppDb>;
 

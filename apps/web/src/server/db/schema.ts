@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { ARTICLE_SOURCE_KINDS, ARTICLE_STATUSES, VERSION_REASONS } from '../../lib/articles';
 import {
   CONFIDENCE_LEVELS,
   CONFIDENTIALITY_LEVELS,
@@ -6,7 +7,7 @@ import {
   SOURCE_KINDS,
   VERIFICATION_STATUSES,
 } from '../../lib/knowledge';
-import { boolean, customType, date, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { type AnyPgColumn, boolean, customType, date, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * Tenant model: `users.id` is the owner id. Every other table carries `owner_id`
@@ -236,3 +237,119 @@ export type {
   SourceKind,
   VerificationStatus,
 } from '../../lib/knowledge';
+
+/*
+ * Article studio (Day 3). Every table below carries owner_id and is read or written only through
+ * src/server/data (forOwner). Article ids and slugs are never trusted across owners: a slug is unique
+ * per owner, so two owners may both have "hello-world".
+ */
+
+/** An article and its current content. The history of earlier content is in `articleVersions`. */
+export const articles = pgTable(
+  'articles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: text('title').notNull().default(''),
+    slug: text('slug').notNull(),
+    description: text('description').notNull().default(''),
+    tags: textArray('tags'),
+    canonicalUrl: text('canonical_url'),
+    coverAssetId: uuid('cover_asset_id').references((): AnyPgColumn => assets.id, { onDelete: 'set null' }),
+    status: text('status', { enum: ARTICLE_STATUSES }).notNull().default('draft'),
+    bodyMarkdown: text('body_markdown').notNull().default(''),
+    sourceKind: text('source_kind', { enum: ARTICLE_SOURCE_KINDS }).notNull().default('manual'),
+    /** The file name, relative folder path or URL the article was imported from. */
+    sourceRef: text('source_ref'),
+    /** Front matter keys with no home of their own (author, series, and so on), kept as imported. */
+    extraMetadata: jsonb('extra_metadata').$type<Record<string, unknown>>().notNull().default({}),
+    /** Optimistic concurrency token: every accepted save increments it. A save must name the one it saw. */
+    revision: integer('revision').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Set by publishing (Day 5). Nothing writes it yet. */
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    /** Ranked full-text index: title (A), description and tags (B), body (C). Maintained by Postgres. */
+    search: tsvector('search').generatedAlwaysAs(
+      sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(cph_join_tags(tags), '')), 'B') || setweight(to_tsvector('english', coalesce(body_markdown, '')), 'C')`,
+    ),
+  },
+  (table) => [
+    uniqueIndex('articles_owner_slug_idx').on(table.ownerId, table.slug),
+    index('articles_owner_updated_idx').on(table.ownerId, table.updatedAt),
+    index('articles_owner_status_idx').on(table.ownerId, table.status),
+    index('articles_search_idx').using('gin', table.search),
+  ],
+);
+
+/** Immutable snapshots of an article's content. Rows are only ever inserted, never changed. */
+export const articleVersions = pgTable(
+  'article_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    versionNo: integer('version_no').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    /** Slug, description, tags, canonical URL, cover and status as they were. */
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    reason: text('reason', { enum: VERSION_REASONS }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('article_versions_article_no_idx').on(table.articleId, table.versionNo),
+    index('article_versions_owner_article_idx').on(table.ownerId, table.articleId),
+  ],
+);
+
+/** An uploaded file (an image today). The bytes live in the storage adapter under `storageKey`. */
+export const assets = pgTable(
+  'assets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The article it was first uploaded for. Cleared if that article is deleted; the file stays. */
+    articleId: uuid('article_id').references((): AnyPgColumn => articles.id, { onDelete: 'set null' }),
+    filename: text('filename').notNull(),
+    /** Decided by sniffing the bytes, never taken from the upload. */
+    mime: text('mime').notNull(),
+    size: integer('size').notNull(),
+    sha256: text('sha256').notNull(),
+    /** Generated by the server. Never derived from the file name. */
+    storageKey: text('storage_key').notNull(),
+    alt: text('alt').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('assets_owner_sha_idx').on(table.ownerId, table.sha256),
+    index('assets_owner_article_idx').on(table.ownerId, table.articleId),
+  ],
+);
+
+/** Studio settings, one row per owner. Today: the folder of Markdown files the owner imports from. */
+export const studioSettings = pgTable(
+  'studio_settings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    contentFolder: text('content_folder'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('studio_settings_owner_idx').on(table.ownerId)],
+);
+
+export type Article = Omit<typeof articles.$inferSelect, 'search'>;
+export type ArticleVersion = typeof articleVersions.$inferSelect;
+export type Asset = typeof assets.$inferSelect;
+export type StudioSettings = typeof studioSettings.$inferSelect;
