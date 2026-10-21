@@ -13,6 +13,9 @@ export default defineConfig({
   test: {
     setupFiles: [setupFile],
     passWithNoTests: true,
+    // Every web test file opens its own embedded Postgres (a WASM engine). One worker per core ran a 20-core
+    // machine with little free memory out of memory (a fatal V8 error), so the pool is capped.
+    maxWorkers: 6,
     projects: [
       project('root', '.', ['test/**/*.test.ts']),
       ...['core', 'daemon', 'client', 'mcp', 'brand-mcp', 'cli'].map((pkg) =>
