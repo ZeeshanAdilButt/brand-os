@@ -199,6 +199,17 @@ export function scopedArticles(scope: Scope) {
         .offset(offset);
     },
 
+    /** Which of these import references already became an article here, so the UI can say "already imported". */
+    async importedFrom(kind: ArticleSourceKind, refs: string[]): Promise<{ sourceRef: string; id: string; title: string }[]> {
+      if (refs.length === 0) return [];
+      const db = await scope.db();
+      const rows = await db
+        .select({ sourceRef: articles.sourceRef, id: articles.id, title: articles.title })
+        .from(articles)
+        .where(and(eq(articles.ownerId, scope.ownerId), eq(articles.sourceKind, kind), inArray(articles.sourceRef, refs)));
+      return rows.flatMap((r) => (r.sourceRef ? [{ sourceRef: r.sourceRef, id: r.id, title: r.title }] : []));
+    },
+
     async slugTaken(slug: string, exceptId?: string): Promise<boolean> {
       const db = await scope.db();
       const conditions = [eq(articles.ownerId, scope.ownerId), eq(articles.slug, slug)];

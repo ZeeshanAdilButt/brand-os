@@ -16,6 +16,7 @@ import { getProfile, preferencesInputSchema, profileInputSchema, savePreferences
 import { parseInput } from '../actions/owner';
 import { resolveSessionUser } from '../auth/resolve';
 import { getAppContext, type AppContext } from '../context';
+import type { UrlImportDeps } from '../import/url';
 import type { StorageAdapter } from '../storage';
 import { checkRequest } from './guard';
 
@@ -24,6 +25,8 @@ export interface HandlerDeps {
   ctx?: AppContext;
   /** Where uploaded files live. Tests pass a temp folder; production derives it from the config. */
   storage?: StorageAdapter;
+  /** URL import seams (name lookup and the one-hop fetch). Tests inject fakes; production uses the real ones. */
+  urlImport?: UrlImportDeps;
 }
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
