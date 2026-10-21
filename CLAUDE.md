@@ -28,6 +28,7 @@ Read in this order: `README.md` (what the product is), `TODO.md` (roadmap and th
 - `packages/core`: pure parsing, lint and platform transforms (no I/O).
 - `packages/daemon`: the publishing engine (approval gate, routes, local dashboard, API).
 - `packages/mcp`, `packages/client`, `packages/cli`: MCP server, daemon client, the `cph` command and installer.
+- `packages/brand-mcp`: the `brand-os` MCP server (articles, knowledge, AI tasks) over the web app's agent API (`/api/agent/*`, bearer key). It has no publishing, platform draft or approval tools. See `docs/brand-os-mcp.md`.
 - `spikes/`: throwaway experiments with written findings.
 
 ## Commands

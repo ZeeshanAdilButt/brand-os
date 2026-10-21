@@ -4,8 +4,8 @@ Working name for the product that content-powerhouse grows into. Days are implem
 
 ## Current Position
 Phase: 1
-Day: 4
-Status: Not started (Day 3 complete)
+Day: 5
+Status: Not started (Day 4 complete)
 
 ## Phase 1: Technical Article Publishing
 
@@ -41,11 +41,15 @@ Acceptance: import, edit, save, reopen and preview a real technical article with
 Day 3 results: CodeMirror 6 editor (lazy loaded) with toolbar, shortcuts, image paste and drop, word count and reading time; one unified/remark/rehype pipeline for the live preview and the reading view (GFM, footnotes, highlighting for go, rust, python, sql, bash, yaml, json, typescript, Mermaid with a visible fallback, sanitizing that reports every removal as "N items were not rendered"); metadata panel with per-owner slug check; debounced autosave with a visible state, optimistic concurrency and a keep-mine or use-saved conflict dialog; version history with coalesced autosaves, line diff between any two versions and restore as a new version; assets behind a storage adapter with sniffed types, an SVG policy, sha256 dedupe and an authenticated tenant-checked route; file, URL (SSRF-checked on every hop) and local folder import. `pnpm test` 1362 passed, 6 skipped (about 230 new web tests: tenant isolation for articles, versions, assets, search and imports through the data layer and the routes; autosave and conflicts; coalescing, diff and restore; rendering; frontmatter variants; SSRF cases; asset limits and traversal; folder traversal and links; source rules); `pnpm typecheck`, `pnpm build`, `pnpm web:build` and `pnpm web:lint` clean. Real flow on `next start` with a temporary data folder: new article, long technical paste with code, a table and a Mermaid diagram, pasted image, autosave, Ctrl+S, history, diff, restore, a forced conflict, a real page import, reading view; checked at 1280px and 400px, light and dark. Choices and trade-offs: DECISIONS.md 18 to 23. Not done on purpose: math rendering, embeds (every iframe is removed and reported), an S3 storage adapter (the seam is documented), in-editor find and replace, copying imported images (they stay linked), a real Postgres run of the hosted driver (no server available, as on Days 1 and 2). Two file-link tests skip on machines where creating file links needs a privilege (Windows without developer mode); the directory-link tests run everywhere.
 
 ### Day 4: AI and Claude MCP
-- [ ] MCP server (profile, articles, drafts, search, AI tasks) on the shared action layer; extend the Phase 0 MCP
-- [ ] AI provider interface: local model (Ollama/OpenAI-compatible), optional BYOK API; AI task inbox for Claude Code
-- [ ] Editor assistance returning structured operations with diff approvals
+- [x] MCP server (profile, articles, search, AI tasks) on the shared action layer. It is a new package, `packages/brand-mcp` (server `brand-os`), not an extension of the Phase 0 server (DECISIONS.md 30); it has no platform-draft or approval tools, which arrive on Days 5 and 6
+- [x] AI provider interface: local model (Ollama/OpenAI-compatible), optional BYOK API (Anthropic, OpenAI-compatible), Claude Code hand-off, reserved CLI agent slot; AI task inbox for Claude Code
+- [x] Editor assistance returning structured operations with diff approvals
 
-Acceptance: Claude Code drives articles over MCP; UI AI works with a configured provider; app works with AI off.
+Acceptance: Claude Code drives articles over MCP; UI AI works with a configured provider; app works with AI off. **Met 2026-10-21** (with the caveats below).
+
+Day 4 results: `pnpm test` 1574 passed, 6 skipped (about 210 new tests: agent keys and the agent API with hashing, scopes, revocation, rate limits and two-account isolation; provider key encryption, redaction and hosted address rules; adapters against injected fake fetch for Ollama-style, OpenAI-compatible and Anthropic shapes with success, malformed output, timeout, 4xx, 5xx and rate limits; result validation and stale detection; the privacy gate and per-task approval by hash; a prompt-injection fixture; caching, soft cap, cancel and retry; event delivery; the MCP tools over the SDK's in-memory transport and against the real routes; UI components in no-AI mode, stale, hand-off and review states; source rules for tenant tables and key handling); `pnpm typecheck`, `pnpm build`, `pnpm web:build` and `pnpm web:lint` clean. Real flow on `next start` (port 3411, temporary data folder, a local fake OpenAI-compatible server on port 4511): added a local provider and tested the connection, selected text, ran Improve, saw the word diff, accepted it, and found "AI change you accepted" in the history; added the Claude Code hand-off provider, asked with it (task showed as waiting with the copyable instruction), created an agent key in Settings > Agent access, ran the built `brand-os` server over stdio against the app (list tools, list tasks, read the task, a result outside the excerpt refused, a valid result submitted), and the studio showed it as ready to review without a reload. Checked at 1280px and 400px, light and dark; no horizontal overflow on the new settings pages. Choices and trade-offs: DECISIONS.md 24 to 31.
+
+Not validated, on purpose or for lack of access: no real model was called (the flow used a local fake server, and the Anthropic and OpenAI-compatible adapters are tested against fake responses only; OpenAI's reference page could not be read, see INTEGRATIONS.md open risks 15 to 17); the MCP client in the real-flow run was the SDK's stdio client, not the Claude Code binary (`claude mcp add` is documented but was not run); the hosted driver against a real Postgres is still outstanding as on Days 1 to 3; the event bus and rate limiter are per process (multi-instance needs a shared store, Day 27); the local companion is documented, not built.
 
 ### Day 5: Technical publishing connectors
 - [ ] Adapter interface (auth, formats, drafts, scheduling, media, status, restrictions)

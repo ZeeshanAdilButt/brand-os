@@ -1,6 +1,6 @@
 # Decisions
 
-Each entry: the decision, why, and what it costs. Dated 2026-10-21 (Phase 1, Day 1). Versions were read from the npm registry on that date. Decisions 11 to 17 were made on Day 2 (2026-10-21).
+Each entry: the decision, why, and what it costs. Dated 2026-10-21 (Phase 1, Day 1). Versions were read from the npm registry on that date. Decisions 11 to 17 were made on Day 2, 18 to 23 on Day 3 and 24 to 31 on Day 4 (all 2026-10-21).
 
 ## 1. One Postgres schema; embedded engine locally, a server when hosted
 
@@ -158,3 +158,66 @@ Mermaid fences render client-side and lazily: the `mermaid` package loads only w
 ## 23. Article search
 
 Same approach as decision 14: a generated `tsvector` (title A; description and tags B; body C), GIN index, `websearch_to_tsquery`, `ts_rank` and `ts_headline`, with the tenant filter inside the same WHERE. The list excludes archived articles unless asked. Slugs are unique per owner (`articles_owner_slug_idx`), so two owners can both have `hello-world`; the slug check endpoint only looks at the caller's articles.
+
+## 24. Agent keys: random, hashed, scoped, revocable, and the only way an agent picks an owner
+
+**Decision.** A person creates named keys in Settings > Agent access with a scope list (`read`, `write_articles`, `ai_tasks`). The secret is `bos_` plus 32 random bytes (base64url), shown once; the database keeps its SHA-256, a short prefix for display, last use and a revoke time. `/api/agent/*` accepts only `Authorization: Bearer`. The owner id comes from the key row. No path, query, body, header or MCP argument can name an owner, and unknown keys in a body are stripped by the same Zod schemas the UI uses.
+
+**Why a plain hash.** The secret is 256 random bits, so it cannot be guessed or brute-forced offline from a hash, and a slow password hash would only slow every request. The lookup is by unique index on the hash, and a request that is not shaped like a secret never reaches the database.
+
+**Limits.** Requests are limited per key (120 a minute) and failed attempts per client (20 a minute), in memory, so per process (a multi-instance deployment needs a shared store: Day 27). A revoked key gets the same "not valid" answer as an unknown one and the attempt is written to the owner's audit log. Agent saves are recorded with the version reason `agent` and audit actor `agent`; the reason is chosen by the action from who is acting, never by the request. A key cannot create or revoke keys or change providers.
+
+**Trade-off.** A key is a bearer secret: anyone who has it has its scopes until it is revoked. Scopes are coarse on purpose (three), and "read" includes private knowledge because the point is to let the owner's own Claude Code understand them; the instructions to the agent say private items are context, not text to publish.
+
+## 25. Provider keys at rest: AES-256-GCM bound to the row
+
+**Decision.** A provider's API key is stored as `v1.<iv>.<tag>.<ciphertext>`, AES-256-GCM with a fresh 12-byte IV, and the owner id and provider id are authenticated data, so a value copied to another row or tenant fails to decrypt. The master key is HKDF-SHA256 of `APP_SECRET` (at least 32 characters; the only option in hosted mode, where saving a key without it is refused with a message that says what to set); in local mode with no `APP_SECRET` it is 32 random bytes in `secret.key` in `DATA_DIR`, created with owner-only permissions (mode 0600; on Windows the inherited permissions are replaced with the current user's, best effort). The browser only ever receives "has a key" and the last four characters; the runner is the only code that reads the ciphertext. Errors from a provider pass through a redactor that removes the key itself and anything shaped like a key or an auth header, and the code that handles keys and task text logs nothing but error names (a source-rule test).
+
+**Costs.** Changing `APP_SECRET` or losing `secret.key` makes saved keys unreadable; the person enters them again (the message says so). Back up `DATA_DIR` including `secret.key` together. Key rotation and a KMS are Day 27 work.
+
+## 26. Provider kinds, trust and hosted rules
+
+**Decision.** Four kinds: `local` (OpenAI-compatible chat completions: Ollama at `/v1`, LM Studio, vLLM), `api_key` (Anthropic Messages API, or an OpenAI-compatible service with the user's key), `claude_code_handoff` (no execution: tasks wait for the owner's Claude Code over the agent API) and `local_cli_agent` (a reserved registry slot, listed in the UI as "not built yet" and refused by the create action). Each kind has capability notes in the UI: where the text goes, what is unknown (context size), quality limits and what is estimated. There is no default provider and no environment variable key: the app calls only providers the person set up (a source-rule test forbids reading provider keys from the environment).
+
+**Trust is derived.** `local` only when the kind is `local` and the address is loopback or a private network (`localhost`, `127.0.0.0/8`, RFC 1918, `.local`, a one-word host name); everything else, including a "local" provider pointed at a public address, the hand-off (the text reaches Anthropic through the person's own Claude Code) and every `api_key` provider, is `external`.
+
+**Hosted servers.** A hosted server cannot reach a model on the visitor's machine and must not become a way to reach private networks, so `local` providers are refused there, an OpenAI-compatible address must be https on a public name and port 443 or 8443, and every call resolves the name, requires every answer to be public and connects to the checked address (the same rules as the URL importer, decision 22).
+
+**API shapes.** Verified from vendor documentation on 2026-10-21 (sources and gaps in `INTEGRATIONS.md`). One thing remains unverified: OpenAI's own reference page refused automated access, so the OpenAI-compatible request shape rests on the Ollama compatibility page and common behaviour; the adapter sends `max_tokens` and retries once with `max_completion_tokens` if the server says that is the right name.
+
+## 27. The privacy gate for model context
+
+**Decision.** A request carries the selected excerpt and the article's title, description and tags. Knowledge items are searched with the owner's scoped search on the excerpt and instruction, and an item is included only if it is relevant AND (the provider is `local`, OR the item is marked for public use, OR the person approved that item for this task). Style preferences go only to local providers. A private item is never added to an external request by default: the task card says how many were left out and offers "Review what would be sent with them", which shows the full text, system and user parts, and creates a new task only when the person confirms. The approval carries the SHA-256 of the exact text; the server rebuilds the text and refuses a different hash. An approval can name only items that are relevant candidates for that task in the owner's own knowledge.
+
+**Prompt injection.** Article and note text is fenced between markers whose nonce is derived from the content (so identical requests give identical text, which the cache needs, but text inside cannot guess its own fence), marker-like text inside is defanged, and the instructions say that anything between markers is material, not instructions. That is not relied on alone: the model can only return structured operations, restricted per task kind, and nothing is applied without a click (decision 28). A fixture test feeds an article that tells the model to delete everything and publish, with an obedient fake model, and shows the task fails and nothing changes.
+
+**Trade-off.** Relevance is keyword search, so a relevant private item may not be found and an irrelevant public one may be. The cap is three notes of 800 characters.
+
+## 28. Structured results, validation and stale detection
+
+**Decision.** A result is one to five operations from `replace_range` (original, proposed, rationale), `suggest_titles`, `review_notes` (severity, quote, note), `insert_after` and `outline`, validated by one Zod discriminated union (`src/lib/ai-ops.ts`) for a model's answer and for a result from Claude Code. Each task kind allows only some operations (an `improve_section` task cannot return `insert_after`). Size limits apply, HTML in proposed text, titles, notes and headings is refused (code spans and fences are ignored so generics like `Map<String, Integer>` survive), and a `replace_range` original must lie inside the task's own excerpt, so a task about one paragraph cannot change another.
+
+**Applying.** Accepting needs the revision the editor has saved, re-locates the original in the live article (at its old position, or at its only occurrence; an ambiguous or missing match is stale), refuses overlapping edits, and saves through the normal save path as a version with the reason `ai_accept`. A stale result is shown as out of date with the reason and cannot be accepted. Titles are applied only as the one the person picks; review notes apply nothing.
+
+**Trade-off.** If a model quotes the original with small differences, the result fails instead of being fuzzily matched; the person can run it again. The word-level diff is a display of what accepting will do, computed in the browser.
+
+## 29. Running tasks: background, cancellable, cached, capped, live
+
+**Decision.** A provider that runs tasks executes them after the response using Next's `after` (outside a request it simply starts). One call is bounded by a timeout (two minutes by default). Cancelling aborts the call in flight through an in-process controller. One retry, only for overloaded, 5xx, a short rate limit or a dropped connection, never for a refusal, a timeout or a bad answer (a bad answer shows the reason and a "Run again" button). An identical request (same provider, model, kind and exact text) is answered from an earlier result at no cost. The monthly soft cap is in estimated tokens per provider and blocks new tasks with the numbers; tokens are the provider's own when reported and otherwise characters divided by four, marked as estimated, and no cost is ever shown. Tasks the server lost (a restart) become failed after five minutes instead of spinning.
+
+**Live updates.** Status changes are published to an in-process bus after the commit and delivered over server-sent events at `/api/ai/events`, scoped by the session; the studio falls back to polling while a task is working if the stream cannot open. **Trade-off:** the bus is per process, and `after` needs a host that keeps the function alive; a multi-instance or serverless deployment needs a shared channel and a real worker (Day 27).
+
+## 30. The Brand OS MCP server is a new package, not an extension of the Phase 0 one
+
+**Decision.** `packages/brand-mcp` (server name `brand-os`, stdio, SDK 1.32.1) is separate from `packages/mcp`. The Phase 0 server is a facade over the local daemon, with the approval gate, the OS credential store and dashboard-only actions; the new one is a facade over the web app's agent API with a per-user key, and has none of those concerns. Mixing them would put publishing-adjacent tools next to ones an owner expects to be harmless. They can be registered side by side. Day 5 and 6 will add publishing tools to the Phase 0 server (behind the approval gate), not here.
+
+**Details.** Nine tools, none that publish, stage platform drafts or approve (a test checks the tool list). Inputs are Zod-typed; a tool result removes owner ids and key-like fields and the key itself from every string. The server keeps its own copy of the result rules so a bad result fails before it is sent; a drift test runs a list of valid and invalid results through both copies and fails if they disagree. An end-to-end test runs the tools over the SDK's in-memory transport against the real route handlers with two accounts.
+
+## 31. User-driven Claude Code versus automatic API inference
+
+Two different things share the word "AI" here, with different rules (see also `INTEGRATIONS.md` section 7).
+
+- **User-driven Claude Code.** The owner runs Claude Code on their own machine, under their own plan, and it calls the `brand-os` tools. The app makes no model call and holds no Claude credential; it supplies tools and data and checks what comes back. A hand-off task is a request the owner left in an inbox, completed only when the owner's own session picks it up.
+- **Automatic API inference.** The app itself calls a model, only because the person added a provider (a local model or their own API key) and only for a task they started. The text goes where the provider's trust level says, the privacy gate applies, usage is counted, and the key is theirs.
+
+The app never calls Anthropic without a key the person saved, never accepts a Claude login, and never runs the `claude` binary on a hosted server. The optional local companion for browser users is documented in `ARCHITECTURE.md` and is not built.

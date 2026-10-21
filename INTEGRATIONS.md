@@ -241,6 +241,16 @@ curl -s http://localhost:11434/v1/chat/completions \
   -d '{ "model": "<local-model-name>", "messages": [{ "role": "user", "content": "Hello" }], "stream": false }'
 ```
 
+### Day 4 adapter check (as checked 2026-10-21)
+
+Sources: https://docs.ollama.com/api/openai-compatibility and https://docs.ollama.com/api/chat (both fetched). https://platform.openai.com/docs/api-reference/chat/create returned HTTP 403 to the automated fetch, so **OpenAI's own request and response reference was not read this run: UNVERIFIED against openai.com**.
+
+What the adapter (`apps/web/src/server/ai/adapters/openai-compatible.ts`) relies on:
+- Ollama's compatibility page lists `/v1/chat/completions` with `model`, `messages`, `max_tokens`, `temperature`, `response_format`, `seed`, `stop`, `stream`, `stream_options` (`include_usage` only), `tools`; it does not support `tool_choice`, `logit_bias`, `user`, `n` or logprobs. The page does not describe the response object. The adapter reads the widely implemented shape `choices[0].message.content` and `usage.prompt_tokens` and `usage.completion_tokens`, and treats missing usage as unknown (it then estimates and says so).
+- The adapter sends `max_tokens` first. Newer OpenAI models reject it in favour of `max_completion_tokens` (UNVERIFIED here, from common behaviour); if a 400 names both, it retries once with the other. Other servers only know `max_tokens`.
+- The key header is always sent (`Authorization: Bearer`), with a placeholder when none is set, because Ollama requires a non-empty value and ignores it locally.
+- Ollama's native `/api/chat` has `format` (a JSON schema) and returns `prompt_eval_count` and `eval_count`; the adapter does not use it. Structured output is enforced by our own validation of the returned text, not by `response_format`, so a server that ignores `response_format` still works. The behaviour for a missing model (status code and body) is not documented on those pages: UNVERIFIED, shown to the person as whatever the server says, with keys removed.
+
 ### Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server, hosted gateways)
 Model the connection as `{ baseUrl, apiKey?, model }`. Do not assume feature parity: probe `GET /v1/models` on connect, and capability-test streaming, tools, and `response_format` once, storing the result per connection. The app must also work with **no** model configured (see section 7).
 
@@ -281,6 +291,19 @@ curl -s https://api.anthropic.com/v1/messages \
 
 ---
 
+### Day 4 adapter check (as checked 2026-10-21)
+
+Sources: https://platform.claude.com/docs/en/api/overview, https://platform.claude.com/docs/en/api/errors, https://platform.claude.com/docs/en/api/messages (first 100,000 of 1.2 million characters read, which covered the request fields), https://platform.claude.com/docs/en/models/overview.
+
+Verified and used by `apps/web/src/server/ai/adapters/anthropic.ts`:
+- `POST https://api.anthropic.com/v1/messages` with `model`, `max_tokens`, `system` (a top-level field; there is no system message role) and `messages`. Required headers: `anthropic-version` (the overview lists `2023-06-01` and marks it required), `content-type`, and an auth header. The overview says `Authorization: Bearer <key>` is the primary form and `x-api-key` is a legacy fallback "still supported"; the adapter sends `x-api-key` (the form in the official curl examples) and the header is set in one place.
+- `anthropic-workspace-id` is required with a multi-workspace key and optional otherwise; it is an optional field in the provider form.
+- Success: a `content` array of blocks (a `thinking` block can come before the `text` block; only text blocks are read), `stop_reason` (`max_tokens` means the text may be cut off, `refusal` is treated as no answer) and `usage.input_tokens` and `usage.output_tokens`.
+- Errors are JSON `{ "type": "error", "error": { "type", "message" }, "request_id" }` with 400 (also used when a spend limit is reached), 401, 402, 403, 404, 409, 413, 429 (a spend-cap 429 has no `retry-after`), 500, 504 and 529 (overloaded). The adapter retries 429 (when `retry-after` is short), 500 and 529 once and nothing else.
+- Models: `claude-sonnet-5-5` and `claude-haiku-5-5` are listed as current ids on the models overview; both use adaptive thinking. Sonnet 5.5 refuses `thinking: {"type": "disabled"}`, so the adapter sends no `thinking` field at all and a generous `max_tokens` (8000) so thinking cannot starve the answer. These are suggestions in the form (a free-text field); the app never requires a model id to match.
+
+UNVERIFIED: whether current models accept a `temperature` field (not in the part of the page read), so none is sent; the exact bytes of the `retry-after` header on 529.
+
 ## 6. Connecting the user's own Claude Code to our MCP server
 
 Sources (as checked 2026-10-21):
@@ -315,6 +338,10 @@ claude mcp add --env CPH_API_URL=http://127.0.0.1:3100 --transport stdio content
 - Interactive sessions ask the user to approve servers from `.mcp.json` before use (reset with `claude mcp reset-project-choices`). Do not put secrets in a committed `.mcp.json`; reference env vars.
 - **Windows:** the current MCP docs page no longer contains a `cmd /c npx` note (a search of the page found none). Community issues from 2026 say native Windows may still need `cmd /c npx -y <package>` because `npx` is a `.cmd` shim, and that `claude mcp add` has mangled the `/c` flag in some versions (issues reported closed). Status: **UNVERIFIED**. Safest for our server: use `node <path>` directly (no shim), or `npx` via `cmd /c` and check `claude mcp get <name>` to confirm `/c` was stored intact; fall back to editing the config entry so `command` is `cmd` and `args` starts with `["/c", "npx", ...]`.
 - stdio servers should not follow the MCP OAuth spec; the spec says stdio "SHOULD NOT" use it and should take credentials from the environment.
+
+### 6a-2. The `brand-os` server (Day 4)
+
+`packages/brand-mcp` is registered the same way as any stdio server. Registration for this repo (a command the owner runs; do not run it from an agent): `claude mcp add --scope project --transport stdio brand-os -- node "<repo>/packages/brand-mcp/dist/index.js"`, then forward `BRAND_OS_CREDENTIAL` and `BRAND_OS_URL` through `.mcp.json` with `${VAR}` expansion (documented above) so no secret is stored in a file. Full steps, scopes and troubleshooting: `docs/brand-os-mcp.md`. The Windows `npx` shim question is avoided by calling `node` on the built file directly.
 
 ### 6b. Hosted server over streamable HTTP
 
@@ -388,4 +415,7 @@ Wording rule for the UI: never say "Connect your Claude account". Say "Add an An
 12. **Anthropic header form.** Docs prefer `Authorization: Bearer`; `x-api-key` is legacy. If Anthropic ever removes the legacy header, switch in one place. Never hardcode model ids; read them from the current models page or `GET /v1/models`.
 13. **MCP spec drift.** Spec revision 2026-07-28 deprecates Dynamic Client Registration and favors Client ID Metadata Documents; Claude Code supports both and pre-registered credentials. Our hosted MCP should ship Protected Resource Metadata first, then CIMD, and keep a bearer-token header path for self-hosters.
 14. **Policy interpretation (section 7)** is our reading of Anthropic's public docs as of 2026-10-21. Re-read the legal page before launch and on any change to how Claude Code authenticates.
-15. **Not re-checked this run** (carried from `docs/research/01-longform-platforms.md`, dated 2026-10-19): Substack (no post API, no canonical field), DEV.to AI disclosure wording, Medium AI-content and Partner Program rules, Hashnode CLI details beyond the flags quoted above.
+15. **OpenAI chat completions reference** was not readable by the automated fetch on 2026-10-21 (HTTP 403). The OpenAI-compatible adapter follows Ollama's compatibility page and common behaviour; `max_completion_tokens` handling is a guess that is covered by a fallback. Try a real key and service once before relying on it.
+16. **Anthropic `temperature` on current models and the 529 `retry-after`** were not confirmed (see section 5). No sampling parameter is sent.
+17. **Ollama missing-model error** (status and body) is not documented on the pages read; the app shows what the server says.
+18. **Not re-checked this run** (carried from `docs/research/01-longform-platforms.md`, dated 2026-10-19): Substack (no post API, no canonical field), DEV.to AI disclosure wording, Medium AI-content and Partner Program rules, Hashnode CLI details beyond the flags quoted above.

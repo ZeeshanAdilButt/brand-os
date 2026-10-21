@@ -21,7 +21,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 // Files this suite checks: the web app plus the repo-level docs and config this task owns.
-const rootDocs = ['ARCHITECTURE.md', 'DECISIONS.md', 'INTEGRATIONS.md', 'CLAUDE.md', 'TODO.md', 'README.md', '.env.example', 'package.json']
+const rootDocs = ['ARCHITECTURE.md', 'DECISIONS.md', 'INTEGRATIONS.md', 'CLAUDE.md', 'TODO.md', 'README.md', 'docs/brand-os-mcp.md', '.env.example', 'package.json']
   .map((f) => path.join(repoRoot, f))
   .filter((f) => fs.existsSync(f));
 const brandMcp = path.join(repoRoot, 'packages', 'brand-mcp');

@@ -1,6 +1,6 @@
 # Architecture
 
-Engineering Brand OS (the product content-powerhouse is growing into) is a local-first, self-hostable, multi-tenant studio for technical articles and their distribution. The same code runs on one person's machine with no account and no AI key, and as a hosted service for many isolated users. Day 1 shipped the foundation described here and Day 2 added accounts, the tenant-scoped data layer and personal knowledge; later days fill in the modules. See `DECISIONS.md` for why, and `TODO.md` for when.
+Engineering Brand OS (the product content-powerhouse is growing into) is a local-first, self-hostable, multi-tenant studio for technical articles and their distribution. The same code runs on one person's machine with no account and no AI key, and as a hosted service for many isolated users. Day 1 shipped the foundation described here, Day 2 added accounts, the tenant-scoped data layer and personal knowledge, Day 3 the article studio and Day 4 optional AI, agent access and the Claude Code MCP server; later days fill in the modules. See `DECISIONS.md` for why, and `TODO.md` for when.
 
 ## Modes
 
@@ -28,12 +28,15 @@ apps/web/                 Next.js (App Router, TypeScript strict, Tailwind, shad
     http/                 Request guard and the JSON route handlers' logic
     db/                   schema.ts (Drizzle), client.ts (pglite or node-postgres), migrate.ts
     data/                 The data-access layer: forOwner(ownerId) and its repositories. Only code that queries tenant tables.
-    actions/              The shared action layer (see below): knowledge, profile, export, system
+    actions/              The shared action layer (see below): knowledge, profile, articles, export, system, agent keys, AI providers, AI tasks and their runner
+    ai/                   Provider adapters (OpenAI-compatible, Anthropic), key encryption, address rules, the context builder (privacy gate), result application, the event bus
+    agent/                Agent key secrets and rate limits, and the views the agent API returns
   drizzle/                Generated SQL migrations (one set, both drivers)
   seed/                   owner.private.json (gitignored, never committed): the private owner seed
   test/                   Vitest: db, health, tokens, hygiene, auth, isolation, search, seed, source rules
 packages/                 Phase 0, kept and reused on Day 5
   core/ daemon/ client/ mcp/ cli/    Approval gate, dev.to and Buffer routes, dashboard, MCP, CLI
+  brand-mcp/                         The brand-os MCP server for Claude Code (Day 4): articles, knowledge and AI tasks over the agent API
 scripts/setup-local.mjs   One-step local setup
 ```
 
@@ -45,7 +48,8 @@ Every capability is a function in `src/server/actions/`: input validated with Zo
 
 ```
  Browser UI (server components, route handlers)  \
- MCP server (user's own Claude Code)              >-->  actions/  -->  data/ (scopedX)  -->  db/
+ Agent API /api/agent/* (bearer key), used by    >-->  actions/  -->  data/ (scopedX)  -->  db/
+   the brand-os MCP server and Claude Code        |
  AI provider (optional, structured operations)   /
 ```
 
@@ -79,14 +83,49 @@ Local mode resolves every request to the `local_owner` row (a real user id, `is_
 
 The studio is a client component tree loaded after the page shell: CodeMirror editor, live preview, a side panel for details and history, and a save controller (`src/lib/autosave.ts`) that owns debouncing, retries and conflicts. Rendering is one shared pipeline (`src/lib/markdown/render.ts`) used by the preview and the reading view; Mermaid is drawn in the browser. Imports (`src/server/import/*`) parse files, fetch pages through an SSRF-checked fetcher and read a local folder; all of them end in `createImportedArticle`, which writes a draft and an `import` version. Decisions 18 to 23 explain the choices.
 
+## Agent access and the agent API
+
+A person creates named keys in Settings > Agent access, each with a scope list (`read`, `write_articles`, `ai_tasks`). The secret is 256 random bits, shown once, and only its SHA-256 hash is stored (`agent_credentials`), with a prefix for display, last use and a revoke time. `/api/agent/*` takes `Authorization: Bearer <secret>` and nothing else:
+
+```
+request -> host guard -> shape check -> hash lookup (the one lookup not scoped to an owner)
+        -> revoked? -> per-key rate limit -> scope check -> action (as actor "agent") -> audit
+```
+
+The owner id comes from the key row and is never read from the path, query, body or headers. The routes call the same actions as the UI (`listArticles`, `saveArticle`, `listItems`, `submitTaskResult`), so validation, optimistic concurrency and audit are shared; an agent's saves are recorded with the version reason `agent`, whatever the body claims. There are no publishing, platform draft or approval routes, and a key cannot create keys or change providers (those actions refuse any actor but the signed-in owner). Failed attempts are slowed per client, requests are limited per key (in memory, per process), and every change and every use of a revoked key is in the owner's audit log.
+
+## AI providers, the privacy gate and tasks
+
+Providers are per user (`ai_providers`): `local` (Ollama or any OpenAI-compatible address), `api_key` (Anthropic, or an OpenAI-compatible service with the user's key), `claude_code_handoff` (the app runs nothing), and a reserved `local_cli_agent` slot that exists in the registry and cannot be selected. Keys are AES-256-GCM ciphertext bound to the owner and row, under a master key from `APP_SECRET` or, locally, a key file in `DATA_DIR`; the browser only ever sees the last four characters. Each provider has a trust level, `local` or `external`, derived from its kind and address (a local model on loopback or a private network is local; everything else is external), never typed in. A hosted server refuses local models and private addresses and calls user addresses through a fetch that resolves the name to a public address and connects to that address.
+
+The context builder (`src/server/ai/context.ts`) is the privacy gate. A request carries the selected excerpt, the article's title, description and tags, and knowledge items that are relevant AND (the provider is local, OR the item is marked for public use, OR the person approved that item for this one task). An approval is made by reading the exact text in a dialog; the server rebuilds the text and refuses the task if its hash differs from what was shown. Article and note text is fenced as data with a nonce derived from the content, and marker-like text inside it is defanged.
+
+An AI task (`ai_tasks`) records what was asked, the exact excerpt and the revision it was made for, the provider, the exact prompt, the status (`pending`, `running`, `needs_review`, `accepted`, `rejected`, `failed`), the structured result and token usage (estimated unless the provider reports it; a cost is never invented). A provider that runs tasks executes them in the background (Next's `after`): bounded by a timeout, cancellable through an in-process controller, one retry for transient failures only, answered from an earlier identical request by hash, and blocked by an optional monthly soft cap counted in estimated tokens. Every result, from a model or from Claude Code, goes through one validation (`src/lib/ai-ops.ts`): a discriminated union of five operations, restricted per task kind, with size limits and no HTML, and `replace_range` may only touch text inside the task's own excerpt. Accepting re-checks the live article (a result whose original text changed is flagged stale and refused), then saves a version with the reason `ai_accept`. Nothing is applied any other way.
+
+Status changes are published on an in-process bus right after the database commit and reach the browser over server-sent events (`/api/ai/events`), scoped to the signed-in owner; the studio falls back to polling if the stream cannot open. The bus and the per-key limiter live in the server process, which is right for local mode and one hosted instance; several instances would need a shared channel.
+
+## The brand-os MCP server
+
+`packages/brand-mcp` is a stdio MCP server (`@modelcontextprotocol/sdk` 1.32.1) that calls `/api/agent/*` with a key from `BRAND_OS_CREDENTIAL` and an address from `BRAND_OS_URL`. Nine typed tools: profile, knowledge search, list, read, create and update articles (update needs the revision read), list and read AI tasks, and submit a task result. It has no publishing, platform draft or approval tool. Results drop owner ids and key-like fields and remove the key from every string. It keeps its own copy of the result rules so a bad result is refused before it is sent; a test fails if that copy ever differs from the app's. Registration and scopes: `docs/brand-os-mcp.md`.
+
+## Local companion for browser users (planned, not built)
+
+A browser-based hosted user cannot let a hosted server reach their machine, and the hosted server must never run the user's `claude` binary or use their subscription. If a user wants local tooling anyway, the planned answer is an optional companion program the user installs and runs themselves. Its design constraints, written down now so nothing is built against them by accident:
+
+- **Pairing.** The user starts the companion, which shows a short one-time code; the user enters it in the web app while signed in. The pairing creates an agent key (Settings > Agent access) with the narrowest scopes the user picks, held only by the companion on that machine. The code expires in minutes and works once. Unpairing revokes the key.
+- **Direction.** The companion connects out to the app's agent API; the hosted server never connects in. There is no inbound port, no tunnel and no way for the server to start a process.
+- **May.** Serve the `brand-os` MCP tools to the user's own Claude Code on that machine, read and write the user's own articles within the key's scopes, and complete AI tasks the user handed off.
+- **May not.** Publish, approve or schedule anything; read files outside a folder the user names; hold platform tokens or Claude credentials; send data anywhere except the user's own Brand OS address; run commands the web app sends it.
+- **Same rules.** Everything it does goes through the agent API and the shared action layer, so isolation, validation and audit are unchanged.
+
 ## Adapter seams
 
-Three seams keep providers replaceable. Day 1 defines the shape; implementations arrive later.
+Three seams keep providers replaceable. Storage and AI are built; publishing arrives on Day 5.
 
 | Seam | Interface (sketch) | Implementations |
 |---|---|---|
 | Storage | put, get, delete, signed or local URL for article assets | Local folder under `DATA_DIR` (default); S3-compatible (hosted, later) |
-| AI | `complete(task) -> structured result`, capability probe, never required | None (default); local Ollama or any OpenAI-compatible server; user's own Anthropic API key |
+| AI | `complete({ system, user, maxOutputTokens, timeoutMs, signal }) -> { text, usage, model, truncated }`; errors are `AdapterError` with a kind and a redacted message; never required | None (default); OpenAI-compatible chat completions (Ollama, LM Studio, a user-keyed service); Anthropic Messages API with the user's key; Claude Code hand-off (no adapter: tasks wait for the agent API); `local_cli_agent` reserved |
 | Publishing | auth, formats, create or update draft, schedule, media, status, restrictions | DEV.to (Day 5), Hashnode, personal-site change, Medium as "prepare and open" |
 
 Verified facts and limits for each provider are in `INTEGRATIONS.md`.

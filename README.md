@@ -17,7 +17,8 @@ Brand OS is a local-first, self-hostable studio for technical writers and engine
 | Web app shell on embedded Postgres, design system, health checks | Built |
 | Accounts, tenant isolation, private knowledge base, onboarding | Built |
 | Article studio: Markdown editor, autosave, version history, import, assets, reading view | Built |
-| AI assistance, platform previews, more destinations | Planned (see [roadmap](#roadmap)) |
+| AI assistance in the studio (local model, your own API key, or Claude Code hand-off), AI task inbox with diffs to accept or reject, agent API with per-user keys, and the `brand-os` MCP server for Claude Code | Built and tested |
+| Platform previews, more destinations | Planned (see [roadmap](#roadmap)) |
 | Hosted cloud service, team workspaces | Planned |
 
 Nothing here is a mock-up: unfinished features are hidden or shown as clearly disabled.
@@ -130,12 +131,33 @@ node packages/cli/dist/index.js install
 
 It registers the MCP server with Claude Code at user scope, adds a logon task that runs the local daemon, and installs a guard hook that stops an AI from driving the approval dashboard. Then ask Claude things like "prepare this article for DEV.to". Claude can draft and stage private drafts; only you can approve.
 
+#### The `brand-os` server: your articles, knowledge and AI tasks
+
+A second MCP server, `brand-os` (`packages/brand-mcp`), lets your own Claude Code read your profile and knowledge, list, read, create and update articles, and complete AI tasks you left in the inbox. It talks to the running web app over its agent API with a credential you create, and it has no publishing, platform draft or approval tools (those arrive later and stay behind your approval).
+
+1. Start the app (`pnpm web:dev`) and build the server (`pnpm build`).
+2. In the app open **Settings > Agent access**, create a credential, pick its scopes (`read`, `write_articles`, `ai_tasks`) and copy it once. Only a hash is stored.
+3. Register the server with Claude Code. This is a command you run yourself; nothing here registers it for you. Keep the credential in an environment variable, not on the command line:
+
+```bash
+# once, in your shell profile or session (value from Settings > Agent access)
+export BRAND_OS_CREDENTIAL=<your-credential>
+
+# register for this project (writes .mcp.json, which reads the variable; do not commit a literal value)
+claude mcp add --scope project --transport stdio brand-os -- node "$(pwd)/packages/brand-mcp/dist/index.js"
+```
+
+   Then edit the `brand-os` entry in `.mcp.json` so its `env` forwards the variable and the address: `"env": { "BRAND_OS_CREDENTIAL": "${BRAND_OS_CREDENTIAL}", "BRAND_OS_URL": "${BRAND_OS_URL:-http://127.0.0.1:3100}" }`. Claude Code asks you to approve project servers the first time. On Windows use the full path to `node` and to `dist/index.js`; `node` directly avoids the `npx` shim problems, and `claude mcp get brand-os` shows what was stored.
+4. In Claude Code, try: "list my Brand OS articles", or, after starting a task with the Claude Code hand-off provider in the studio: "In Claude Code: list my Brand OS AI tasks and complete task `<id>`". Claude reads the task, submits structured operations, and the result waits in the studio for you to accept or reject. Nothing is applied until you do.
+
+Details, scopes and troubleshooting: [docs/brand-os-mcp.md](docs/brand-os-mcp.md).
+
 ### Connect your systems
 
 1. Open the dashboard (`cph dashboard`) and go to **Connections**.
 2. **DEV.to:** create an API key in your DEV.to settings and paste it into the dashboard card. Never paste keys into chat.
 3. **Buffer (optional, for LinkedIn, X and YouTube):** create a free account, connect the channels, create one API key and paste it into the dashboard card.
-4. **AI (optional):** point to a local model (Ollama or any OpenAI-compatible server), bring your own API key, or just use Claude Code over MCP.
+4. **AI (optional):** in **Settings > AI**, point to a local model (Ollama or any OpenAI-compatible server), bring your own API key, or hand tasks to your own Claude Code. The app works with none of them.
 
 Credentials are encrypted at rest with a master key held in your operating system's credential store, and they never appear in logs, MCP results or the UI.
 
