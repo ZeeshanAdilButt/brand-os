@@ -1,7 +1,8 @@
+import { MAX_IMAGE_BYTES } from '../../lib/articles';
 import type { StorageExtension } from '../storage';
 
-/** Largest accepted upload. Mirrored in the editor so a too-large file is refused before it is sent. */
-export const MAX_ASSET_BYTES = 10 * 1024 * 1024;
+/** Largest accepted upload. The editor knows the same number (lib/articles) and refuses a bigger file up front. */
+export const MAX_ASSET_BYTES = MAX_IMAGE_BYTES;
 
 export const ALLOWED_IMAGE_TYPES = {
   'image/png': 'png',

@@ -1,8 +1,10 @@
 'use client';
 
 import { Menu, Search } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { AccountInfo } from './account-block';
 import { Brand } from './brand';
 import { CommandPalette } from './command-palette';
@@ -19,10 +21,13 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
   const [navOpen, setNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const apple = useSyncExternalStore(noopSubscribe, isApplePlatform, () => false);
+  // The article studio (editor and preview side by side) needs the full width; every other page keeps the reading column.
+  const wide = /^\/articles\/[0-9a-f-]{36}\/?$/i.test(usePathname() ?? '');
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      // An editor that handled Ctrl+K itself (insert link) has already prevented the default.
+      if (!event.defaultPrevented && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen((open) => !open);
       }
@@ -79,7 +84,11 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
           </div>
         </header>
 
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-5xl px-4 py-8 outline-none sm:px-6 sm:py-10 lg:px-10">
+        <main
+          id="main"
+          tabIndex={-1}
+          className={cn('mx-auto w-full outline-none', wide ? 'max-w-none px-2 py-2 sm:px-4 sm:py-3' : 'max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10')}
+        >
           {children}
         </main>
       </div>

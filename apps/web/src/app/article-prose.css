@@ -1,0 +1,337 @@
+/*
+ * Rendered article text, shared by the editing preview and the reading view (both show the HTML
+ * from src/lib/markdown/render.ts). Colors come from the tokens in globals.css, so light and dark
+ * follow the theme; the syntax colors reuse the text-safe accents so code stays readable in both.
+ */
+@layer components {
+  .article-prose {
+    --code-bg: color-mix(in srgb, var(--foreground) 5%, var(--card));
+    --code-border: color-mix(in srgb, var(--foreground) 12%, var(--card));
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+  }
+  .article-prose > :first-child {
+    margin-top: 0;
+  }
+  .article-prose :where(h1, h2, h3, h4, h5, h6) {
+    position: relative;
+    margin: 2em 0 0.6em;
+    line-height: 1.25;
+    scroll-margin-top: 5.5rem;
+  }
+  .article-prose h1 {
+    font-size: 2rem;
+    font-weight: 600;
+  }
+  .article-prose h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--border);
+  }
+  .article-prose h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  .article-prose :where(h4, h5, h6) {
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+  .article-prose a.anchor {
+    margin-left: 0.4em;
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+    font-size: 0.8em;
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 120ms;
+  }
+  .article-prose :where(h1, h2, h3, h4, h5, h6):hover > a.anchor,
+  .article-prose a.anchor:focus-visible {
+    opacity: 1;
+  }
+  .article-prose p,
+  .article-prose :where(ul, ol, blockquote, pre, table, figure, details, .md-table, .mermaid-block) {
+    margin: 0 0 1.1em;
+  }
+  .article-prose a:not(.anchor) {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .article-prose a:not(.anchor):hover {
+    text-decoration-thickness: 2px;
+  }
+  .article-prose :where(ul, ol) {
+    padding-left: 1.5em;
+  }
+  .article-prose ul {
+    list-style: disc;
+  }
+  .article-prose ol {
+    list-style: decimal;
+  }
+  .article-prose li {
+    margin: 0.3em 0;
+  }
+  .article-prose li > :where(ul, ol, p) {
+    margin-top: 0.3em;
+    margin-bottom: 0.3em;
+  }
+  .article-prose ul.contains-task-list {
+    list-style: none;
+    padding-left: 0.25em;
+  }
+  .article-prose li.task-list-item input[type="checkbox"] {
+    margin: 0 0.55em 0.15em 0;
+    width: 1em;
+    height: 1em;
+    vertical-align: middle;
+    accent-color: var(--primary);
+  }
+  .article-prose blockquote {
+    padding: 0.2em 0 0.2em 1.1em;
+    border-left: 3px solid var(--rust);
+    color: var(--muted-foreground);
+  }
+  .article-prose blockquote > :last-child {
+    margin-bottom: 0;
+  }
+  .article-prose hr {
+    margin: 2.2em 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+  .article-prose img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1.4em auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  .article-prose :where(code, kbd, samp) {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+  }
+  .article-prose :not(pre) > code {
+    padding: 0.12em 0.35em;
+    border-radius: 0.3em;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    overflow-wrap: anywhere;
+  }
+  .article-prose kbd {
+    padding: 0.1em 0.4em;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 0.3em;
+    background: var(--card);
+  }
+  .article-prose pre {
+    position: relative;
+    padding: 1em 1.1em;
+    overflow-x: auto;
+    border-radius: var(--radius);
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    tab-size: 4;
+  }
+  .article-prose pre code {
+    font-size: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+  .article-prose pre[data-lang]::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 0.35rem;
+    right: 0.6rem;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    pointer-events: none;
+    transition: opacity 120ms;
+  }
+  .article-prose pre:hover[data-lang]::before,
+  .article-prose pre:focus-within[data-lang]::before {
+    opacity: 0;
+  }
+  .article-prose .code-copy {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.4rem;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+    background: var(--card);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    opacity: 0;
+    transition: opacity 120ms;
+  }
+  .article-prose pre:hover .code-copy,
+  .article-prose .code-copy:focus-visible {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .article-prose .code-copy {
+      opacity: 1;
+    }
+    .article-prose pre[data-lang]::before {
+      display: none;
+    }
+  }
+  .article-prose .md-table {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+  }
+  .article-prose table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .article-prose :where(th, td) {
+    padding: 0.55em 0.9em;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  .article-prose th {
+    background: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .article-prose tr:last-child td {
+    border-bottom: 0;
+  }
+  .article-prose .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    padding: 0;
+  }
+  .article-prose section[data-footnotes] {
+    margin-top: 2.5em;
+    padding-top: 0.8em;
+    border-top: 1px solid var(--border);
+    font-size: 0.9375rem;
+    color: var(--muted-foreground);
+  }
+  .article-prose section[data-footnotes] ol {
+    margin-bottom: 0;
+  }
+  .article-prose sup a[data-footnote-ref] {
+    padding: 0 0.1em;
+    text-decoration: none;
+  }
+  .article-prose a[data-footnote-backref] {
+    margin-left: 0.3em;
+    text-decoration: none;
+  }
+  .article-prose details {
+    padding: 0.6em 1em;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+  }
+  .article-prose summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .article-prose .mermaid-block {
+    display: flow-root;
+  }
+  .article-prose .mermaid-diagram {
+    padding: 1em;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    text-align: center;
+  }
+  .article-prose .mermaid-diagram svg {
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+  }
+  .article-prose .mermaid-block > details {
+    margin-top: 0.6em;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+  .article-prose .mermaid-block > details pre {
+    margin: 0.6em 0 0;
+  }
+  .article-prose .mermaid-warning {
+    margin-bottom: 0.6em;
+    padding: 0.6em 0.9em;
+    border: 1px solid color-mix(in srgb, var(--warning) 55%, transparent);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--warning) 12%, var(--card));
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  .article-prose .mermaid-pending {
+    margin-bottom: 0.4em;
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+  }
+
+  /* Syntax colors. Every one is a text-safe accent on the code background. */
+  .article-prose .hljs {
+    color: var(--foreground);
+  }
+  .article-prose :where(.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in, .hljs-doctag) {
+    color: var(--link);
+  }
+  .article-prose :where(.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-template-variable, .hljs-selector-attr, .hljs-selector-pseudo) {
+    color: var(--teal-text);
+  }
+  .article-prose :where(.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-link, .hljs-type, .hljs-params) {
+    color: var(--warning);
+  }
+  .article-prose :where(.hljs-comment, .hljs-quote, .hljs-meta) {
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .article-prose :where(.hljs-title, .hljs-section, .hljs-name, .hljs-selector-id, .hljs-selector-class, .hljs-variable) {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  .article-prose .hljs-deletion {
+    color: var(--destructive);
+  }
+  .article-prose .hljs-emphasis {
+    font-style: italic;
+  }
+  .article-prose .hljs-strong {
+    font-weight: 700;
+  }
+}

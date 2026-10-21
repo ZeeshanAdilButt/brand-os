@@ -51,6 +51,9 @@ export const LIMITS = {
   query: 200,
 } as const;
 
+/** Largest image the studio accepts. Enforced by the server; mirrored in the editor so a big file is refused before it is sent. */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 /** Autosaves closer together than this belong to one burst of editing and share one history entry. */
 export const AUTOSAVE_BURST_MS = 10 * 60 * 1000;
 
@@ -85,4 +88,58 @@ export function countWords(markdown: string): number {
 /** Whole minutes at 220 words per minute, at least 1 for any non-empty text. */
 export function readingMinutes(words: number): number {
   return words === 0 ? 0 : Math.max(1, Math.round(words / 220));
+}
+
+/** An article as the browser sees it (dates arrive as ISO strings). */
+export interface ArticleDTO {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  tags: string[];
+  canonicalUrl: string | null;
+  coverAssetId: string | null;
+  status: ArticleStatus;
+  bodyMarkdown: string;
+  sourceKind: ArticleSourceKind;
+  sourceRef: string | null;
+  extraMetadata: Record<string, unknown>;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
+}
+
+export interface VersionSummaryDTO {
+  id: string;
+  versionNo: number;
+  title: string;
+  reason: VersionReason;
+  createdAt: string;
+  chars: number;
+}
+
+export interface VersionDTO {
+  versionNo: number;
+  title: string;
+  body: string;
+  metadata: Record<string, unknown>;
+  reason: VersionReason;
+  createdAt: string;
+}
+
+export interface AssetDTO {
+  id: string;
+  filename: string;
+  mime: string;
+  size: number;
+  alt: string;
+  url: string;
+  markdown: string;
+  createdAt: string;
+}
+
+/** Roughly how many minutes a body of this many characters takes to read (the list never loads bodies). */
+export function approxReadingMinutes(chars: number): number {
+  return chars === 0 ? 0 : Math.max(1, Math.round(chars / 6 / 220));
 }
