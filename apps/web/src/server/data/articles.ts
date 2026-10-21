@@ -43,6 +43,9 @@ export interface ArticleCreateInput {
   reason?: VersionReason;
 }
 
+/** Why a save happened. Only 'autosave' is coalesced into the previous history entry. */
+export type SaveReason = 'autosave' | 'manual' | 'agent' | 'ai_accept';
+
 export type ArticlePatch = {
   title?: string;
   slug?: string;
@@ -284,7 +287,7 @@ export function scopedArticles(scope: Scope) {
      * the previous autosave of the same burst is replaced by a new one holding the latest state.
      * Rows are never edited; a superseded autosave row is deleted and a new row inserted.
      */
-    async save(id: string, expectedRevision: number, patch: ArticlePatch, reason: 'autosave' | 'manual'): Promise<Article> {
+    async save(id: string, expectedRevision: number, patch: ArticlePatch, reason: SaveReason): Promise<Article> {
       if (patch.coverAssetId) await assertOwnAsset(patch.coverAssetId);
       const db = await scope.db();
       try {
@@ -318,7 +321,8 @@ export function scopedArticles(scope: Scope) {
             .orderBy(desc(articleVersions.versionNo))
             .limit(1);
 
-          if (reason === 'manual') {
+          // Everything but an autosave (a deliberate save, an agent's save, an accepted AI change) leaves a durable snapshot.
+          if (reason !== 'autosave') {
             if (latest && sameSnapshot(latest, article) && latest.reason !== 'autosave') return article;
             if (latest?.reason === 'autosave' && sameSnapshot(latest, article)) {
               await tx.delete(articleVersions).where(and(eq(articleVersions.ownerId, scope.ownerId), eq(articleVersions.id, latest.id)));
@@ -330,7 +334,7 @@ export function scopedArticles(scope: Scope) {
               title: article.title,
               body: article.bodyMarkdown,
               metadata: snapshotMetadata(article),
-              reason: 'manual',
+              reason,
             });
             return article;
           }

@@ -7,7 +7,15 @@ import {
   slugify,
   type ArticleSourceKind,
 } from '../../lib/articles';
-import { ConflictError, type ArticleFilter, type ArticleHit, type ArticleListRow, type ArticlePatch, type VersionSummary } from '../data/articles';
+import {
+  ConflictError,
+  type ArticleFilter,
+  type ArticleHit,
+  type ArticleListRow,
+  type ArticlePatch,
+  type SaveReason,
+  type VersionSummary,
+} from '../data/articles';
 import { NotFoundError, SlugTakenError } from '../data/scope';
 import type { Article, ArticleVersion } from '../db/schema';
 import { ActionError, parseId, parseInput, type OwnerContext } from './owner';
@@ -143,6 +151,7 @@ export async function createArticle(owner: OwnerContext, input: unknown = {}): P
       canonicalUrl: values.canonicalUrl,
       bodyMarkdown: values.bodyMarkdown,
       sourceKind: 'manual',
+      ...(owner.actor === 'agent' ? { reason: 'agent' as const } : {}),
     }),
   );
   await owner.data.audit.record({ actor: owner.actor, action: 'article.created', entityType: 'article', entityId: article.id });
@@ -163,12 +172,23 @@ export async function saveArticle(owner: OwnerContext, id: unknown, input: unkno
     status: rest.status,
     bodyMarkdown: rest.bodyMarkdown,
   };
-  const article = await guard(() => owner.data.articles.save(articleId, expectedRevision, patch, reason));
+  // What led to the save is decided by who is acting, never by the request: an agent's saves are always
+  // recorded as the agent's, whatever `reason` the body claims.
+  const saveReason: SaveReason = owner.actor === 'agent' ? 'agent' : reason;
+  const article = await guard(() => owner.data.articles.save(articleId, expectedRevision, patch, saveReason));
   // Autosaves would flood the log; deliberate saves are recorded.
-  if (reason === 'manual') {
-    await owner.data.audit.record({ actor: owner.actor, action: 'article.saved', entityType: 'article', entityId: article.id });
+  if (saveReason !== 'autosave') {
+    await owner.data.audit.record({ actor: owner.actor, action: 'article.saved', entityType: 'article', entityId: article.id, metadata: { reason: saveReason } });
   }
   return article;
+}
+
+/**
+ * Apply an accepted AI change: a patch against the revision the person saw, recorded as its own
+ * version (reason 'ai_accept'). Only the AI task actions call this.
+ */
+export async function saveAcceptedAiChange(owner: OwnerContext, articleId: string, expectedRevision: number, patch: ArticlePatch): Promise<Article> {
+  return guard(() => owner.data.articles.save(articleId, expectedRevision, patch, 'ai_accept'));
 }
 
 export async function deleteArticle(owner: OwnerContext, id: unknown): Promise<void> {
