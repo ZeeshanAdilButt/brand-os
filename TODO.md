@@ -5,7 +5,7 @@ Working name for the product that content-powerhouse grows into. Days are implem
 ## Current Position
 Phase: 1
 Day: 5
-Status: Not started (Day 4 complete)
+Status: Built and tested against fake servers (Day 4 complete). Waiting on the owner's live DEV.to check, the one acceptance step only the owner can do
 
 ## Phase 1: Technical Article Publishing
 
@@ -52,10 +52,23 @@ Day 4 results: `pnpm test` 1574 passed, 6 skipped (about 210 new tests: agent ke
 Not validated, on purpose or for lack of access: no real model was called (the flow used a local fake server, and the Anthropic and OpenAI-compatible adapters are tested against fake responses only; OpenAI's reference page could not be read, see INTEGRATIONS.md open risks 15 to 17); the MCP client in the real-flow run was the SDK's stdio client, not the Claude Code binary (`claude mcp add` is documented but was not run); the hosted driver against a real Postgres is still outstanding as on Days 1 to 3; the event bus and rate limiter are per process (multi-instance needs a shared store, Day 27); the local companion is documented, not built.
 
 ### Day 5: Technical publishing connectors
-- [ ] Adapter interface (auth, formats, drafts, scheduling, media, status, restrictions)
-- [ ] DEV.to adapter (reuse Phase 0 route and approval gate); Hashnode if supported; connection state; canonical URLs and tags; provider IDs and URLs; errors and retries
+- [x] Adapter interface (auth, formats, drafts, scheduling, media, status, restrictions); capability data shown in the UI
+- [x] Design: the Phase 0 invariants ported to Postgres for the web app, the daemon left as legacy (DECISIONS.md 32); reconciling or retiring the daemon is a Day 7 decision
+- [x] Connections (Settings > Connections): encrypted keys, read-only probe, status and account, test, disconnect
+- [x] DEV.to adapter: private draft, publish only inside `publish()`, canonical URL, sanitized tags with a visible report, status check, Retry-After in seconds and as a date
+- [x] Hashnode adapter (GraphQL), verified from the official schema; marked live-unverified
+- [x] Platform drafts with lint (errors block approval), source tracking and a payload hash
+- [x] Approval flow: single use, 30 minutes, hash bound, session only, atomic with the move to publishing, no duplicates, unknown resolved by a check or by hand
+- [x] Errors and retries: clean (failed) versus ambiguous (unknown), staging retries with capped backoff, publishing never
+- [x] Minimal UI: Settings > Connections, the studio Publish panel with the approval card, the Publishing page
+- [x] Agent API and brand-os MCP: create, list, get, stage privately, request approval, status; no approve, publish or hand-off (tested by route files, handlers and the tool list)
+- [ ] **Pending the owner's live check:** add a DEV.to key in Settings > Connections, prepare a draft, stage a private draft, look at it in the DEV.to dashboard, and approve a publish if wanted (README, "Publish to DEV.to")
 
-Acceptance: at least one real publication created or published after explicit approval.
+Acceptance: at least one real publication created or published after explicit approval. **Not met yet: pending the owner's live check.** Everything else is built and validated against fake servers; no real platform was called.
+
+Day 5 results: `pnpm test`, `pnpm typecheck`, `pnpm build` and `pnpm web:lint` are green (see the commit message of the docs commit for the counts). Tests cover tenant isolation of connections, drafts, approvals, attempts and audit through the data layer, the routes and the agent API and MCP; single-use and expiring approvals; a changed payload or a changed article voiding an approval; exactly one remote call for concurrent approvals; duplicate prevention; unknown never retried or silently re-approvable; a late stage failure unable to flip a publishing or published draft; stage never touching a live article; agents unable to approve or publish by any route; keys encrypted at rest and never returned, logged or echoed; both adapters against fake fetch for success, 401, 422, 429 (seconds and date), 5xx, timeout and a refused redirect; tag sanitizing, canonical handling and lint (including local-asset images); source rules for the new tenant tables. Real flow: the built app on a spare port with a temporary data folder and a local fake DEV.to server (the address override needs an explicit test flag and a loopback address): connected the fake, prepared a draft from an article, saw a local-image lint error block staging, staged a private draft, requested approval, ticked the boxes (the button stayed off until all four), approved and published, saw the link, then edited an article after requesting approval and saw the approval void and the draft flagged. Checked at 1280px and 400px, light and dark; one horizontal overflow in the approval card was found and fixed.
+
+Not validated, on purpose or for lack of access: no real DEV.to or Hashnode request was made, and the owner's live check is pending; Hashnode is built from the official schema only (INTEGRATIONS.md open risks 19 and 20); no real Postgres server run of the hosted driver (as on earlier days); the approval has no per-action presence check in the web app (DECISIONS.md 33).
 
 ### Day 6: Publishing preview and workflow
 - [ ] Composer: original (left), destination cards (middle), AI suggestions (right); per-destination preview, edit, diff, metadata
@@ -126,11 +139,11 @@ Use the owner's own local coding agent CLI (for example Codex) to improve wordin
 
 ## Standing rules
 - Vertical slices. Finish one real workflow before starting ten.
-- Public actions (publish, email, submit) need explicit per-action approval; the Phase 0 approval gate stays the only path.
+- Public actions (publish, email, submit) need explicit per-action approval; every publish goes through an approval gate (the Phase 0 daemon, or the web app's approval model).
 - Private seed data never enters git, fixtures, docs or other tenants. No invented metrics or experience; achievements are owner claims needing review before publication.
 - No fake UX: unfinished features are hidden or clearly disabled.
 - No em dashes in code comments, UI copy, docs or commits. No Claude attribution in git.
 - Daily loop: read TODO.md and CLAUDE.md, finish the current day, test, review security and UX, tick validated tasks, commit, report.
 
 ## Implementation notes
-- Phase 0 (done, branch feat/phase-0): approval gate, dev.to and Buffer routes, dashboard, MCP, CLI. 994 tests. Day 5 reuses it.
+- Phase 0 (done, branch feat/phase-0): approval gate, dev.to and Buffer routes, dashboard, MCP, CLI. 994 tests. Day 5 ported its invariants to the web app instead of calling it (DECISIONS.md 32); it stays as the legacy path until Day 7.

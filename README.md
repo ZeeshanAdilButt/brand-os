@@ -18,7 +18,8 @@ Brand OS is a local-first, self-hostable studio for technical writers and engine
 | Accounts, tenant isolation, private knowledge base, onboarding | Built |
 | Article studio: Markdown editor, autosave, version history, import, assets, reading view | Built |
 | AI assistance in the studio (local model, your own API key, or Claude Code hand-off), AI task inbox with diffs to accept or reject, agent API with per-user keys, and the `brand-os` MCP server for Claude Code | Built and tested |
-| Platform previews, more destinations | Planned (see [roadmap](#roadmap)) |
+| Technical publishing in the web app: connections, DEV.to and Hashnode adapters, private drafts, hash-bound single-use approval, the approved publish, recovery for an unknown result, and agent and MCP tools that can prepare and ask but never approve | Built and tested against local fake servers. **DEV.to live check pending the owner**; Hashnode is built from the official schema and is live-unverified |
+| Per-destination composer, previews and batches, more destinations | Planned (see [roadmap](#roadmap)) |
 | Hosted cloud service, team workspaces | Planned |
 
 Nothing here is a mock-up: unfinished features are hidden or shown as clearly disabled.
@@ -133,10 +134,10 @@ It registers the MCP server with Claude Code at user scope, adds a logon task th
 
 #### The `brand-os` server: your articles, knowledge and AI tasks
 
-A second MCP server, `brand-os` (`packages/brand-mcp`), lets your own Claude Code read your profile and knowledge, list, read, create and update articles, and complete AI tasks you left in the inbox. It talks to the running web app over its agent API with a credential you create, and it has no publishing, platform draft or approval tools (those arrive later and stay behind your approval).
+A second MCP server, `brand-os` (`packages/brand-mcp`), lets your own Claude Code read your profile and knowledge, list, read, create and update articles, and complete AI tasks you left in the inbox. It talks to the running web app over its agent API with a credential you create, and it can prepare platform drafts, stage private copies and ask for your approval, but it has no tool to approve or publish (only you can, in the app).
 
 1. Start the app (`pnpm web:dev`) and build the server (`pnpm build`).
-2. In the app open **Settings > Agent access**, create a credential, pick its scopes (`read`, `write_articles`, `ai_tasks`) and copy it once. Only a hash is stored.
+2. In the app open **Settings > Agent access**, create a credential, pick its scopes (`read`, `write_articles`, `ai_tasks`, `platform_drafts`) and copy it once. Only a hash is stored.
 3. Register the server with Claude Code. This is a command you run yourself; nothing here registers it for you. Keep the credential in an environment variable, not on the command line:
 
 ```bash
@@ -152,9 +153,22 @@ claude mcp add --scope project --transport stdio brand-os -- node "$(pwd)/packag
 
 Details, scopes and troubleshooting: [docs/brand-os-mcp.md](docs/brand-os-mcp.md).
 
+### Publish to DEV.to
+
+The web app publishes through Settings > Connections. This is the one step that only you can do, because it needs your own DEV.to key and your own approval. Nothing here has been run against the real DEV.to yet.
+
+1. In DEV.to open Settings, then Extensions, and create a "DEV Community API Key".
+2. In Brand OS open **Settings > Connections**, paste the key into the DEV.to card (a password field) and choose **Connect DEV.to**. The key is checked with a read-only request and stored encrypted. It is never shown again.
+3. Open an article, choose **Publish** in the studio toolbar, then **Prepare draft**. Read the checks: an image that only exists in the app, or more than four tags, must be fixed first.
+4. Choose **Stage private draft**, then **Open the private draft on DEV.to** and look at it in your DEV.to dashboard. It is a draft, not public.
+5. Only if you want it live: choose **Request approval**, read the exact post, tick all four boxes and choose **Approve and publish**. It goes out once. If the result is unknown, use **Check on platform**; it is never retried for you.
+
+Hashnode works the same way (it needs a Pro plan on the publication) and is marked live-unverified until you have tried it.
+
 ### Connect your systems
 
-1. Open the dashboard (`cph dashboard`) and go to **Connections**.
+0. The web app: open **Settings > Connections** to connect DEV.to or Hashnode (see "Publish to DEV.to" above).
+1. The Phase 0 command-line tool: open the dashboard (`cph dashboard`) and go to **Connections**.
 2. **DEV.to:** create an API key in your DEV.to settings and paste it into the dashboard card. Never paste keys into chat.
 3. **Buffer (optional, for LinkedIn, X and YouTube):** create a free account, connect the channels, create one API key and paste it into the dashboard card.
 4. **AI (optional):** in **Settings > AI**, point to a local model (Ollama or any OpenAI-compatible server), bring your own API key, or hand tasks to your own Claude Code. The app works with none of them.

@@ -17,8 +17,14 @@ Verified against Claude Code's MCP documentation on 2026-10-21 (see `INTEGRATION
 | `list_ai_tasks` | `read` | Tasks in the inbox (pending and running by default) |
 | `get_ai_task` | `read` | The task, its exact excerpt, allowed operations and their shapes |
 | `submit_ai_task_result` | `ai_tasks` | Complete a pending or running task; the owner still accepts or rejects it |
+| `create_platform_draft` | `platform_drafts` | Adapt an article for DEV.to or Hashnode: the exact payload, sanitized tags and lint. Sends nothing. Needs the owner to have connected the platform |
+| `list_platform_drafts` | `read` | Drafts with status, lint flag and any open approval |
+| `get_platform_draft` | `read` | One draft: title, tags and what changed, canonical URL, the Markdown, the exact request body, every lint error and warning |
+| `stage_remote_draft` | `platform_drafts` | Create or update a PRIVATE draft on the platform. Never public; refused while lint errors exist |
+| `request_publish_approval` | `platform_drafts` | Open a pending, single-use request (30 minutes) and return the link where the owner decides. Publishes nothing |
+| `get_publication_status` | `read` | Where a draft stands, the link once published, any failure |
 
-There are **no tools for publishing, platform drafts, approvals, credentials, provider settings or other accounts**. Publishing and platform drafts arrive on Days 5 and 6, behind the existing approval gate; this server will not be where approval happens.
+There are **no tools to approve, decline, publish, check on a platform, mark a result, connect an account, change credentials or provider settings, or reach other accounts**, and no route behind them: only the signed-in owner can approve, in the app. A test fails if a tool or an agent route with such a name or purpose appears.
 
 Read tools are annotated read-only. Write tools are annotated non-destructive (every article save is a restorable version), and none is open-world.
 
@@ -28,7 +34,7 @@ The credential decides whose data a request touches. No tool takes an owner, use
 
 A credential is created by the signed-in owner under **Settings > Agent access**:
 
-- it has a name and a list of scopes (`read`, `write_articles`, `ai_tasks`);
+- it has a name and a list of scopes (`read`, `write_articles`, `ai_tasks`, `platform_drafts`);
 - the secret is shown once and only its SHA-256 hash is stored;
 - the list shows last use, and **Revoke** takes effect on the next request;
 - requests are rate limited per credential, failed attempts are slowed, and every change an agent makes is in the owner's audit log with the credential it came from.
@@ -81,6 +87,16 @@ On Windows prefer `node <path>` over `npx` (the shim has had quoting problems); 
 
 A result is checked by the same rules as an answer from any model: one to five operations from `replace_range`, `suggest_titles`, `review_notes`, `insert_after` and `outline`; only the operations that task kind allows; size limits; no HTML; and a `replace_range` must copy its `original` exactly from the task excerpt, so nothing outside the selection can change. Article text, knowledge and excerpts are data: Claude is told to ignore any instructions inside them.
 
+## Publishing from Claude Code
+
+With the `platform_drafts` scope Claude can take an article as far as a request for your approval, and no further.
+
+1. In **Settings > Connections** you connect DEV.to (and Hashnode, live-unverified). Claude never sees or sets a key.
+2. Claude calls `create_platform_draft` for an article, reads the lint with `get_platform_draft` and tells you what must be fixed (an image that only exists in the app, too many tags). Lint errors block staging and approval.
+3. `stage_remote_draft` makes a private copy on the platform, which you can open there.
+4. `request_publish_approval` returns a link to the article's Publish panel. Opening it approves nothing. You read the exact payload, tick four boxes and click **Approve and publish**. The request expires after 30 minutes, can be used once, and is void if the article changes.
+5. Claude can poll `get_publication_status` and should say "published" only when it says published. If the result is `unknown`, you resolve it in the app; it is never retried.
+
 ## What never leaves in a result
 
 Results never contain the credential, an owner id, a provider key or another account's data. The server strips those fields and removes the credential from every string, including error messages.
@@ -94,4 +110,6 @@ Results never contain the credential, an owner id, a provider key or another acc
 | "did not accept the credential" | It is missing, mistyped or revoked. Create a new one. |
 | "does not have the ... scope" | Create a credential with that scope. |
 | "current revision is N" | The article changed since you read it. `get_article` again and redo the edit. |
+| "Connect DEV.to first" | The owner has not connected the platform in Settings > Connections. |
+| "Fix N problems before staging" | The draft has lint errors; read them with `get_platform_draft`. |
 | "Not found for this account" | The id does not exist for the credential's owner (or belongs to someone else, which looks identical). |

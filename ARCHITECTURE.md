@@ -1,6 +1,6 @@
 # Architecture
 
-Engineering Brand OS (the product content-powerhouse is growing into) is a local-first, self-hostable, multi-tenant studio for technical articles and their distribution. The same code runs on one person's machine with no account and no AI key, and as a hosted service for many isolated users. Day 1 shipped the foundation described here, Day 2 added accounts, the tenant-scoped data layer and personal knowledge, Day 3 the article studio and Day 4 optional AI, agent access and the Claude Code MCP server; later days fill in the modules. See `DECISIONS.md` for why, and `TODO.md` for when.
+Engineering Brand OS (the product content-powerhouse is growing into) is a local-first, self-hostable, multi-tenant studio for technical articles and their distribution. The same code runs on one person's machine with no account and no AI key, and as a hosted service for many isolated users. Day 1 shipped the foundation described here, Day 2 added accounts, the tenant-scoped data layer and personal knowledge, Day 3 the article studio, Day 4 optional AI, agent access and the Claude Code MCP server, and Day 5 the technical publishing connectors; later days fill in the modules. See `DECISIONS.md` for why, and `TODO.md` for when.
 
 ## Modes
 
@@ -31,12 +31,13 @@ apps/web/                 Next.js (App Router, TypeScript strict, Tailwind, shad
     actions/              The shared action layer (see below): knowledge, profile, articles, export, system, agent keys, AI providers, AI tasks and their runner
     ai/                   Provider adapters (OpenAI-compatible, Anthropic), key encryption, address rules, the context builder (privacy gate), result application, the event bus
     agent/                Agent key secrets and rate limits, and the views the agent API returns
+    publishing/           Platform adapters (DEV.to, Hashnode), the shared request helper, lint, tag rules, hashes, the adapter registry and views
   drizzle/                Generated SQL migrations (one set, both drivers)
   seed/                   owner.private.json (gitignored, never committed): the private owner seed
   test/                   Vitest: db, health, tokens, hygiene, auth, isolation, search, seed, source rules
-packages/                 Phase 0, kept and reused on Day 5
+packages/                 Phase 0, kept as the legacy single-user path (decision 32)
   core/ daemon/ client/ mcp/ cli/    Approval gate, dev.to and Buffer routes, dashboard, MCP, CLI
-  brand-mcp/                         The brand-os MCP server for Claude Code (Day 4): articles, knowledge and AI tasks over the agent API
+  brand-mcp/                         The brand-os MCP server for Claude Code: articles, knowledge, AI tasks and platform drafts over the agent API
 scripts/setup-local.mjs   One-step local setup
 ```
 
@@ -92,7 +93,7 @@ request -> host guard -> shape check -> hash lookup (the one lookup not scoped t
         -> revoked? -> per-key rate limit -> scope check -> action (as actor "agent") -> audit
 ```
 
-The owner id comes from the key row and is never read from the path, query, body or headers. The routes call the same actions as the UI (`listArticles`, `saveArticle`, `listItems`, `submitTaskResult`), so validation, optimistic concurrency and audit are shared; an agent's saves are recorded with the version reason `agent`, whatever the body claims. There are no publishing, platform draft or approval routes, and a key cannot create keys or change providers (those actions refuse any actor but the signed-in owner). Failed attempts are slowed per client, requests are limited per key (in memory, per process), and every change and every use of a revoked key is in the owner's audit log.
+The owner id comes from the key row and is never read from the path, query, body or headers. The routes call the same actions as the UI (`listArticles`, `saveArticle`, `listItems`, `submitTaskResult`), so validation, optimistic concurrency and audit are shared; an agent's saves are recorded with the version reason `agent`, whatever the body claims. Platform draft routes (prepare, stage privately, request approval, read status) exist; there is no route that approves, declines, publishes, checks, marks or connects, and a key cannot create keys or change providers (those actions refuse any actor but the signed-in owner). Failed attempts are slowed per client, requests are limited per key (in memory, per process), and every change and every use of a revoked key is in the owner's audit log.
 
 ## AI providers, the privacy gate and tasks
 
@@ -106,7 +107,7 @@ Status changes are published on an in-process bus right after the database commi
 
 ## The brand-os MCP server
 
-`packages/brand-mcp` is a stdio MCP server (`@modelcontextprotocol/sdk` 1.32.1) that calls `/api/agent/*` with a key from `BRAND_OS_CREDENTIAL` and an address from `BRAND_OS_URL`. Nine typed tools: profile, knowledge search, list, read, create and update articles (update needs the revision read), list and read AI tasks, and submit a task result. It has no publishing, platform draft or approval tool. Results drop owner ids and key-like fields and remove the key from every string. It keeps its own copy of the result rules so a bad result is refused before it is sent; a test fails if that copy ever differs from the app's. Registration and scopes: `docs/brand-os-mcp.md`.
+`packages/brand-mcp` is a stdio MCP server (`@modelcontextprotocol/sdk` 1.32.1) that calls `/api/agent/*` with a key from `BRAND_OS_CREDENTIAL` and an address from `BRAND_OS_URL`. Fifteen typed tools: profile, knowledge search, list, read, create and update articles (update needs the revision read), list and read AI tasks, submit a task result, and six for platform drafts (create, list, get, stage a private copy, request approval, read status). It has no approve, decline, publish, check or hand-off tool. Results drop owner ids and key-like fields and remove the key from every string. It keeps its own copy of the result rules so a bad result is refused before it is sent; a test fails if that copy ever differs from the app's. Registration and scopes: `docs/brand-os-mcp.md`.
 
 ## Local companion for browser users (planned, not built)
 
@@ -120,27 +121,41 @@ A browser-based hosted user cannot let a hosted server reach their machine, and 
 
 ## Adapter seams
 
-Three seams keep providers replaceable. Storage and AI are built; publishing arrives on Day 5.
+Three seams keep providers replaceable. Storage, AI and publishing are built.
 
 | Seam | Interface (sketch) | Implementations |
 |---|---|---|
 | Storage | put, get, delete, signed or local URL for article assets | Local folder under `DATA_DIR` (default); S3-compatible (hosted, later) |
 | AI | `complete({ system, user, maxOutputTokens, timeoutMs, signal }) -> { text, usage, model, truncated }`; errors are `AdapterError` with a kind and a redacted message; never required | None (default); OpenAI-compatible chat completions (Ollama, LM Studio, a user-keyed service); Anthropic Messages API with the user's key; Claude Code hand-off (no adapter: tasks wait for the agent API); `local_cli_agent` reserved |
-| Publishing | auth, formats, create or update draft, schedule, media, status, restrictions | DEV.to (Day 5), Hashnode, personal-site change, Medium as "prepare and open" |
+| Publishing | `id`, `info` (auth kind, capabilities, verification level), `adapt`, `validate`, `preview`, `health`, `stage` (private), `publish`, `check` (read-only); errors are `PlatformError` with a kind and an ambiguous flag | DEV.to and Hashnode (Day 5); personal-site change (Day 6); Medium as "prepare and open" |
 
 Verified facts and limits for each provider are in `INTEGRATIONS.md`.
 
 ## Approval boundaries
 
 - Nothing is published, posted, scheduled or sent without the owner's explicit approval of that exact action. One approval covers one action, never a batch relayed by another session.
-- Publish actions in the web app will route through the Phase 0 approval gate in `packages/daemon` (Day 5). The web app and MCP can stage drafts and request approval; they cannot approve.
+- Publish actions in the web app go through the approval model in `src/server/actions/publishing.ts` and `src/server/data/publishing.ts` (decisions 32 and 33): the Phase 0 gate's invariants rebuilt on Postgres, per owner. The web app, the agent API and MCP can prepare drafts, stage private copies and request approval; only the signed-in owner, in the browser, can approve.
 - AI output is a proposal: structured operations shown as a diff, applied only when the owner accepts.
 - Credentials are never read from `~/.claude` or any Claude login. The only Anthropic credential accepted is an API key the user saved on purpose.
 - Provider keys are stored per user, encrypted with an app-level key, shown as last four characters only, never logged.
 
-## Phase 0 and the new stack (two stores, until Day 5)
+## Publishing
 
-Phase 0 is a separate local program: a daemon with SQLite (`cph.db`), the approval gate, OS keyring secrets, dev.to and Buffer routes, an MCP server and a dashboard. The new web app has its own Postgres. They do not share data on Day 1. Day 5 reconciles them as described in `DECISIONS.md` (decision 7).
+Four tenant tables: `platform_connections` (one per platform, key encrypted and bound to the row), `platform_drafts` (the adapted article, the exact payload and its hash, lint, the article revision and source hash it came from, the remote id and link), `approvals` (single use, hash bound, 30 minutes) and `publish_attempts` (every stage, publish, check and manual resolution with a redacted message). All are reached through `forOwner(...).connections` and `.platformDrafts`.
+
+```
+prepare -> (lint) -> stage (private copy) -> request approval -> approve and publish -> published
+   |                    |                          |                    |  one transaction:
+   |                    |                          |                    |  consume approval + status publishing
+   v                    v                          v                    v  then ONE adapter call
+ source_changed if the article changes at any point before publishing; failed or unknown after
+```
+
+`authorizePublish` is the only code that moves a draft to `publishing`. It re-checks, inside one transaction, the draft status, the staged remote copy, the article's source hash, the connection state, and the approval (pending, unexpired, same payload hash), consumes the approval and writes a `started` attempt. A partial unique index on (owner, platform, payload hash) while `publishing`, `unknown` or `published` stops a second draft with the same payload. The adapter is then called once. Routes: `/api/connections`, `/api/articles/[id]/destinations`, `/api/platform-drafts` (prepare, read, stage, request-approval, check, mark) and `/api/approvals/[id]/approve|decline`; the agent routes under `/api/agent/platform-drafts` stop at request-approval and status.
+
+## Phase 0 and the new stack (two stores)
+
+Phase 0 is a separate local program: a daemon with SQLite (`cph.db`), the approval gate, OS keyring secrets, dev.to and Buffer routes, an MCP server and a dashboard. The new web app has its own Postgres. They do not share data. Day 5 did not couple them: the web app has its own publishing path (decision 32) and the daemon stays as the legacy single-user path until Day 7 decides whether to reconcile or retire it.
 
 ## Observability
 

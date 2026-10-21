@@ -13,13 +13,14 @@ Read in this order: `README.md` (what the product is), `TODO.md` (roadmap and th
 
 ## Hard rules
 
-- **Public actions need explicit approval.** Never publish, post, schedule or send anything to a real platform without the user's approval of that exact action. Drafts and dry runs are fine. One approval covers one action; there is no "approve all". The approval gate in `packages/daemon` is the only path to a publish.
+- **Public actions need explicit approval.** Never publish, post, schedule or send anything to a real platform without the user's approval of that exact action. Drafts and dry runs are fine. One approval covers one action; there is no "approve all". Two paths can publish and both are gated: the approval gate in `packages/daemon` (legacy, single user) and the web app's approval model (`apps/web/src/server/actions/publishing.ts`, decision 33). Agent credentials and MCP tools can never approve or publish.
 - **Tenant isolation.** Every tenant row carries an owner id taken only from the authenticated session, never from request input or an agent argument. All tenant queries go through `forOwner(ownerId)` in `apps/web/src/server/data`.
 - **No secrets or personal data in git.** The repo is public. Keys, tokens, `.env` files, local databases and private seed data stay out of it. Private knowledge lives in the database; the one-time import file `apps/web/seed/owner.private.json` is gitignored. Tests use synthetic data only. Before every push, scan the diff for key-shaped strings; never put provider-shaped token literals in tests.
 - **Generic voice.** No personal names, personal domains or employer details in tracked files; use the placeholder domain `example-blog.dev` and "the owner" or "you".
 - **No fake UX.** Unfinished features are hidden or shown as clearly disabled. No simulated success, analytics or integrations.
 - **External sites are read-only.** The tool reads a configured content site and never writes to it.
 - **Style.** No em dashes in code comments, UI copy, docs or commit messages. Plain, specific writing; no invented metrics.
+- **Real platforms are never called from tests or from agent runs.** Adapters take an injected fetch; the DEV.to and Hashnode fakes are test helpers. A live check needs the owner's own key and approval.
 - Changes to the user's own machine configuration (editor or agent settings, scheduled tasks) need explicit go-ahead after showing the exact change.
 
 ## Where things are
@@ -28,7 +29,7 @@ Read in this order: `README.md` (what the product is), `TODO.md` (roadmap and th
 - `packages/core`: pure parsing, lint and platform transforms (no I/O).
 - `packages/daemon`: the publishing engine (approval gate, routes, local dashboard, API).
 - `packages/mcp`, `packages/client`, `packages/cli`: MCP server, daemon client, the `cph` command and installer.
-- `packages/brand-mcp`: the `brand-os` MCP server (articles, knowledge, AI tasks) over the web app's agent API (`/api/agent/*`, bearer key). It has no publishing, platform draft or approval tools. See `docs/brand-os-mcp.md`.
+- `packages/brand-mcp`: the `brand-os` MCP server (articles, knowledge, AI tasks) over the web app's agent API (`/api/agent/*`, bearer key). It can prepare platform drafts, stage private copies and request approval, and has no approve, decline or publish tool. See `docs/brand-os-mcp.md`.
 - `spikes/`: throwaway experiments with written findings.
 
 ## Commands

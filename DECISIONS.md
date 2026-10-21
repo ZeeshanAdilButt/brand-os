@@ -1,6 +1,6 @@
 # Decisions
 
-Each entry: the decision, why, and what it costs. Dated 2026-10-21 (Phase 1, Day 1). Versions were read from the npm registry on that date. Decisions 11 to 17 were made on Day 2, 18 to 23 on Day 3 and 24 to 31 on Day 4 (all 2026-10-21).
+Each entry: the decision, why, and what it costs. Dated 2026-10-21 (Phase 1, Day 1). Versions were read from the npm registry on that date. Decisions 11 to 17 were made on Day 2, 18 to 23 on Day 3, 24 to 31 on Day 4 and 32 to 38 on Day 5 (all 2026-10-21).
 
 ## 1. One Postgres schema; embedded engine locally, a server when hosted
 
@@ -58,6 +58,8 @@ Today there are two stores: the Phase 0 daemon's SQLite (`cph.db`, approval gate
 - No bulk migration of SQLite rows is planned. If Phase 0 content rows are worth keeping, a one-time import action reads them through `packages/client` and writes through the action layer.
 
 **Cost.** Until then, publishing from the web app does not exist (the Publishing and Connections pages say so), and the dashboard from Phase 0 remains the way to approve a post.
+
+**Superseded in part on Day 5 (decision 32).** The web app does not call the daemon. It ports the gate's invariants onto Postgres instead, and the daemon stays as the legacy single-user path until Day 7 decides whether to reconcile or retire it.
 
 ## 8. Local ports and files
 
@@ -221,3 +223,57 @@ Two different things share the word "AI" here, with different rules (see also `I
 - **Automatic API inference.** The app itself calls a model, only because the person added a provider (a local model or their own API key) and only for a task they started. The text goes where the provider's trust level says, the privacy gate applies, usage is counted, and the key is theirs.
 
 The app never calls Anthropic without a key the person saved, never accepts a Claude login, and never runs the `claude` binary on a hosted server. The optional local companion for browser users is documented in `ARCHITECTURE.md` and is not built.
+
+## 32. Publishing in the web app ports the Phase 0 invariants to Postgres; the daemon stays untouched
+
+**Decision.** The web app is the multi-tenant publishing path. It does not call the single-user SQLite daemon. The Phase 0 engine's invariants were read (`packages/daemon/src/gate`, `routes/devto.ts`, `services/publish.ts`) and rebuilt in `apps/web` on Postgres, tenant-scoped through `forOwner`. `packages/daemon` is legacy: untouched, its tests green. Reconciling or retiring it is a Day 7 decision.
+
+**What was ported.**
+- A hash-bound, single-use approval consumed atomically with the move to `publishing`, in one transaction (`authorizePublish` in `src/server/data/publishing.ts`).
+- The approval is void if the draft or its source changes: editing the article flags the draft `source_changed` and invalidates the pending approval, and the authorization re-checks the source hash itself.
+- A private stage hard-sets `published: false`, reads the remote article first and refuses to touch a live one. `publish()` is the only place `published: true` is sent, with exactly the approved payload.
+- One publish request, never retried. A refusal after sending is `failed`; a timeout, network error, 5xx, redirect or unreadable success is `unknown`, resolved only by a read-only platform check or the owner's explicit word, never silently re-approvable.
+- Every platform request has a 30 second timeout and `redirect: 'error'`; keys are scrubbed from every error text; a late stage answer can never move a draft that is approved, publishing or published (a positive status list in the update itself).
+- A lint that blocks approval, and a duplicate guard (here a partial unique index on owner, platform and payload hash while `publishing`, `unknown` or `published`).
+
+**What was not ported, on purpose.** Windows Hello presence (the web app has a signed-in browser session instead, decision 33), the OS keyring (keys are encrypted in Postgres, decision 35), Buffer and the assist routes, scheduling, per-platform dry-run switches, and reading content from disk (the article studio is the source).
+
+**Cost.** Two engines exist until Day 7. They do not share data. The web app has no per-action Windows Hello prompt; the approval is a session click with a checklist, which is weaker against malware on the owner's machine (decision 33).
+
+## 33. The approval model: one session-only act, bound to one payload hash
+
+**Decision.** A draft goes `draft`, `staged` (a private copy exists on the platform), `pending_approval`, then `publishing` and `published` (or `failed` or `unknown`). Nothing can be requested for approval until it is staged, so the owner can look at the private copy first. A request is a row with the payload hash, a short tag (the first 8 hex characters, upper-cased, shown on the card and on the button), a 30 minute expiry and a requester. A newer request voids the older one.
+
+**Who may do what.** Agent credentials and the `brand-os` MCP server can prepare drafts, stage private copies and REQUEST approval. They cannot approve, decline, publish, check, mark or connect: there is no route, no scope and no tool for those, and tests prove it three ways (route files, exported handlers, the tool list). Approving takes a signed-in browser session. The route also refuses a request that carries an Authorization header and one with no Origin header; the request guard has already checked that the Origin is this app. The approval card shows the platform, account, canonical URL, tags and the exact request body that will be sent, and four checklist boxes that must all be ticked before the button enables. "Approve and publish" is one transaction, not two: there is no state in which an approved but unspent approval exists (the status `approved` is kept in the vocabulary and is never persisted). There is no bulk approve.
+
+**What it does not protect against.** In local mode the app trusts loopback: a process on the owner's machine that forges an Origin header can call the same route the browser calls. Hosted mode requires a real session cookie. A per-action presence check (Windows Hello) is not available on this machine and is not part of the web app; the checklist and the exact payload are the friction instead.
+
+**Trade-off.** The payload hash binds platform, account and payload together. Disconnecting and reconnecting a different account changes the account, so an old approval cannot be spent on it.
+
+## 34. Failures: clean or ambiguous, and what is repeated
+
+**Decision.** Every platform failure is classified (`auth`, `forbidden_plan`, `validation`, `rate_limit`, `not_found`, `server`, `timeout`, `network`, `redirect`, `protocol`, `config`) with a redacted, readable message and a next step. A clear refusal (401, plan, 422, 429, 404, nothing sent) is `failed`. Anything that may have taken effect (5xx, timeout, dropped connection, a refused redirect, a success answer that cannot be read) is `unknown`. A publish that was authorized but never recorded an answer (the process stopped) is shown as `unknown` after three minutes, never `failed`.
+
+**Staging may retry; publishing never does.** Staging is private and repeatable, so up to three tries with a short, capped pause (1 s, 3 s, at most 10 s) are made for a 5xx, a dropped connection, a timeout or a rate limit that names a short wait. An ambiguous failure of a first create is not repeated, because it could make a second private draft; it is reported with a next step instead. A 429 asks for the wait it says (seconds or an HTTP date), and a wait over 10 seconds is not retried at all.
+
+**Recovery.** "Check on platform" is read-only. Live settles an unknown draft as published with its link; still private returns it to staged (so a new, explicit approval can follow); not found settles nothing, because it is not proof that nothing went out. "Mark by hand" needs an explicit confirmation that the owner looked.
+
+## 35. Platform keys and the test-only address override
+
+**Decision.** A key is checked with a read-only call before it is saved (a refused key is not stored), then stored as AES-256-GCM ciphertext bound to the owner and the connection row, with the same master key as AI provider keys (decision 25). One connection per platform per owner. The browser receives only the last four characters. The key is typed into a password field on Settings > Connections and nowhere else; no environment variable provides one (a source rule forbids it). Decrypted keys live only for one call. They never reach the agent API, MCP results, the audit log or an error message (a test plants the key in a platform's error body and checks every output).
+
+**The address override.** Platform addresses are constants. Two environment variables (`CPH_TEST_DEVTO_URL`, `CPH_TEST_HASHNODE_URL`) can point an adapter at a fake server, but only when `CPH_ALLOW_TEST_PLATFORM_URLS=1` is also set and only for a loopback address, so they cannot send a real key elsewhere. A test asserts that without the flag the override is ignored.
+
+## 36. Hashnode: built from the official schema, live-unverified
+
+**Decision.** Hashnode's GraphQL API (`gql-beta.hashnode.com`) is implemented from the official agent skill and its schema (see `INTEGRATIONS.md`). `publishDraft` takes only a draft id, so `publish()` first writes the approved payload into the draft with `updateDraft` and then publishes it: a failure in the first step is clean (nothing is public), a failure in the second follows the usual rules. The description goes to `metaTags.description`, tags are slugs, the canonical URL is `originalArticleURL`, a series is ignored with a warning (it needs an existing series id), and a missing Pro plan is reported as such. The UI and `INTEGRATIONS.md` call it live-unverified until the owner tries it with a real token.
+
+## 37. Source tracking, adaptation and lint
+
+**Decision.** A platform draft stores the article revision and a hash of the fields it was built from (title, slug, description, tags, canonical URL, cover, body). An edit through any route (editor, restore, agent save, accepted AI change) flags drafts built from the old text; reading drafts and authorizing a publish check again, so a missed sync cannot publish stale text. Adaptation is visible, not silent: tags are cleaned to the platform's form with a line for every change, a list still over the limit is left long so the lint refuses it, and DEV.to gets a short "Originally published at" footer only when a canonical URL is set. Lint errors (empty title or body, more tags than allowed, an image or link that only exists on the owner's machine, a cover that is not public https, an over-long body) block staging and approval; warnings (missing canonical, Mermaid on DEV.to, template-like text, removed HTML) are shown and allowed. Reachability is judged from the address form only; nothing is fetched.
+
+**Trade-off.** An article that was already published is not rebuilt (editing a live post is not built), and a second article with identical text cannot be published to the same account.
+
+## 38. Where publishing is shown
+
+**Decision.** Connections moved to Settings > Connections (the old address redirects). The article studio has a Publish panel with one card per destination. The Publishing page lists every draft and what needs the owner (unknown results, waiting approvals). The composer, per-destination editing and approved batches are Day 6.

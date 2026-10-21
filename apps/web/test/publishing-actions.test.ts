@@ -669,6 +669,16 @@ describe('tenant isolation of the publishing actions', () => {
     expect((await getDraft(owner, env, draftId)).status).toBe('pending_approval');
   });
 
+  it('keeps audit rows for publishing apart too', async () => {
+    const { draftId, approvalId } = await readyToApprove();
+    await approveAndPublish(owner, env, approvalId, { checked: checklistFor() });
+    const mine = await owner.data.audit.list(500);
+    expect(mine.some((e) => e.action === 'platform.published' && e.entityId === draftId)).toBe(true);
+    expect(mine.some((e) => e.action === 'approval.requested')).toBe(true);
+    const theirs = await other.data.audit.list(500);
+    expect(theirs.some((e) => e.entityId === draftId || e.entityId === approvalId)).toBe(false);
+  });
+
   it('two accounts can publish the same text, each through their own connection', async () => {
     await connectPlatform(other, env, { platform: 'devto', secret: KEY });
     const mine = await readyToApprove({ title: 'Parallel', body: 'Same words.' });

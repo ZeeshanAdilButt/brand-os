@@ -84,6 +84,19 @@ Responses: `201` (article), `401`, `422`.
 | `canonical_url` | For content originally published elsewhere. |
 | `body_markdown` | Markdown with Liquid tags; may contain YAML front matter. Pick one source of truth: send JSON fields, no front matter. |
 
+### Day 5 adapter check (as checked 2026-10-21)
+
+Re-read from https://developers.forem.com/api/v1 before coding:
+- Body fields for `POST /api/articles` and `PUT /api/articles/{id}`: `title`, `body_markdown`, `published` (default false), `series`, `main_image`, `canonical_url`, `description`, `tags` (typed as a string, "a comma-separated list of tags (up to 4 tags)"), `organization_id`. Responses 201/401/422 and 200/401/404/422.
+- `GET /api/articles/me` (published), `/me/published`, `/me/unpublished`, `/me/all` take `page` and `per_page` (1 to 1000, default 30; the maximum can be lowered by the operator). The adapter reads 100 per page, up to 30 pages, and treats not found as "not found", not "never published".
+- `GET /api/users/me` documents no response fields (the sample is empty). The adapter reads `username` and fails with a clear message if it is absent. UNVERIFIED which fields a real answer carries.
+- The `Accept` value is still not printed on the official page; the adapter sends `application/vnd.forem.api-v1+json` as before.
+- Tag characters and length limits are not documented. The adapter cleans to lower-case letters and digits and caps a name at 30 characters; both are our reading and are UNVERIFIED. It never drops a tag silently and blocks more than 4.
+- A title limit (reported near 128 characters) is not documented; it is only a warning.
+- No rate limit text was found. The adapter handles `429` with `Retry-After` in seconds or as an HTTP date and falls back to 30 seconds.
+
+The adapter was exercised only against a local fake server and fake fetch functions. No real DEV.to request has been made.
+
 ### Gotchas
 - **Rate limits are not documented** in the official reference (UNVERIFIED). Community reports ~10 article creates per 30 s and `429` with `Retry-After` as either seconds or an HTTP date. Parse both forms; fall back to 30 s.
 - **No image upload endpoint** in the v1 reference (UNVERIFIED that none exists). Host images yourself and use absolute URLs.
@@ -153,6 +166,18 @@ Then, after user approval only: `mutation($input: PublishDraftInput!){ publishDr
 | Query depth | 10 |
 | Rate limit | Published targets 20,000 queries/min and 500 mutations/min, **not currently enforced**. Do not build logic around it. |
 | Caching | Query responses may be cached ~25 s; read-after-write can be stale. |
+
+### Day 5 adapter check (as checked 2026-10-21)
+
+Read from the official agent skill (https://github.com/Hashnode/gql-skill: `SKILL.md`, and in `skills/gql-api/references/`: `schema.graphql`, `queries.md`, `mutations.md`, `auth-and-roles.md`, `errors-and-limits.md`, `recipes.md`):
+- Endpoint `https://gql-beta.hashnode.com/`, `Authorization: Bearer <pat>`, and the skill asks for an `x-hashnode-client` header (the adapter sends `brand-os`).
+- `me { id username name publications(first: Int!, after: String) { edges { node { id title url isTeam } } } }` finds the account and the publication ids. `me` needs authentication; the documents do not say it needs Pro.
+- `createDraft(input: CreateDraftInput!)` takes `publicationId`, `title`, `contentMarkdown`, `tags: [{ slug, name? }]` (max 15), `originalArticleURL`, `coverImageOptions { coverImageURL }`, `metaTags { title, description, image }`, `seriesId`. `updateDraft(input: UpdateDraftInput!)` takes the same fields keyed by `draftId` (no `publicationId`). `publishDraft(input: { draftId })` returns `post { id slug url }` and soft-deletes the draft. All three need a Pro plan; the non-Pro answer is `FORBIDDEN` with a message about the Pro plan.
+- `draft(id: ObjectId!)` and `post(id: ID!)` and `publication(id:) { posts(first:) }` are the read paths. A caller not allowed to see a draft gets `NOT_FOUND`, not `FORBIDDEN`.
+- Errors are in `errors[].extensions.code`: `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `BAD_USER_INPUT`, `INTERNAL_SERVER_ERROR`. The documents do not say which HTTP status accompanies them; the adapter handles both HTTP errors and 200 with `errors`.
+- Limits: 100 KB request body, 15 tags, 8 MB images (no SVG). The rate limit is advisory.
+
+UNVERIFIED and therefore live-unverified: the real HTTP status of each error code; whether `updateDraft` accepts a payload identical to the current one; the draft preview address (the adapter shows no private link); series (needs an existing series id, so the series is ignored with a warning); how a published draft is found afterwards (the adapter looks for the post by title and canonical URL among the 20 newest posts). The adapter was exercised only against a local fake of the schema. No real Hashnode request has been made.
 
 ### Gotchas
 - GraphQL returns HTTP 200 with an `errors[]` array. Check `errors[].extensions.code` (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `BAD_USER_INPUT`).
@@ -419,3 +444,5 @@ Wording rule for the UI: never say "Connect your Claude account". Say "Add an An
 16. **Anthropic `temperature` on current models and the 529 `retry-after`** were not confirmed (see section 5). No sampling parameter is sent.
 17. **Ollama missing-model error** (status and body) is not documented on the pages read; the app shows what the server says.
 18. **Not re-checked this run** (carried from `docs/research/01-longform-platforms.md`, dated 2026-10-19): Substack (no post API, no canonical field), DEV.to AI disclosure wording, Medium AI-content and Partner Program rules, Hashnode CLI details beyond the flags quoted above.
+19. **Day 5, DEV.to.** The tag rules (characters, length), the title limit, the fields of `/api/users/me` and rate limits are not in the official reference. The adapter cleans and warns; it has only met a fake server. The first live check is the owner's (README, "Publish to DEV.to").
+20. **Day 5, Hashnode.** Everything in the Day 5 adapter check above marked UNVERIFIED, and the Pro requirement for the first draft. Treat the adapter as a draft until a real token has been tried once.

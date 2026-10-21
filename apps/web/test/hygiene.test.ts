@@ -12,7 +12,7 @@ const TEXT_EXT = /\.(ts|tsx|css|json|sql|md|mjs|yml|yaml|example)$/;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name) || SKIP_FILES.has(entry.name)) continue;
+    if (SKIP_DIRS.has(entry.name) || entry.name.startsWith('.next') || SKIP_FILES.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full, out);
     else if (TEXT_EXT.test(entry.name) || entry.name === '.env.example') out.push(full);
