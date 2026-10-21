@@ -18,16 +18,17 @@ export function WordDiff({ original, proposed }: { original: string; proposed: s
           segment.kind === 'equal' ? (
             <span key={i}>{segment.text}</span>
           ) : segment.kind === 'del' ? (
-            <del key={i} className="rounded-sm bg-destructive/15 text-destructive decoration-destructive/70">
+            <del key={i} className="rounded-sm bg-destructive/15 text-destructive line-through decoration-destructive/80">
               {segment.text}
             </del>
           ) : (
-            <ins key={i} className="rounded-sm bg-success/15 text-foreground no-underline [text-decoration:none]">
+            <ins key={i} className="rounded-sm bg-success/20 text-foreground underline decoration-success decoration-2 underline-offset-[3px]">
               {segment.text}
             </ins>
           ),
         )}
       </p>
+      <p className="mt-2 border-t pt-1.5 text-[0.6875rem] text-muted-foreground">Struck through: removed. Underlined: added.</p>
     </div>
   );
 }
