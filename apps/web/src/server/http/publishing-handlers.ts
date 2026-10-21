@@ -15,6 +15,19 @@ import {
   stageDraft,
   testConnection,
 } from '../actions/publishing';
+import {
+  addDestination,
+  checkCanonical,
+  editDraft,
+  exportDraft,
+  getPreview,
+  getSiteSettings,
+  recordManualPost,
+  removeDestination,
+  reorderDestinations,
+  resetDraft,
+  saveSiteSettings,
+} from '../actions/composer';
 import { ActionError } from '../actions/owner';
 import type { AppConfig } from '../config';
 import { publishEnvFrom, type PublishEnv } from '../publishing/registry';
@@ -92,8 +105,71 @@ export function handleDraftStage(request: Request, id: string, deps: PublishHand
   return withOwner(request, deps, async (owner, ctx) => json(await stageDraft(owner, envFor(deps, ctx), id)));
 }
 
+/** The body is optional: `{ "mode": "manual" }` asks to record a post made by hand instead of publishing. */
 export function handleDraftRequestApproval(request: Request, id: string, deps: PublishHandlerDeps = {}) {
-  return withOwner(request, deps, async (owner, ctx) => json(await requestApproval(owner, envFor(deps, ctx), id), 201));
+  return withOwner(request, deps, async (owner, ctx) => {
+    const text = await request.text();
+    let body: unknown = {};
+    if (text.trim() !== '') {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        throw new ActionError('invalid', 'The request body must be valid JSON.');
+      }
+    }
+    return json(await requestApproval(owner, envFor(deps, ctx), id, body), 201);
+  });
+}
+
+// ---- the composer ------------------------------------------------------------------------------------
+
+export function handleDestinationAdd(request: Request, articleId: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => json(await addDestination(owner, articleId, await readJson(request)), 201));
+}
+
+export function handleDestinationRemove(request: Request, articleId: string, platform: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => {
+    await removeDestination(owner, articleId, platform);
+    return json({ removed: true });
+  });
+}
+
+export function handleDestinationsReorder(request: Request, articleId: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => {
+    await reorderDestinations(owner, articleId, await readJson(request));
+    return json({ ok: true });
+  });
+}
+
+export function handleDraftEdit(request: Request, id: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner, ctx) => json(await editDraft(owner, envFor(deps, ctx), id, await readJson(request))));
+}
+
+export function handleDraftReset(request: Request, id: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner, ctx) => {
+    const text = await request.text();
+    return json(await resetDraft(owner, envFor(deps, ctx), id, text.trim() === '' ? {} : (JSON.parse(text) as unknown)));
+  });
+}
+
+export function handleDraftExport(request: Request, id: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => json(await exportDraft(owner, id)));
+}
+
+export function handleDraftPreview(request: Request, id: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner, ctx) => json(await getPreview(owner, envFor(deps, ctx), id)));
+}
+
+export function handleCanonicalCheck(request: Request, articleId: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner, ctx) => json(await checkCanonical(owner, envFor(deps, ctx), articleId)));
+}
+
+export function handleSiteSettingsGet(request: Request, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => json(await getSiteSettings(owner)));
+}
+
+export function handleSiteSettingsSave(request: Request, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => json(await saveSiteSettings(owner, await readJson(request))));
 }
 
 export function handleDraftCheck(request: Request, id: string, deps: PublishHandlerDeps = {}) {
@@ -113,6 +189,14 @@ export function handleApprovalApprove(request: Request, id: string, deps: Publis
   return withOwner(request, deps, async (owner, ctx) => {
     requireBrowserOrigin(request);
     return json(await approveAndPublish(owner, envFor(deps, ctx), id, await readJson(request)));
+  });
+}
+
+/** Records a post the owner made by hand. Like approving a publish: browser session only, one approval id, nothing is sent. */
+export function handleApprovalRecord(request: Request, id: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner, ctx) => {
+    requireBrowserOrigin(request);
+    return json(await recordManualPost(owner, envFor(deps, ctx), id, await readJson(request)));
   });
 }
 

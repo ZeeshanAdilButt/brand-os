@@ -21,6 +21,7 @@ import {
 import type { DbHandle } from '../src/server/db/client';
 import { users } from '../src/server/db/schema';
 import { plainSecret, type PublishEnv } from '../src/server/publishing/registry';
+import { liveCanonical } from './helpers/canonical';
 import { createFakeDevto, type FakeDevto } from './helpers/fake-devto';
 import { memoryDb, testConfig } from './helpers';
 
@@ -87,7 +88,7 @@ afterAll(async () => {
 beforeEach(async () => {
   fake = createFakeDevto({ apiKey: KEY });
   clock = new Date(START);
-  env = { config: testConfig(), fetchFn: fake.fetch, now: () => clock, sleep: async () => undefined, timeoutMs: 2000 };
+  env = { config: testConfig(), fetchFn: fake.fetch, canonical: liveCanonical(), now: () => clock, sleep: async () => undefined, timeoutMs: 2000 };
   owner = as(A);
   other = as(B);
   for (const who of [owner, other]) {
@@ -241,12 +242,18 @@ describe('preparing a draft', () => {
   it('shows destinations with capabilities, connection state and the draft', async () => {
     const article = await newArticle();
     const before = await listDestinations(owner, env, article.id);
-    expect(before.map((d) => d.platform)).toEqual(['devto', 'hashnode']);
-    expect(before[0]).toMatchObject({ connection: { status: 'connected' }, draft: null });
-    expect(before[1]!.connection).toBeNull();
-    expect(before[0]!.info.capabilities.tagsMax).toBe(4);
+    // Every catalog entry has a card; nothing is added until the owner adds it.
+    expect(before).toHaveLength(13);
+    expect(before.every((d) => !d.added)).toBe(true);
+    const devto = before.find((d) => d.platform === 'devto')!;
+    const hashnode = before.find((d) => d.platform === 'hashnode')!;
+    expect(devto).toMatchObject({ connection: { status: 'connected' }, draft: null });
+    expect(hashnode.connection).toBeNull();
+    expect(devto.info.capabilities.tagsMax).toBe(4);
     const draft = await prepareDraft(owner, env, { articleId: article.id, platform: 'devto' });
-    expect((await listDestinations(owner, env, article.id))[0]!.draft?.id).toBe(draft.id);
+    const after = await listDestinations(owner, env, article.id);
+    expect(after[0]).toMatchObject({ platform: 'devto', added: true });
+    expect(after.find((d) => d.platform === 'devto')!.draft?.id).toBe(draft.id);
   });
 });
 
@@ -376,7 +383,7 @@ describe('asking for approval', () => {
     expect(approval).toMatchObject({ status: 'pending', requestedBy: 'owner', payloadSha256: requested.draft.payloadSha256 });
     expect(approval.tag).toBe(`#${requested.draft.payloadSha256.slice(0, 8).toUpperCase()}`);
     expect(Date.parse(approval.expiresAt) - START.getTime()).toBe(30 * 60_000);
-    expect(requested.link).toBe(`${env.config.appUrl}/articles/${requested.draft.articleId}?panel=publish`);
+    expect(requested.link).toBe(`${env.config.appUrl}/articles/${requested.draft.articleId}/publish`);
     expect((await getDraft(owner, env, draftId)).approval?.id).toBe(approval.id);
   });
 

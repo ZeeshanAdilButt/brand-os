@@ -22,6 +22,7 @@ import {
   handleAgentDraftStatus,
 } from '../src/server/http/agent-handlers';
 import { handleConnectionCreate } from '../src/server/http/publishing-handlers';
+import { liveCanonical } from './helpers/canonical';
 import { createFakeDevto, type FakeDevto } from './helpers/fake-devto';
 import { handleProviderCreate, handleTaskAccept, handleTaskCreate } from '../src/server/http/ai-handlers';
 import { hostedHarness, HOSTED_URL, type HostedHarness, type TestUser } from './hosted-harness';
@@ -46,7 +47,7 @@ let aTask: string;
 let bTask: string;
 let fake: FakeDevto;
 const FAKE_KEY = ['fake', 'devto', 'key', 'mcp', '77aa88bb'].join('-');
-const publishDeps = () => ({ publish: { fetchFn: fake.fetch, sleep: async () => undefined, timeoutMs: 2000 } });
+const publishDeps = () => ({ publish: { fetchFn: fake.fetch, canonical: liveCanonical(), sleep: async () => undefined, timeoutMs: 2000 } });
 
 /** The agent API as the MCP server's HTTP client sees it, served by the real route handlers in this process. */
 const bridge = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {

@@ -32,6 +32,7 @@ import {
   handleDraftsGet,
   handleDraftStage,
 } from '../src/server/http/publishing-handlers';
+import { liveCanonical } from './helpers/canonical';
 import { createFakeDevto, type FakeDevto } from './helpers/fake-devto';
 import { sqlRows } from './helpers';
 import { hostedHarness, HOSTED_URL, type HostedHarness, type TestUser } from './hosted-harness';
@@ -97,7 +98,7 @@ beforeAll(async () => {
   a = await h.signUp('publish.a@example.test', 'Writer A');
   b = await h.signUp('publish.b@example.test', 'Writer B');
   fake = createFakeDevto({ apiKey: KEY });
-  deps = { publish: { fetchFn: fake.fetch, sleep: async () => undefined, timeoutMs: 2000 } };
+  deps = { publish: { fetchFn: fake.fetch, canonical: liveCanonical(), sleep: async () => undefined, timeoutMs: 2000 } };
   aAgent = await mint(a, 'claude', ['read', 'write_articles', 'platform_drafts']);
   aReadOnly = await mint(a, 'reader', ['read']);
   bAgent = await mint(b, 'claude', ['read', 'platform_drafts']);

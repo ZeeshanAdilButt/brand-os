@@ -1,22 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { PLATFORM_IDS, PLATFORMS, isPublishable, isSyndication } from '../../lib/catalog';
 import {
   APPROVAL_TTL_MS,
-  PLATFORMS,
-  PLATFORM_IDS,
   STAGEABLE_STATUSES,
   approvalChecklist,
   approvalTag,
   type ConnectionDTO,
   type DestinationDTO,
+  type DraftExtras,
+  type DraftPayload,
   type DraftStatus,
   type PlatformDraftDTO,
   type PlatformId,
 } from '../../lib/publishing';
+import { defaultSiteSettings, resolvePathTemplate, slugForPath, type SiteDraftOptions, type SiteSettingsDTO } from '../../lib/site-export';
 import { redactSecrets } from '../ai/redact';
 import { encryptKey, masterKey, SecretUnavailableError } from '../ai/crypto';
 import { PublishRefusal } from '../data/tenant';
-import type { PlatformDraft } from '../db/schema';
+import type { Article, PlatformDraft, SiteSettings } from '../db/schema';
+import { checkCanonicalPage } from '../publishing/canonical';
 import { PlatformError } from '../publishing/errors';
 import { adapterFor, contextFor, contextWith, KeyUnreadableError, plainSecret, type PublishEnv } from '../publishing/registry';
 import { payloadHashOf, sourceHashOf } from '../publishing/source';
@@ -30,18 +33,27 @@ import { ActionError, parseId, parseInput, type OwnerContext } from './owner';
  *
  *  - only a signed-in person (actor "owner") can connect, approve, decline or resolve by hand;
  *  - an agent can prepare drafts, stage private copies and REQUEST approval, nothing else;
- *  - `approveAndPublish` is the only code that can make anything public, and it calls the adapter once.
+ *  - `approveAndPublish` is the only code that can make anything public, and it calls the adapter once;
+ *  - a destination without a connector (`isPublishable` false) can be prepared, previewed, edited and posted by
+ *    hand, and can never be staged, approved for publishing or published, by any route.
  */
 
 const STAGE_ATTEMPTS = 3;
 const STAGE_BACKOFF_MS = [1000, 3000];
 const STAGE_MAX_WAIT_MS = 10_000;
 
-function requireOwnerActor(owner: OwnerContext, what: string): void {
+export function requireOwnerActor(owner: OwnerContext, what: string): void {
   if (owner.actor !== 'owner') throw new ActionError('forbidden', `${what} can only be done by signing in. Agents and AI cannot do this.`);
 }
 
 const platformSchema = z.enum(PLATFORM_IDS);
+
+/** A destination the app can send to. Everything else is preview and posting by hand. */
+export function requirePublishable(platform: PlatformId, doing: string): void {
+  if (isPublishable(platform)) return;
+  const info = PLATFORMS[platform];
+  throw new ActionError('conflict', `${info.name} cannot be ${doing} by this app. ${info.reason}`, {}, { code: 'NOT_PUBLISHABLE' });
+}
 
 // ---- connections -------------------------------------------------------------------------------------
 
@@ -51,6 +63,7 @@ export interface ConnectionView {
   connection: ConnectionDTO | null;
 }
 
+/** One view for every catalog entry. Only those with a connector can hold a connection. */
 export async function listConnections(owner: OwnerContext): Promise<ConnectionView[]> {
   const rows = await owner.data.connections.list();
   return PLATFORM_IDS.map((platform) => {
@@ -83,6 +96,21 @@ function probeProblem(platform: PlatformId, err: unknown, secret: string): strin
   return 'The connection could not be checked.';
 }
 
+export function toSiteSettingsDTO(row: SiteSettings | null): SiteSettingsDTO {
+  if (!row) return defaultSiteSettings();
+  return { siteUrl: row.siteUrl, repo: row.repo, baseBranch: row.baseBranch, pathTemplate: row.pathTemplate, mapping: row.mapping, updatedAt: row.updatedAt.toISOString() };
+}
+
+/** The host of the site's public address, for checks that something is "on the site". */
+export function siteHostOf(settings: SiteSettingsDTO): string | null {
+  if (!settings.siteUrl) return null;
+  try {
+    return new URL(settings.siteUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Save a key. It is checked against the platform first with a read-only call; a key the platform refuses is
  * not stored. The key is encrypted with the owner and row bound in, and is never returned or logged.
@@ -90,11 +118,19 @@ function probeProblem(platform: PlatformId, err: unknown, secret: string): strin
 export async function connectPlatform(owner: OwnerContext, env: PublishEnv, input: unknown): Promise<ConnectionDTO> {
   requireOwnerActor(owner, 'Connecting a platform');
   const { platform, secret } = parseInput(connectSchema, input);
+  if (!isPublishable(platform)) {
+    const info = PLATFORMS[platform];
+    throw new ActionError('conflict', `${info.name} cannot be connected yet. ${info.reason}`, {}, { code: 'NOT_PUBLISHABLE' });
+  }
+  const settings = platform === 'site' ? toSiteSettingsDTO(await owner.data.siteSettings.get()) : null;
+  if (platform === 'site' && !settings?.repo) {
+    throw new ActionError('conflict', 'Save the repository (owner/name) first, then connect the GitHub token.', { secret: 'Save the repository first.' }, { code: 'NO_REPO' });
+  }
   const existing = await owner.data.connections.getByPlatform(platform);
   const id = existing?.id ?? randomUUID();
   const sealed = sealSecret(env, secret, owner.ownerId, id);
 
-  const { adapter, ctx } = contextWith(env, platform, existing?.config ?? {}, secret);
+  const { adapter, ctx } = contextWith(env, platform, existing?.config ?? {}, secret, settings?.repo ? { repo: settings.repo, baseBranch: settings.baseBranch } : undefined);
   let health;
   try {
     health = await adapter.health(ctx);
@@ -131,7 +167,8 @@ export async function testConnection(owner: OwnerContext, env: PublishEnv, id: u
     const updated = await owner.data.connections.recordCheck(row.id, { status: 'needs_reconnect', message });
     return { connection: toConnectionDTO(updated), ok: false, message };
   }
-  const { adapter, ctx } = contextFor(env, row, secret);
+  const settings = row.platform === 'site' ? toSiteSettingsDTO(await owner.data.siteSettings.get()) : null;
+  const { adapter, ctx } = contextFor(env, row, secret, settings?.repo ? { repo: settings.repo, baseBranch: settings.baseBranch } : undefined);
   try {
     const health = await adapter.health(ctx);
     const updated = await owner.data.connections.recordCheck(row.id, { status: 'connected', who: health.who, config: health.config ?? row.config, message: null });
@@ -173,7 +210,7 @@ export async function disconnectPlatform(owner: OwnerContext, id: unknown): Prom
 // ---- drafts ------------------------------------------------------------------------------------------
 
 /** Housekeeping that must run before any draft is shown or acted on. */
-async function refresh(owner: OwnerContext, env: Pick<PublishEnv, 'now'>, articleId?: string): Promise<void> {
+export async function refresh(owner: OwnerContext, env: Pick<PublishEnv, 'now'>, articleId?: string): Promise<void> {
   const now = (env.now ?? (() => new Date()))();
   await owner.data.platformDrafts.expireApprovals(now);
   const swept = await owner.data.platformDrafts.sweepStalePublishing(now);
@@ -195,16 +232,48 @@ export async function syncArticleDrafts(owner: OwnerContext, articleId: string):
   return changed.length;
 }
 
-async function draftView(owner: OwnerContext, row: PlatformDraft): Promise<PlatformDraftDTO> {
-  const [approval, attempts, connection] = await Promise.all([
+/** The boxes the owner ticks for this draft's open approval. Computed here so the screen and the check agree. */
+export async function checklistFor(owner: OwnerContext, draft: PlatformDraft, kind: 'publish' | 'manual'): Promise<string[]> {
+  const name = PLATFORMS[draft.platform].name;
+  const hasCanonical = draft.payload.canonicalUrl !== null && draft.payload.canonicalUrl !== '';
+  if (kind === 'manual') return approvalChecklist(name, hasCanonical, { kind: 'manual' });
+  if (draft.platform === 'site') return approvalChecklist(name, hasCanonical, { kind: 'pull_request' });
+  let canonicalNotLive = false;
+  if (hasCanonical && isSyndication(draft.platform)) {
+    const check = await owner.data.canonicalChecks.get(draft.articleId, draft.payload.canonicalUrl!);
+    canonicalNotLive = check?.state !== 'live';
+  }
+  return approvalChecklist(name, hasCanonical, { kind: 'publish', canonicalNotLive });
+}
+
+export function adaptInputOf(article: Pick<Article, 'title' | 'description' | 'tags' | 'canonicalUrl' | 'bodyMarkdown'>, cover: string | null, series: string | null) {
+  return {
+    title: article.title,
+    description: article.description,
+    tags: article.tags,
+    canonicalUrl: article.canonicalUrl,
+    coverImageUrl: cover,
+    series,
+    bodyMarkdown: article.bodyMarkdown,
+  };
+}
+
+export async function draftView(owner: OwnerContext, row: PlatformDraft): Promise<PlatformDraftDTO> {
+  const [approval, attempts, connection, article] = await Promise.all([
     owner.data.platformDrafts.latestApproval(row.id),
     owner.data.platformDrafts.listAttempts(row.id),
     owner.data.connections.getByPlatform(row.platform),
+    owner.data.articles.get(row.articleId),
   ]);
-  return toDraftDTO(row, { approval, attempts, adapter: adapterFor(row.platform), config: connection?.config ?? {} });
+  const adapter = adapterFor(row.platform);
+  const generated = row.generatedPayload && Object.keys(row.generatedPayload).length > 0 ? row.generatedPayload : row.payload;
+  const fresh = article ? adapter.adapt(adaptInputOf(article, generated.coverImageUrl, generated.series)).payload : null;
+  const canonical = row.payload.canonicalUrl ? await owner.data.canonicalChecks.get(row.articleId, row.payload.canonicalUrl) : null;
+  const checklist = approval ? await checklistFor(owner, row, approval.kind) : [];
+  return toDraftDTO(row, { approval, attempts, adapter, config: connection?.config ?? {}, fresh, canonical, checklist });
 }
 
-async function loadDraft(owner: OwnerContext, id: unknown): Promise<PlatformDraft> {
+export async function loadDraft(owner: OwnerContext, id: unknown): Promise<PlatformDraft> {
   const draftId = parseId(id, 'Draft');
   const row = await owner.data.platformDrafts.get(draftId);
   if (!row) throw new ActionError('not_found', 'Draft not found');
@@ -236,19 +305,33 @@ export async function listDrafts(owner: OwnerContext, env: Pick<PublishEnv, 'now
   return Promise.all(rows.map((row) => draftView(owner, row)));
 }
 
-/** For the article studio: every destination with its capabilities, the connection and the draft, if any. */
+/**
+ * For the composer and the studio: a card for every catalog entry, in the owner's order for the ones they
+ * added, then the rest. Each carries its capabilities, the connection and the draft, if any.
+ */
 export async function listDestinations(owner: OwnerContext, env: Pick<PublishEnv, 'now'>, articleId: unknown): Promise<DestinationDTO[]> {
   const id = parseId(articleId, 'Article');
   if (!(await owner.data.articles.get(id))) throw new ActionError('not_found', 'Article not found');
   await refresh(owner, env, id);
-  const connections = await owner.data.connections.list();
+  await owner.data.destinations.ensureForDrafts(id);
+  const [connections, added, settings] = await Promise.all([owner.data.connections.list(), owner.data.destinations.list(id), owner.data.siteSettings.get()]);
+  const site = toSiteSettingsDTO(settings);
   const out: DestinationDTO[] = [];
   for (const platform of PLATFORM_IDS) {
     const connection = connections.find((c) => c.platform === platform);
     const row = await owner.data.platformDrafts.current(id, platform);
-    out.push({ platform, info: PLATFORMS[platform], connection: connection ? toConnectionDTO(connection) : null, draft: row ? await draftView(owner, row) : null });
+    const entry = added.find((d) => d.platform === platform);
+    out.push({
+      platform,
+      info: PLATFORMS[platform],
+      connection: connection ? toConnectionDTO(connection) : null,
+      draft: row ? await draftView(owner, row) : null,
+      added: Boolean(entry),
+      position: entry?.position ?? 1000 + PLATFORM_IDS.indexOf(platform),
+      siteReady: platform === 'site' ? Boolean(site.repo) : null,
+    });
   }
-  return out;
+  return out.sort((a, b) => a.position - b.position);
 }
 
 const prepareSchema = z.object({
@@ -257,6 +340,8 @@ const prepareSchema = z.object({
   /** A public https address for the cover. The article's own cover image only exists in this app and cannot be sent. */
   coverImageUrl: z.string().trim().max(2000).nullable().optional(),
   series: z.string().trim().max(100).nullable().optional(),
+  /** Rebuild even though the owner has edited the draft: the edits are replaced by a fresh adaptation. */
+  discardEdits: z.boolean().optional(),
 });
 
 const COVER_KEYS = ['cover_image', 'coverImage', 'cover', 'main_image', 'image'] as const;
@@ -270,18 +355,92 @@ function coverFromMetadata(extra: Record<string, unknown>): string | null {
   return null;
 }
 
+/** Who a draft will be posted as: the connected account, the repository for the site, or nobody (hand posting). */
+function accountFor(platform: PlatformId, who: string | null, site: SiteSettingsDTO): string | null {
+  if (platform === 'site') return site.repo ? `${site.repo}@${site.baseBranch}` : 'Markdown export';
+  return who;
+}
+
+/** The options that belong to the personal site's draft, kept across rebuilds where they still apply. */
+function siteOptionsFor(article: Pick<Article, 'slug' | 'title'>, site: SiteSettingsDTO, previous: SiteDraftOptions | undefined, nowIso: string): SiteDraftOptions {
+  const slug = slugForPath(article.slug) || slugForPath(article.title);
+  const dateIso = previous?.dateIso ?? nowIso;
+  const resolved = resolvePathTemplate(site.pathTemplate, { slug, dateIso, extension: site.mapping.extension });
+  const path = resolved.ok ? resolved.path : site.pathTemplate;
+  // An "update existing" choice belongs to one path: a different path starts over.
+  const keep = previous && previous.path === path;
+  return {
+    slug,
+    dateIso,
+    path,
+    repo: site.repo,
+    baseBranch: site.baseBranch,
+    mapping: site.mapping,
+    updateExisting: keep ? previous.updateExisting : false,
+    expectedSha: keep ? previous.expectedSha : null,
+  };
+}
+
+export interface BuiltDraft {
+  payload: DraftPayload;
+  tagReport: PlatformDraft['tagReport'];
+  lint: PlatformDraft['lint'];
+  extras: DraftExtras;
+  account: string | null;
+  payloadSha256: string;
+}
+
+/** Lint that depends on the surroundings, not just the payload: the article's local cover, a missing publication. */
+export function contextLint(platform: PlatformId, article: Pick<Article, 'coverAssetId'>, payload: DraftPayload, config: { publicationId?: string }): PlatformDraft['lint'] {
+  const issues: PlatformDraft['lint'] = [];
+  if (article.coverAssetId && !payload.coverImageUrl && PLATFORMS[platform].kind === 'long_form') {
+    issues.push({ code: 'cover_local_only', severity: 'warning', message: 'The article’s cover image only exists in this app, so no cover will be sent. Add a public https URL for the cover to include one.' });
+  }
+  if (platform === 'hashnode' && !config.publicationId) {
+    issues.push({ code: 'publication_missing', severity: 'error', message: 'No Hashnode publication is selected. Choose one in Settings > Connections.' });
+  }
+  return issues;
+}
+
+/** Build a draft's payload, checks and hash from the article. Nothing is stored or sent. */
+export function buildDraft(input: {
+  article: Article;
+  platform: PlatformId;
+  who: string | null;
+  config: { publicationId?: string };
+  site: SiteSettingsDTO;
+  previous: PlatformDraft | null;
+  cover: string | null;
+  series: string | null;
+  now: Date;
+}): BuiltDraft {
+  const adapter = adapterFor(input.platform);
+  const { payload, tagReport } = adapter.adapt(adaptInputOf(input.article, input.cover, input.series));
+  const extras: DraftExtras = {};
+  if (input.platform === 'site') extras.site = siteOptionsFor(input.article, input.site, input.previous?.extras.site, input.now.toISOString());
+  if (input.previous?.extras.options && Object.keys(input.previous.extras.options).length > 0) extras.options = input.previous.extras.options;
+  const lint = [...adapter.validate(payload, extras), ...contextLint(input.platform, input.article, payload, input.config)];
+  const account = accountFor(input.platform, input.who, input.site);
+  return { payload, tagReport, lint, extras, account, payloadSha256: payloadHashOf(input.platform, account, payload, extras) };
+}
+
 /**
  * Build (or rebuild) the platform draft for an article: adapt the text, sanitize the tags, run the checks,
  * hash the exact payload and remember which version of the article it came from. Nothing is sent. A draft
- * that is publishing, unknown or published is not rebuilt: it stays as the record of what went out.
+ * that is publishing, unknown or published is not rebuilt: it stays as the record of what went out. A draft the
+ * owner edited is not rebuilt either, unless they say the edits may be replaced.
  */
 export async function prepareDraft(owner: OwnerContext, env: Pick<PublishEnv, 'now'>, input: unknown): Promise<PlatformDraftDTO> {
   const values = parseInput(prepareSchema, input);
   const article = await owner.data.articles.get(values.articleId);
   if (!article) throw new ActionError('not_found', 'Article not found');
-  const connection = await owner.data.connections.getByPlatform(values.platform);
   const info = PLATFORMS[values.platform];
-  if (!connection) throw new ActionError('conflict', `Connect ${info.name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
+  const connection = await owner.data.connections.getByPlatform(values.platform);
+  // A destination with a connector asks for its account first. The personal site does not (export needs none),
+  // and the rest have nothing to connect.
+  if (isPublishable(values.platform) && values.platform !== 'site' && !connection) {
+    throw new ActionError('conflict', `Connect ${info.name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
+  }
 
   await refresh(owner, env, article.id);
   const existing = await owner.data.platformDrafts.current(article.id, values.platform);
@@ -294,52 +453,43 @@ export async function prepareDraft(owner: OwnerContext, env: Pick<PublishEnv, 'n
           : `A publish to ${info.name} is in progress.`;
     throw new ActionError('conflict', why, {}, { code: 'ALREADY_OUT' });
   }
+  if (existing && existing.editCount > 0 && !values.discardEdits) {
+    throw new ActionError('conflict', `You edited this ${info.name} draft. Rebuilding replaces your edits with a fresh adaptation of the article. Confirm to rebuild.`, {}, { code: 'HAS_EDITS' });
+  }
 
-  const adapter = adapterFor(values.platform);
   const explicitCover = values.coverImageUrl === undefined ? undefined : values.coverImageUrl || null;
-  const cover = explicitCover !== undefined ? explicitCover : (existing?.payload.coverImageUrl ?? coverFromMetadata(article.extraMetadata));
-  const series = values.series === undefined ? (existing?.payload.series ?? null) : values.series || null;
-  const { payload, tagReport } = adapter.adapt({
-    title: article.title,
-    description: article.description,
-    tags: article.tags,
-    canonicalUrl: article.canonicalUrl,
-    coverImageUrl: cover,
-    series,
-    bodyMarkdown: article.bodyMarkdown,
-  });
-  const lint = adapter.validate(payload);
-  if (article.coverAssetId && !payload.coverImageUrl) {
-    lint.push({ code: 'cover_local_only', severity: 'warning', message: 'The article’s cover image only exists in this app, so no cover will be sent. Add a public https URL for the cover to include one.' });
-  }
-  if (!connection.config.publicationId && values.platform === 'hashnode') {
-    lint.push({ code: 'publication_missing', severity: 'error', message: 'No Hashnode publication is selected. Choose one in Settings > Connections.' });
-  }
-  const account = connection.who;
-  const built = {
-    connectionId: connection.id,
-    account,
-    payload,
-    payloadSha256: payloadHashOf(values.platform, account, payload),
-    tagReport,
-    lint,
+  const cover = explicitCover !== undefined ? explicitCover : (existing?.generatedPayload.coverImageUrl ?? existing?.payload.coverImageUrl ?? coverFromMetadata(article.extraMetadata));
+  const series = values.series === undefined ? (existing?.generatedPayload.series ?? existing?.payload.series ?? null) : values.series || null;
+  const site = toSiteSettingsDTO(await owner.data.siteSettings.get());
+  const now = (env.now ?? (() => new Date()))();
+  const built = buildDraft({ article, platform: values.platform, who: connection?.who ?? null, config: connection?.config ?? {}, site, previous: existing, cover, series, now });
+  const rowValues = {
+    connectionId: connection?.id ?? null,
+    account: built.account,
+    payload: built.payload,
+    payloadSha256: built.payloadSha256,
+    tagReport: built.tagReport,
+    lint: built.lint,
     sourceRevision: article.revision,
     sourceHash: sourceHashOf(article),
+    generatedPayload: built.payload,
+    extras: built.extras,
   };
 
   let row: PlatformDraft | null;
   if (existing) {
-    row = await owner.data.platformDrafts.rebuild(existing.id, built);
+    row = await owner.data.platformDrafts.rebuild(existing.id, rowValues);
     if (!row) throw new ActionError('conflict', 'This draft can no longer be rebuilt.');
   } else {
-    row = await owner.data.platformDrafts.create({ articleId: article.id, platform: values.platform, ...built });
+    row = await owner.data.platformDrafts.create({ articleId: article.id, platform: values.platform, ...rowValues });
   }
+  await owner.data.destinations.add(article.id, values.platform);
   await owner.data.audit.record({
     actor: owner.actor,
     action: existing ? 'platform_draft.rebuilt' : 'platform_draft.created',
     entityType: 'platform_draft',
     entityId: row.id,
-    metadata: { platform: values.platform, articleId: article.id, errors: lint.filter((i) => i.severity === 'error').length, warnings: lint.filter((i) => i.severity === 'warning').length },
+    metadata: { platform: values.platform, articleId: article.id, errors: built.lint.filter((i) => i.severity === 'error').length, warnings: built.lint.filter((i) => i.severity === 'warning').length },
   });
   return draftView(owner, row);
 }
@@ -386,9 +536,21 @@ export interface StageOutcome {
   draft: PlatformDraftDTO;
 }
 
+/** What the adapters need to know about a draft beyond its payload. */
+export function adapterDraftOf(draft: PlatformDraft) {
+  return { id: draft.id, payload: draft.payload, remoteId: draft.remoteId, extras: draft.extras, payloadSha256: draft.payloadSha256 };
+}
+
+/** The repository a personal-site probe reads, from the draft's own options. */
+function siteTargetOf(draft: PlatformDraft) {
+  const site = draft.extras.site;
+  return draft.platform === 'site' && site?.repo ? { repo: site.repo, baseBranch: site.baseBranch } : undefined;
+}
+
 /** Create or update the PRIVATE copy on the platform. It never publishes and never touches a live article. */
 export async function stageDraft(owner: OwnerContext, env: PublishEnv, id: unknown): Promise<StageOutcome> {
   const first = await loadDraft(owner, id);
+  requirePublishable(first.platform, 'staged');
   await refresh(owner, env, first.articleId);
   const draft = await loadDraft(owner, id);
   const name = PLATFORMS[draft.platform].name;
@@ -399,7 +561,7 @@ export async function stageDraft(owner: OwnerContext, env: PublishEnv, id: unkno
   if (errors.length > 0) {
     throw new ActionError('invalid', `Fix ${errors.length} problem${errors.length === 1 ? '' : 's'} before staging: ${errors[0]!.message}`, {}, { code: 'LINT' });
   }
-  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : null;
+  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform).then((c) => (c ? owner.data.connections.getWithKey(c.id) : null));
   if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
   let secret: string;
   try {
@@ -407,22 +569,26 @@ export async function stageDraft(owner: OwnerContext, env: PublishEnv, id: unkno
   } catch (err) {
     throw new ActionError('unavailable', err instanceof KeyUnreadableError ? err.message : 'The saved key could not be read.');
   }
-  const { adapter, ctx } = contextFor(env, connection, secret);
+  const { adapter, ctx } = contextFor(env, connection, secret, siteTargetOf(draft));
   const attempt = await owner.data.platformDrafts.startAttempt(draft.id, 'stage', draft.payloadSha256);
 
   try {
-    const { value, attempts } = await stageWithRetries(env, draft.remoteId !== null, () => adapter.stage(ctx, { id: draft.id, payload: draft.payload, remoteId: draft.remoteId }));
-    const staged = await owner.data.platformDrafts.markStaged(draft.id, draft.payloadSha256, { remoteId: value.remoteId, previewUrl: value.previewUrl });
+    const { value, attempts } = await stageWithRetries(env, draft.remoteId !== null, () => adapter.stage(ctx, adapterDraftOf(draft)));
+    const staged = await owner.data.platformDrafts.markStaged(draft.id, draft.payloadSha256, { remoteId: value.remoteId, previewUrl: value.previewUrl, info: value.info ?? null });
     await owner.data.platformDrafts.finishAttempt(attempt.id, {
       status: 'succeeded',
       remoteId: value.remoteId,
-      message: staged ? (attempts > 1 ? `Staged after ${attempts} tries.` : null) : 'The draft changed while it was being staged, so the result was not applied.',
+      message: staged ? (attempts > 1 ? `Staged after ${attempts} tries.` : draft.platform === 'site' ? 'Read the repository and checked the target file. Nothing was written.' : null) : 'The draft changed while it was being staged, so the result was not applied.',
     });
     await owner.data.audit.record({ actor: owner.actor, action: 'platform_draft.staged', entityType: 'platform_draft', entityId: draft.id, metadata: { platform: draft.platform, applied: Boolean(staged), attempts } });
     const view = await draftView(owner, await loadDraft(owner, draft.id));
-    return staged
-      ? { ok: true, message: `A private draft is on ${name}. It is not public.`, draft: view }
-      : { ok: false, message: 'The draft changed while it was being staged. Review it and stage again.', draft: view };
+    const okMessage =
+      draft.platform === 'site'
+        ? value.info?.fileExists
+          ? `Checked ${draft.extras.site?.repo}. A file already exists at ${value.info.path}. Mark the draft “update existing” if you mean to replace it. Nothing was written.`
+          : `Checked ${draft.extras.site?.repo}: ${value.info?.path} is free on ${draft.extras.site?.baseBranch}. Nothing was written.`
+        : `A private draft is on ${name}. It is not public.`;
+    return staged ? { ok: true, message: okMessage, draft: view } : { ok: false, message: 'The draft changed while it was being staged. Review it and stage again.', draft: view };
   } catch (err) {
     const platformError = err instanceof PlatformError ? err : new PlatformError('network', 'The request failed before the platform answered.');
     const failure = describeFailure(draft.platform, platformError, 'stage');
@@ -435,6 +601,21 @@ export async function stageDraft(owner: OwnerContext, env: PublishEnv, id: unkno
   }
 }
 
+// ---- canonical page ----------------------------------------------------------------------------------
+
+/**
+ * Look at the article's canonical page and keep what was found. Syndication destinations warn, and ask for one
+ * more tick, when it is not live. The look is read-only and goes through the SSRF-safe fetcher.
+ */
+export async function refreshCanonical(owner: OwnerContext, env: PublishEnv, article: Pick<Article, 'id'>, url: string | null) {
+  if (!url) return null;
+  const site = toSiteSettingsDTO(await owner.data.siteSettings.get());
+  const result = await checkCanonicalPage(url, siteHostOf(site), env.canonical);
+  const row = await owner.data.canonicalChecks.save({ articleId: article.id, url, ...result, checkedAt: (env.now ?? (() => new Date()))() });
+  await owner.data.audit.record({ actor: owner.actor, action: 'canonical.checked', entityType: 'article', entityId: article.id, metadata: { state: result.state, httpStatus: result.httpStatus } });
+  return row;
+}
+
 // ---- approval ----------------------------------------------------------------------------------------
 
 export interface ApprovalRequestOutcome {
@@ -443,24 +624,48 @@ export interface ApprovalRequestOutcome {
   link: string;
 }
 
+const requestSchema = z.object({ mode: z.enum(['publish', 'manual']).default('publish') }).strict();
+
 /**
  * Ask the owner to approve this exact payload. Creates a pending, single-use request that expires in 30
- * minutes. Anyone allowed to prepare drafts may ask; only the owner, in the app, can answer.
+ * minutes. Anyone allowed to prepare drafts may ask; only the owner, in the app, can answer. Mode `manual` asks
+ * the owner to approve recording a post they made by hand; it is the owner's request only.
  */
-export async function requestApproval(owner: OwnerContext, env: PublishEnv, id: unknown): Promise<ApprovalRequestOutcome> {
+export async function requestApproval(owner: OwnerContext, env: PublishEnv, id: unknown, input: unknown = {}): Promise<ApprovalRequestOutcome> {
+  const { mode } = parseInput(requestSchema, input ?? {});
+  if (mode === 'manual') requireOwnerActor(owner, 'Recording a post made by hand');
   const first = await loadDraft(owner, id);
+  if (mode === 'publish') requirePublishable(first.platform, 'approved for publishing');
   await refresh(owner, env, first.articleId);
   const draft = await loadDraft(owner, id);
   const name = PLATFORMS[draft.platform].name;
   if (draft.status === 'source_changed' || draft.stale) throw new ActionError('conflict', 'The article changed after this draft was built. Rebuild the draft first.', {}, { code: 'SOURCE_CHANGED' });
-  if (draft.status !== 'staged' && draft.status !== 'pending_approval') {
-    const why = draft.status === 'draft' || draft.status === 'failed' ? `Stage the private draft on ${name} first, so you can look at it before it goes public.` : (STATUS_WHY[draft.status] ?? 'It is not ready for approval.');
-    throw new ActionError('conflict', `Approval cannot be requested yet. ${why}`, {}, { code: 'STATUS' });
+
+  if (mode === 'manual') {
+    if (draft.status !== 'draft' && draft.status !== 'staged' && draft.status !== 'failed' && draft.status !== 'pending_approval') {
+      throw new ActionError('conflict', `Recording cannot be requested now. ${STATUS_WHY[draft.status] ?? ''}`.trim(), {}, { code: 'STATUS' });
+    }
+  } else {
+    if (draft.status !== 'staged' && draft.status !== 'pending_approval') {
+      const why = draft.status === 'draft' || draft.status === 'failed' ? (draft.platform === 'site' ? 'Check the target on GitHub first, so you know where the file will go.' : `Stage the private draft on ${name} first, so you can look at it before it goes public.`) : (STATUS_WHY[draft.status] ?? 'It is not ready for approval.');
+      throw new ActionError('conflict', `Approval cannot be requested yet. ${why}`, {}, { code: 'STATUS' });
+    }
+    const errors = draft.lint.filter((i) => i.severity === 'error');
+    if (errors.length > 0) throw new ActionError('invalid', `Fix ${errors.length} problem${errors.length === 1 ? '' : 's'} first: ${errors[0]!.message}`, {}, { code: 'LINT' });
+    const connection = draft.connectionId ? await owner.data.connections.get(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform);
+    if (!connection || connection.status !== 'connected') throw new ActionError('conflict', `${name} is not connected. Reconnect it in Settings > Connections.`, {}, { code: 'UNHEALTHY' });
+    if (draft.platform === 'site') {
+      const options = draft.extras.site;
+      const seen = draft.remoteInfo;
+      if (seen?.fileExists && !(options?.updateExisting && options.expectedSha === seen.fileSha)) {
+        throw new ActionError('conflict', `A file already exists at ${options?.path}. Mark the draft “update existing” (after looking at the file), or change the path.`, {}, { code: 'FILE_EXISTS' });
+      }
+    }
+    if (isSyndication(draft.platform) && draft.payload.canonicalUrl) {
+      const article = await owner.data.articles.get(draft.articleId);
+      if (article) await refreshCanonical(owner, env, article, draft.payload.canonicalUrl);
+    }
   }
-  const errors = draft.lint.filter((i) => i.severity === 'error');
-  if (errors.length > 0) throw new ActionError('invalid', `Fix ${errors.length} problem${errors.length === 1 ? '' : 's'} first: ${errors[0]!.message}`, {}, { code: 'LINT' });
-  const connection = draft.connectionId ? await owner.data.connections.get(draft.connectionId) : null;
-  if (!connection || connection.status !== 'connected') throw new ActionError('conflict', `${name} is not connected. Reconnect it in Settings > Connections.`, {}, { code: 'UNHEALTHY' });
 
   const now = (env.now ?? (() => new Date()))();
   const approval = await owner.data.platformDrafts.openApproval(draft.id, {
@@ -468,13 +673,14 @@ export async function requestApproval(owner: OwnerContext, env: PublishEnv, id: 
     expiresAt: new Date(now.getTime() + APPROVAL_TTL_MS),
     requestedBy: owner.actor === 'agent' ? 'agent' : 'owner',
     expectedHash: draft.payloadSha256,
+    kind: mode,
   });
   if (!approval) throw new ActionError('conflict', 'The draft changed. Review it and ask again.', {}, { code: 'STATUS' });
-  await owner.data.audit.record({ actor: owner.actor, action: 'approval.requested', entityType: 'approval', entityId: approval.id, metadata: { platform: draft.platform, draftId: draft.id, tag: approval.tag } });
-  return { draft: await draftView(owner, await loadDraft(owner, draft.id)), link: `${env.config.appUrl}/articles/${draft.articleId}?panel=publish` };
+  await owner.data.audit.record({ actor: owner.actor, action: 'approval.requested', entityType: 'approval', entityId: approval.id, metadata: { platform: draft.platform, draftId: draft.id, tag: approval.tag, mode } });
+  return { draft: await draftView(owner, await loadDraft(owner, draft.id)), link: `${env.config.appUrl}/articles/${draft.articleId}/publish` };
 }
 
-/** Say no to a pending request. Only the signed-in owner. The draft goes back to staged. */
+/** Say no to a pending request. Only the signed-in owner. The draft goes back to where it was. */
 export async function declineApproval(owner: OwnerContext, env: PublishEnv, approvalId: unknown): Promise<PlatformDraftDTO> {
   requireOwnerActor(owner, 'Declining an approval');
   const id = parseId(approvalId, 'Approval');
@@ -485,9 +691,12 @@ export async function declineApproval(owner: OwnerContext, env: PublishEnv, appr
   return draftView(owner, await loadDraft(owner, denied.draftId));
 }
 
-const approveSchema = z.object({
-  checked: z.array(z.string().max(300)).max(20),
-});
+/** Exactly one approval id arrives in the path and nothing else is accepted in the body: there is no way to approve more than one payload at a time. */
+const approveSchema = z
+  .object({
+    checked: z.array(z.string().max(300)).max(20),
+  })
+  .strict();
 
 export interface PublishOutcome {
   outcome: 'published' | 'failed' | 'unknown';
@@ -510,16 +719,18 @@ export async function approveAndPublish(owner: OwnerContext, env: PublishEnv, ap
   if (!approval) throw new ActionError('not_found', 'Approval not found');
   const draft = await owner.data.platformDrafts.get(approval.draftId);
   if (!draft) throw new ActionError('not_found', 'Draft not found');
+  requirePublishable(draft.platform, 'published');
+  if (approval.kind !== 'publish') throw new ActionError('conflict', 'This approval is for recording a post made by hand, not for publishing.', {}, { code: 'APPROVAL_INVALID' });
   const name = PLATFORMS[draft.platform].name;
   const now = env.now ?? (() => new Date());
 
-  const required = approvalChecklist(name, draft.payload.canonicalUrl !== null);
+  const required = await checklistFor(owner, draft, 'publish');
   const missing = required.filter((box) => !checked.includes(box));
   if (missing.length > 0) {
     throw new ActionError('invalid', `Tick every box before approving (${missing.length} left).`, { checked: 'Every box must be ticked.' }, { code: 'CHECKLIST', missing });
   }
 
-  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : null;
+  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform).then((c) => (c ? owner.data.connections.getWithKey(c.id) : null));
   if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
   let secret: string;
   try {
@@ -527,7 +738,7 @@ export async function approveAndPublish(owner: OwnerContext, env: PublishEnv, ap
   } catch (err) {
     throw new ActionError('unavailable', err instanceof KeyUnreadableError ? err.message : 'The saved key could not be read.');
   }
-  const { adapter, ctx } = contextFor(env, connection, secret);
+  const { adapter, ctx } = contextFor(env, connection, secret, siteTargetOf(draft));
 
   // A read-only probe first. If it fails nothing is consumed and the approval stays pending until it expires.
   try {
@@ -557,7 +768,7 @@ export async function approveAndPublish(owner: OwnerContext, env: PublishEnv, ap
   // From here the approval is spent and the draft is `publishing`. The adapter is called once.
   let publication;
   try {
-    publication = await adapter.publish(ctx, { id: draft.id, payload: authorized.draft.payload, remoteId: authorized.draft.remoteId });
+    publication = await adapter.publish(ctx, adapterDraftOf(authorized.draft));
   } catch (err) {
     const platformError = err instanceof PlatformError ? err : new PlatformError('network', 'The request ended in an unexpected way.');
     const failure = describeFailure(draft.platform, platformError, 'publish');
@@ -578,7 +789,11 @@ export async function approveAndPublish(owner: OwnerContext, env: PublishEnv, ap
     now: now(),
   });
   await owner.data.audit.record({ actor: owner.actor, action: 'platform.published', entityType: 'platform_draft', entityId: draft.id, metadata: { platform: draft.platform, remoteId: publication.remoteId, recorded: Boolean(settled) } });
-  return { outcome: 'published', message: `Published on ${name}.`, draft: await draftView(owner, await loadDraft(owner, draft.id)) };
+  return {
+    outcome: 'published',
+    message: draft.platform === 'site' ? 'Pull request opened. Merge it in GitHub to go live.' : `Published on ${name}.`,
+    draft: await draftView(owner, await loadDraft(owner, draft.id)),
+  };
 }
 
 // ---- recovery ----------------------------------------------------------------------------------------
@@ -597,10 +812,12 @@ export interface CheckOutcome {
 export async function checkOnPlatform(owner: OwnerContext, env: PublishEnv, id: unknown): Promise<CheckOutcome> {
   requireOwnerActor(owner, 'Checking on the platform');
   const first = await loadDraft(owner, id);
+  requirePublishable(first.platform, 'checked');
   await refresh(owner, env, first.articleId);
   const draft = await loadDraft(owner, id);
   const name = PLATFORMS[draft.platform].name;
-  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : null;
+  const isSite = draft.platform === 'site';
+  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform).then((c) => (c ? owner.data.connections.getWithKey(c.id) : null));
   if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
   let secret: string;
   try {
@@ -608,13 +825,14 @@ export async function checkOnPlatform(owner: OwnerContext, env: PublishEnv, id: 
   } catch (err) {
     throw new ActionError('unavailable', err instanceof KeyUnreadableError ? err.message : 'The saved key could not be read.');
   }
-  const { adapter, ctx } = contextFor(env, connection, secret);
+  const { adapter, ctx } = contextFor(env, connection, secret, siteTargetOf(draft));
   const now = (env.now ?? (() => new Date()))();
   const view = async () => draftView(owner, await loadDraft(owner, draft.id));
+  const what = isSite ? 'a pull request' : 'the post';
 
   let result;
   try {
-    result = await adapter.check(ctx, { id: draft.id, payload: draft.payload, remoteId: draft.remoteId });
+    result = await adapter.check(ctx, adapterDraftOf(draft));
   } catch (err) {
     const platformError = err instanceof PlatformError ? err : new PlatformError('network', 'The check failed.');
     const failure = describeFailure(draft.platform, platformError, 'check');
@@ -627,22 +845,36 @@ export async function checkOnPlatform(owner: OwnerContext, env: PublishEnv, id: 
 
   const attempt = await owner.data.platformDrafts.startAttempt(draft.id, 'check', draft.payloadSha256);
   if (result.state === 'published') {
-    const resolved = draft.status === 'unknown' ? await owner.data.platformDrafts.resolveUnknown(draft.id, { outcome: 'published', remoteId: result.remoteId, remoteUrl: result.remoteUrl }, { kind: 'check', message: `Found live on ${name}.`, now }) : null;
-    await owner.data.platformDrafts.finishAttempt(attempt.id, { status: 'succeeded', remoteId: result.remoteId, remoteUrl: result.remoteUrl, message: `Live on ${name}.` });
+    const resolved = draft.status === 'unknown' ? await owner.data.platformDrafts.resolveUnknown(draft.id, { outcome: 'published', remoteId: result.remoteId, remoteUrl: result.remoteUrl }, { kind: 'check', message: isSite ? 'Found a pull request on GitHub.' : `Found live on ${name}.`, now }) : null;
+    await owner.data.platformDrafts.finishAttempt(attempt.id, { status: 'succeeded', remoteId: result.remoteId, remoteUrl: result.remoteUrl, message: isSite ? 'A pull request exists.' : `Live on ${name}.` });
     await owner.data.audit.record({ actor: owner.actor, action: 'platform.checked', entityType: 'platform_draft', entityId: draft.id, metadata: { platform: draft.platform, remote: 'published', resolved: Boolean(resolved) } });
-    return { remote: 'published', message: resolved ? `It is live on ${name}. The draft is now recorded as published.` : `It is live on ${name}.`, draft: await view() };
+    return {
+      remote: 'published',
+      message: isSite ? (resolved ? 'A pull request exists. The draft is now recorded as opened.' : 'A pull request exists.') : resolved ? `It is live on ${name}. The draft is now recorded as published.` : `It is live on ${name}.`,
+      draft: await view(),
+    };
   }
   if (result.state === 'private') {
-    const resolved = draft.status === 'unknown' ? await owner.data.platformDrafts.resolveUnknown(draft.id, { outcome: 'not_published' }, { kind: 'check', message: `Still private on ${name}.`, now }) : null;
-    await owner.data.platformDrafts.finishAttempt(attempt.id, { status: 'succeeded', message: `Private on ${name}.` });
+    const resolved = draft.status === 'unknown' ? await owner.data.platformDrafts.resolveUnknown(draft.id, { outcome: 'not_published' }, { kind: 'check', message: isSite ? 'No pull request exists.' : `Still private on ${name}.`, now }) : null;
+    await owner.data.platformDrafts.finishAttempt(attempt.id, { status: 'succeeded', message: isSite ? 'No pull request exists.' : `Private on ${name}.` });
     await owner.data.audit.record({ actor: owner.actor, action: 'platform.checked', entityType: 'platform_draft', entityId: draft.id, metadata: { platform: draft.platform, remote: 'private', resolved: Boolean(resolved) } });
-    return { remote: 'private', message: resolved ? `It is still a private draft on ${name}, so it did not go out. You can ask for approval again.` : `It is a private draft on ${name}.`, draft: await view() };
+    return {
+      remote: 'private',
+      message: isSite
+        ? resolved
+          ? 'No pull request was opened (only the branch exists), so nothing went out. You can ask for approval again.'
+          : 'No pull request exists yet.'
+        : resolved
+          ? `It is still a private draft on ${name}, so it did not go out. You can ask for approval again.`
+          : `It is a private draft on ${name}.`,
+      draft: await view(),
+    };
   }
-  await owner.data.platformDrafts.finishAttempt(attempt.id, { status: 'succeeded', message: `Not found on ${name}.` });
+  await owner.data.platformDrafts.finishAttempt(attempt.id, { status: 'succeeded', message: isSite ? 'No pull request or branch found.' : `Not found on ${name}.` });
   await owner.data.audit.record({ actor: owner.actor, action: 'platform.checked', entityType: 'platform_draft', entityId: draft.id, metadata: { platform: draft.platform, remote: 'not_found' } });
   return {
     remote: 'not_found',
-    message: `It could not be found on ${name}. That is not proof it never went out, so the result stays unknown. Look in your ${name} dashboard, then mark it by hand.`,
+    message: `${what[0]!.toUpperCase()}${what.slice(1)} could not be found on ${name}. That is not proof it never went out, so the result stays unknown. Look on ${name}, then mark it by hand.`,
     draft: await view(),
   };
 }
