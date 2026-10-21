@@ -134,7 +134,7 @@
   }
   .article-prose pre {
     position: relative;
-    padding: 1em 1.1em;
+    padding: 1em 3.2rem 1em 1.1em;
     overflow-x: auto;
     border-radius: var(--radius);
     background: var(--code-bg);
