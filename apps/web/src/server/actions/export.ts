@@ -19,5 +19,6 @@ export async function exportMyData(owner: OwnerContext) {
     preferences: all.preferences ? withoutOwner(all.preferences) : null,
     sources: all.sources.map(withoutOwner),
     items: all.items.map(withoutOwner),
+    articles: all.articles.map(withoutOwner),
   };
 }

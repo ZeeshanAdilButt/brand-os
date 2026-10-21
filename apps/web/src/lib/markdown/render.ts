@@ -110,10 +110,6 @@ function attributeName(prop: string): string {
   return prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 }
 
-function shorten(value: string, max = 60): string {
-  const one = value.replace(/\s+/g, ' ').trim();
-  return one.length > max ? `${one.slice(0, max)}...` : one;
-}
 
 /** Sanitize, and report precisely what the sanitizer took out. */
 function rehypeSanitizeAndReport() {
