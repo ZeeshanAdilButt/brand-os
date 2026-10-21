@@ -19,6 +19,16 @@ import {
 import { NotFoundError, SlugTakenError } from '../data/scope';
 import type { Article, ArticleVersion } from '../db/schema';
 import { ActionError, parseId, parseInput, type OwnerContext } from './owner';
+import { syncArticleDrafts } from './publishing';
+
+/** Drafts built from the old text are flagged and their approvals voided. A failure here never fails the save: publishing re-checks the source itself. */
+async function voidStaleDrafts(owner: OwnerContext, articleId: string): Promise<void> {
+  try {
+    await syncArticleDrafts(owner, articleId);
+  } catch {
+    /* the authorization re-checks the source inside its own transaction */
+  }
+}
 
 const text = (max: number) => z.string().trim().max(max);
 
@@ -176,6 +186,7 @@ export async function saveArticle(owner: OwnerContext, id: unknown, input: unkno
   // recorded as the agent's, whatever `reason` the body claims.
   const saveReason: SaveReason = owner.actor === 'agent' ? 'agent' : reason;
   const article = await guard(() => owner.data.articles.save(articleId, expectedRevision, patch, saveReason));
+  await voidStaleDrafts(owner, article.id);
   // Autosaves would flood the log; deliberate saves are recorded.
   if (saveReason !== 'autosave') {
     await owner.data.audit.record({ actor: owner.actor, action: 'article.saved', entityType: 'article', entityId: article.id, metadata: { reason: saveReason } });
@@ -188,7 +199,9 @@ export async function saveArticle(owner: OwnerContext, id: unknown, input: unkno
  * version (reason 'ai_accept'). Only the AI task actions call this.
  */
 export async function saveAcceptedAiChange(owner: OwnerContext, articleId: string, expectedRevision: number, patch: ArticlePatch): Promise<Article> {
-  return guard(() => owner.data.articles.save(articleId, expectedRevision, patch, 'ai_accept'));
+  const article = await guard(() => owner.data.articles.save(articleId, expectedRevision, patch, 'ai_accept'));
+  await voidStaleDrafts(owner, article.id);
+  return article;
 }
 
 export async function deleteArticle(owner: OwnerContext, id: unknown): Promise<void> {
@@ -236,6 +249,7 @@ export async function restoreVersion(owner: OwnerContext, articleId: unknown, ve
   if (!no.success) throw new ActionError('not_found', 'Version not found');
   const { expectedRevision } = parseInput(restoreSchema, input);
   const article = await guard(() => owner.data.articles.restore(id, no.data, expectedRevision));
+  await voidStaleDrafts(owner, article.id);
   await owner.data.audit.record({
     actor: owner.actor,
     action: 'article.restored',
