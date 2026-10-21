@@ -3,6 +3,8 @@
  * Labels and notes are user-facing copy: they say plainly where the text goes and what is unknown.
  */
 
+import type { TaskResult } from './ai-ops';
+
 /** How a provider is reached. `local_cli_agent` is a reserved slot: it exists in the registry and is never selectable. */
 export const PROVIDER_KINDS = ['local', 'api_key', 'claude_code_handoff', 'local_cli_agent'] as const;
 export type ProviderKind = (typeof PROVIDER_KINDS)[number];
@@ -152,6 +154,59 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   rejected: 'Rejected',
   failed: 'Failed',
 };
+
+export interface TaskUsageDTO {
+  tokensIn: number | null;
+  tokensOut: number | null;
+  /** True when a count is our estimate (characters divided by four) and not the provider's own number. */
+  estimated: boolean;
+  /** Answered from an earlier identical request: nothing was sent and nothing was spent. */
+  fromCache: boolean;
+  provider: string | null;
+  model: string | null;
+  /** Always null: the app does not know prices, so it never invents a cost. */
+  costUsd: null;
+}
+
+export interface TaskNoteDTO {
+  id: string;
+  title: string;
+  viaApproval: boolean;
+}
+
+/** An AI task as the browser sees it. Lists carry a shortened excerpt (`excerptTruncated`); a single task carries all of it. */
+export interface TaskDTO {
+  id: string;
+  kind: TaskKind;
+  status: TaskStatus;
+  articleId: string;
+  articleRevision: number;
+  selection: { start: number; end: number } | null;
+  excerpt: string;
+  excerptTruncated: boolean;
+  instruction: string;
+  provider: { id: string | null; name: string | null; kind: ProviderKind | null };
+  model: string | null;
+  result: TaskResult | null;
+  error: string | null;
+  /** Set when a result is waiting but the article text it was made for has changed. */
+  stale: string | null;
+  /** A hand-off task nobody has picked up yet: it waits for the person's own Claude Code. */
+  waiting: boolean;
+  usage: TaskUsageDTO;
+  notes: TaskNoteDTO[];
+  withheldCount: number;
+  attempts: number;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+}
+
+/** Sent over the event stream whenever a task changes, right after the change is committed. */
+export interface TaskEvent {
+  type: 'task';
+  task: TaskDTO;
+}
 
 export const TASK_LIMITS = {
   /** Longest selection a task accepts. */

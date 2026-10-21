@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { AGENT_SCOPES } from '../../lib/agent';
-import { PROTOCOLS, PROVIDER_KINDS, TRUST_LEVELS } from '../../lib/ai';
+import { PROTOCOLS, PROVIDER_KINDS, TASK_KINDS, TASK_STATUSES, TRUST_LEVELS } from '../../lib/ai';
+import type { TaskResult } from '../../lib/ai-ops';
 import { ARTICLE_SOURCE_KINDS, ARTICLE_STATUSES, VERSION_REASONS } from '../../lib/articles';
 import {
   CONFIDENCE_LEVELS,
@@ -415,6 +416,67 @@ export const aiProviders = pgTable(
 );
 
 export type AiProvider = typeof aiProviders.$inferSelect;
+
+/**
+ * The AI task inbox (Day 4). One row per request for help with an article: what was asked, what text it
+ * covers, who runs it, and the structured result waiting for the person's decision. Nothing here is ever
+ * applied to an article automatically.
+ */
+export const aiTasks = pgTable(
+  'ai_tasks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: TASK_KINDS }).notNull(),
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    /** The selected range in the article body when the task was made. Null for a task on the article as a whole. */
+    selStart: integer('sel_start'),
+    selEnd: integer('sel_end'),
+    /** The exact text the task covers, copied from the article when it was made. */
+    excerpt: text('excerpt').notNull(),
+    instruction: text('instruction').notNull().default(''),
+    /** Null once the provider has been deleted; the snapshot below still says who it was. */
+    providerId: uuid('provider_id').references(() => aiProviders.id, { onDelete: 'set null' }),
+    providerKind: text('provider_kind', { enum: PROVIDER_KINDS }),
+    providerName: text('provider_name'),
+    model: text('model'),
+    status: text('status', { enum: TASK_STATUSES }).notNull().default('pending'),
+    result: jsonb('result').$type<TaskResult>(),
+    error: text('error'),
+    /** The article revision the task was made against. */
+    articleRevision: integer('article_revision').notNull(),
+    /** The exact text a provider receives (or Claude Code reads). Also what a per-task approval showed. */
+    promptText: text('prompt_text'),
+    promptSha256: text('prompt_sha256'),
+    /** Identical requests share this hash, so a repeat is answered from an earlier result instead of paying again. */
+    requestHash: text('request_hash'),
+    /** Private knowledge items the person approved sending for this task. */
+    approvedItemIds: text('approved_item_ids').array().notNull().default(sql`'{}'::text[]`),
+    /** The notes that went into the context, for display: id, title, text, and whether an approval let them in. */
+    contextNotes: jsonb('context_notes').$type<{ id: string; title: string; body: string; viaApproval: boolean }[]>().notNull().default([]),
+    withheldCount: integer('withheld_count').notNull().default(0),
+    tokensIn: integer('tokens_in'),
+    tokensOut: integer('tokens_out'),
+    /** True when any token count is our estimate (characters / 4) rather than the provider's own number. */
+    tokensEstimated: boolean('tokens_estimated').notNull().default(true),
+    fromCache: boolean('from_cache').notNull().default(false),
+    attempts: integer('attempts').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('ai_tasks_owner_article_idx').on(table.ownerId, table.articleId, table.createdAt),
+    index('ai_tasks_owner_status_idx').on(table.ownerId, table.status),
+    index('ai_tasks_owner_hash_idx').on(table.ownerId, table.requestHash),
+  ],
+);
+
+export type AiTask = typeof aiTasks.$inferSelect;
 export type Article = Omit<typeof articles.$inferSelect, 'search'>;
 export type ArticleVersion = typeof articleVersions.$inferSelect;
 export type Asset = typeof assets.$inferSelect;

@@ -1,4 +1,5 @@
 import type { AgentScope } from '../../lib/agent';
+import type { AiEnv } from '../ai/runtime';
 import { ActionError, sessionToOwner, type OwnerContext } from '../actions/owner';
 import { defaultLimiters, type AgentLimiters } from '../agent/rate-limit';
 import { bearerFrom, hashSecret, looksLikeSecret } from '../agent/secret';
@@ -10,6 +11,8 @@ import { checkRequest } from './guard';
 /** Deps for the agent API: the usual seams plus the rate limiters, which tests replace. */
 export interface AgentHandlerDeps extends HandlerDeps {
   limiters?: AgentLimiters;
+  /** Overrides for the AI environment (clock). Tests only. */
+  ai?: Partial<Omit<AiEnv, 'config'>>;
 }
 
 /** Who is calling: facts about the credential, never an owner id a caller could pass in. */

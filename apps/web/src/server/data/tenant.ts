@@ -5,6 +5,7 @@ import { scopedAudit } from './audit';
 import { scopedArticles, scopedAssets, scopedStudioSettings } from './articles';
 import { scopedCredentials } from './agent-credentials';
 import { scopedProviders } from './ai-providers';
+import { scopedTasks } from './ai-tasks';
 import { scopedItems, scopedSources } from './knowledge';
 import { scopedPreferences, scopedProfile } from './profile';
 import { makeScope, type DbSource, type Scope } from './scope';
@@ -36,6 +37,7 @@ export function forOwner(ownerId: string, db?: AppDb) {
     studioSettings: scopedStudioSettings(scope),
     credentials: scopedCredentials(scope),
     providers: scopedProviders(scope),
+    tasks: scopedTasks(scope),
     audit: {
       async record(input: AuditInput) {
         return scopedAudit(await scope.db(), scope.ownerId).record(input);

@@ -22,7 +22,7 @@ export default defineConfig({
       {
         extends: true as const,
         resolve: { alias: { '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)) } },
-        test: { name: 'web', root: 'apps/web', include: ['test/**/*.test.{ts,tsx}'], testTimeout: 30_000 },
+        test: { name: 'web', root: 'apps/web', include: ['test/**/*.test.{ts,tsx}'], testTimeout: 30_000, hookTimeout: 60_000 },
       },
     ],
   },

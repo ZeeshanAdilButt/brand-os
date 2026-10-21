@@ -43,6 +43,13 @@
       "when": 1792594127224,
       "tag": "0005_rainy_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792594731091,
+      "tag": "0006_fast_valeria_richards",
+      "breakpoints": true
     }
   ]
 }

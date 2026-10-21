@@ -1,8 +1,10 @@
 import { createArticle, getArticle, listArticles, saveArticle } from '../actions/articles';
+import { agentListTasks, agentTaskView, submitTaskResult } from '../actions/ai-tasks';
 import { listItems } from '../actions/knowledge';
 import { ActionError } from '../actions/owner';
 import { getProfile } from '../actions/profile';
 import { articleRowView, articleView, itemView, preferencesView, profileView } from '../agent/views';
+import { aiEnvFrom } from '../ai/runtime';
 import { withAgent, type AgentHandlerDeps } from './agent-auth';
 import { json, readJson } from './handlers';
 import { MARK_END, MARK_START } from '../../lib/knowledge';
@@ -74,5 +76,26 @@ export function handleAgentArticlePatch(request: Request, id: string, deps: Agen
       }
       throw err;
     }
+  });
+}
+
+/** AI tasks waiting for the owner's own Claude Code (pending or running by default). Scope: read. */
+export function handleAgentTasksGet(request: Request, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'read', action: 'agent.ai_tasks.list' }, async (owner, _agent, ctx) => {
+    const params = Object.fromEntries(new URL(request.url).searchParams);
+    return json({ tasks: await agentListTasks(owner, { env: aiEnvFrom(ctx, deps.ai) }, params) });
+  });
+}
+
+/** One task with everything needed to complete it. Scope: read. */
+export function handleAgentTaskGet(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'read', action: 'agent.ai_tasks.get' }, async (owner) => json(await agentTaskView(owner, id)));
+}
+
+/** Submit the operations that complete a task. They are validated like a model's answer and wait for the owner's review. Scope: ai_tasks. */
+export function handleAgentTaskResult(request: Request, id: string, deps: AgentHandlerDeps = {}) {
+  return withAgent(request, deps, { scope: 'ai_tasks', action: 'agent.ai_tasks.submit_result' }, async (owner) => {
+    const task = await submitTaskResult(owner, id, await readJson(request));
+    return json({ id: task.id, status: task.status });
   });
 }

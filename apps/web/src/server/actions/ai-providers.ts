@@ -7,6 +7,7 @@ import { redactSecrets } from '../ai/redact';
 import { adapterFor, executesTasks, notReadyReason, plainKey, type AiEnv } from '../ai/runtime';
 import { checkTarget, deriveTrust } from '../ai/target';
 import type { PublicProvider } from '../data/ai-providers';
+import { monthStart } from '../data/ai-tasks';
 import { NotFoundError } from '../data/scope';
 import { ActionError, parseId, parseInput, type OwnerContext } from './owner';
 
@@ -92,9 +93,10 @@ export function toProviderDTO(row: PublicProvider, usedThisMonth = 0): ProviderD
   };
 }
 
-export async function listProviders(owner: OwnerContext): Promise<ProviderDTO[]> {
-  const rows = await owner.data.providers.list();
-  return rows.map((row) => toProviderDTO(row));
+/** Providers with this calendar month's estimated token use, which the soft cap is measured against. */
+export async function listProviders(owner: OwnerContext, now: Date = new Date()): Promise<ProviderDTO[]> {
+  const [rows, usage] = await Promise.all([owner.data.providers.list(), owner.data.tasks.usageSince(monthStart(now))]);
+  return rows.map((row) => toProviderDTO(row, usage.get(row.id) ?? 0));
 }
 
 /** True when at least one enabled provider is ready. When false the app is in no-AI mode: AI actions are disabled with an explanation. */
@@ -194,7 +196,7 @@ export async function updateProvider(owner: OwnerContext, env: AiEnv, id: unknow
       entityId: row.id,
       metadata: { changedKey: Boolean(values.apiKey || values.clearKey), enabled: row.enabled },
     });
-    return toProviderDTO(row);
+    return toProviderDTO(row, (await owner.data.tasks.usageSince(monthStart(new Date()))).get(row.id) ?? 0);
   } catch (err) {
     if (err instanceof NotFoundError) throw new ActionError('not_found', 'Provider not found');
     throw err;

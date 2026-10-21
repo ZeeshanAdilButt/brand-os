@@ -21,7 +21,11 @@ export interface AiEnv {
   resolve?: Resolver | undefined;
   sleep?: ((ms: number) => Promise<void>) | undefined;
   now?: (() => Date) | undefined;
+  /** How long one model call may take before the task fails. Defaults to two minutes. */
+  taskTimeoutMs?: number | undefined;
 }
+
+export const DEFAULT_TASK_TIMEOUT_MS = 120_000;
 
 export function aiEnvFrom(ctx: Pick<AppContext, 'config'>, overrides: Partial<Omit<AiEnv, 'config'>> = {}): AiEnv {
   return { config: ctx.config, ...overrides };
