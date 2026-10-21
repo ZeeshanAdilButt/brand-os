@@ -208,6 +208,30 @@ export interface TaskEvent {
   task: TaskDTO;
 }
 
+/** A provider that is ready to take tasks, as the studio lists it. */
+export interface ReadyProvider {
+  id: string;
+  name: string;
+  kind: ProviderKind;
+  isDefault: boolean;
+  /** True when the app runs its tasks itself; false for the hand-off, which waits for Claude Code. */
+  executes: boolean;
+}
+
+/** What the server says a task would send, so private notes can be approved by reading the text. */
+export interface ContextPreviewDTO {
+  providerId: string;
+  providerName: string;
+  providerKind: ProviderKind;
+  trust: 'local' | 'external';
+  leavesMachine: boolean;
+  prompt: string;
+  promptSha256: string;
+  estimatedTokens: number;
+  included: { id: string; title: string; viaApproval: boolean }[];
+  withheld: { id: string; title: string }[];
+}
+
 export const TASK_LIMITS = {
   /** Longest selection a task accepts. */
   excerpt: 20_000,

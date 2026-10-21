@@ -1,0 +1,127 @@
+'use client';
+
+import { AlertTriangle, Info, OctagonAlert } from 'lucide-react';
+import { useId, useMemo } from 'react';
+import type { Operation, TaskResult } from '@/lib/ai-ops';
+import { diffWords } from '@/lib/diff';
+import { cn } from '@/lib/utils';
+
+/** A rewritten passage with the changed words marked inline: removed words struck through, added words highlighted. */
+export function WordDiff({ original, proposed }: { original: string; proposed: string }) {
+  const segments = useMemo(() => diffWords(original, proposed), [original, proposed]);
+  const changed = segments.some((s) => s.kind !== 'equal');
+  if (!changed) return <p className="rounded-md border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">The proposed text is the same as the original.</p>;
+  return (
+    <div className="rounded-md border bg-background px-3 py-2.5 text-sm leading-relaxed" role="group" aria-label="Proposed change, with removed and added words marked">
+      <p className="whitespace-pre-wrap break-words">
+        {segments.map((segment, i) =>
+          segment.kind === 'equal' ? (
+            <span key={i}>{segment.text}</span>
+          ) : segment.kind === 'del' ? (
+            <del key={i} className="rounded-sm bg-destructive/15 text-destructive decoration-destructive/70">
+              {segment.text}
+            </del>
+          ) : (
+            <ins key={i} className="rounded-sm bg-success/15 text-foreground no-underline [text-decoration:none]">
+              {segment.text}
+            </ins>
+          ),
+        )}
+      </p>
+    </div>
+  );
+}
+
+const SEVERITY = {
+  info: { label: 'Note', icon: Info, cls: 'text-muted-foreground' },
+  warning: { label: 'Check', icon: AlertTriangle, cls: 'text-warning' },
+  error: { label: 'Problem', icon: OctagonAlert, cls: 'text-destructive' },
+} as const;
+
+function OperationView({ op, titleIndex, onTitleIndex, name }: { op: Operation; titleIndex: number | null; onTitleIndex(index: number): void; name: string }) {
+  if (op.type === 'replace_range') {
+    return (
+      <div className="grid gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Suggested change</p>
+        <WordDiff original={op.original} proposed={op.proposed} />
+        {op.rationale ? <p className="text-sm leading-relaxed text-muted-foreground">{op.rationale}</p> : null}
+      </div>
+    );
+  }
+  if (op.type === 'suggest_titles') {
+    return (
+      <fieldset className="grid gap-1.5">
+        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Suggested titles</legend>
+        {op.titles.map((title, i) => (
+          <label key={i} className={cn('flex cursor-pointer items-start gap-2 rounded-md border bg-background px-3 py-2 text-sm has-[:checked]:border-primary/60 has-[:checked]:bg-accent')}>
+            <input type="radio" name={name} checked={titleIndex === i} onChange={() => onTitleIndex(i)} className="mt-1 accent-[var(--primary)]" />
+            <span className="min-w-0 break-words">{title}</span>
+          </label>
+        ))}
+      </fieldset>
+    );
+  }
+  if (op.type === 'review_notes') {
+    return (
+      <div className="grid gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Review notes</p>
+        <ul className="grid gap-2">
+          {op.notes.map((note, i) => {
+            const s = SEVERITY[note.severity];
+            return (
+              <li key={i} className="rounded-md border bg-background px-3 py-2 text-sm">
+                <p className={cn('flex items-center gap-1.5 text-xs font-semibold', s.cls)}>
+                  <s.icon aria-hidden className="size-3.5" />
+                  {s.label}
+                </p>
+                {note.quote ? <blockquote className="mt-1 border-l-2 pl-2 text-xs italic text-muted-foreground">{note.quote}</blockquote> : null}
+                <p className="mt-1 leading-relaxed">{note.note}</p>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="text-xs text-muted-foreground">Notes only. Accepting them marks them as read; your text does not change.</p>
+      </div>
+    );
+  }
+  if (op.type === 'insert_after') {
+    return (
+      <div className="grid gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Text to add after your selection</p>
+        <p className="whitespace-pre-wrap break-words rounded-md border border-success/40 bg-success/10 px-3 py-2.5 text-sm leading-relaxed">{op.text}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Outline to add</p>
+      <ul className="grid gap-1 rounded-md border border-success/40 bg-success/10 px-3 py-2.5 text-sm">
+        {op.headings.map((h, i) => (
+          <li key={i} style={{ paddingLeft: `${(h.level - 1) * 0.875}rem` }} className={cn(h.level <= 2 && 'font-medium')}>
+            {h.text}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** What a waiting result will do, rendered as a diff or a list. Nothing here changes the article. */
+export function ResultView({ result, titleIndex, onTitleIndex }: { result: TaskResult; titleIndex: number | null; onTitleIndex(index: number): void }) {
+  const name = useId();
+  return (
+    <div className="grid gap-4">
+      {result.operations.map((op, i) => (
+        <OperationView key={i} op={op} titleIndex={titleIndex} onTitleIndex={onTitleIndex} name={`${name}-${i}`} />
+      ))}
+    </div>
+  );
+}
+
+/** The button label and whether a choice is still needed, from what the result contains. */
+export function acceptLabel(result: TaskResult): { label: string; needsTitle: boolean; rejectLabel: string } {
+  const types = new Set(result.operations.map((o) => o.type));
+  if (types.has('suggest_titles')) return { label: 'Use this title', needsTitle: true, rejectLabel: 'Reject' };
+  if (types.size === 1 && types.has('review_notes')) return { label: 'Mark as read', needsTitle: false, rejectLabel: 'Dismiss' };
+  return { label: 'Accept change', needsTitle: false, rejectLabel: 'Reject' };
+}

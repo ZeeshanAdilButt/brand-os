@@ -32,6 +32,15 @@ export interface EditorHandle {
   focus(): void;
   /** Open the image picker. */
   chooseImage(): void;
+  /** The current selection, or null when nothing is selected. */
+  getSelection(): EditorSelectionInfo | null;
+}
+
+export interface EditorSelectionInfo {
+  /** Offsets into the Markdown text (UTF-16 code units, the same positions the server uses). */
+  start: number;
+  end: number;
+  text: string;
 }
 
 export interface UploadOutcome {
@@ -48,6 +57,8 @@ interface Props {
   onNotice(message: string): void;
   /** 0 to 1, how far the editor is scrolled. */
   onScroll?(fraction: number): void;
+  /** Called when the selection changes: the selected range, or null when the cursor is just a caret. */
+  onSelectionChange?(selection: EditorSelectionInfo | null): void;
   className?: string;
 }
 
@@ -229,6 +240,12 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownE
     chooseImage() {
       fileInput.current?.click();
     },
+    getSelection() {
+      const v = view.current;
+      if (!v) return null;
+      const { from, to } = v.state.selection.main;
+      return from === to ? null : { start: from, end: to, text: v.state.sliceDoc(from, to) };
+    },
   }));
 
   useEffect(() => {
@@ -289,6 +306,10 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownE
         theme,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) latest.current.onChange(update.state.doc.toString());
+          if (update.selectionSet || update.docChanged) {
+            const { from, to } = update.state.selection.main;
+            latest.current.onSelectionChange?.(from === to ? null : { start: from, end: to, text: update.state.sliceDoc(from, to) });
+          }
         }),
         EditorView.domEventHandlers({
           paste(event, v) {

@@ -1,18 +1,24 @@
 'use client';
 
-import { ArrowLeft, BookOpen, Columns2, Eye, History, PenLine, Save, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Columns2, Eye, History, PenLine, Save, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AiPanel } from '@/components/ai/ai-panel';
+import { ApprovalDialog } from '@/components/ai/approval-dialog';
+import { AssistBar } from '@/components/ai/assist-bar';
+import type { TaskActions } from '@/components/ai/task-card';
+import { useArticleTasks } from '@/components/ai/use-task-stream';
 import { Button } from '@/components/ui/button';
+import { type ContextPreviewDTO, type ReadyProvider, type TaskDTO, type TaskKind } from '@/lib/ai';
 import { api, sendSave, toDraft } from '@/lib/api-client';
 import { countWords, readingMinutes, slugify, SLUG_PATTERN, STATUS_LABELS, type ArticleDTO, type AssetDTO } from '@/lib/articles';
 import { SaveController, type ControllerStatus, type Draft } from '@/lib/autosave';
 import { cn } from '@/lib/utils';
 import { ConflictDialog } from './conflict-dialog';
 import { HistoryPanel } from './history-panel';
-import type { EditorHandle, UploadOutcome } from './markdown-editor';
+import type { EditorHandle, EditorSelectionInfo, UploadOutcome } from './markdown-editor';
 import { MetadataPanel, type SlugView } from './metadata-panel';
 import { PreviewPane } from './preview-pane';
 import { SaveIndicator } from './save-indicator';
@@ -31,7 +37,7 @@ function EditorSkeleton() {
 const MarkdownEditor = dynamic(() => import('./markdown-editor').then((m) => m.MarkdownEditor), { ssr: false, loading: () => <EditorSkeleton /> });
 
 type Mode = 'edit' | 'split' | 'preview';
-type Panel = 'details' | 'history' | null;
+type Panel = 'details' | 'history' | 'ai' | null;
 
 const isWide = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
@@ -41,7 +47,7 @@ const modeButton = (active: boolean) =>
     active ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-accent hover:text-foreground',
   );
 
-export function Studio({ initial }: { initial: ArticleDTO }) {
+export function Studio({ initial, providers }: { initial: ArticleDTO; providers: ReadyProvider[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const draftRef = useRef(draft);
@@ -51,6 +57,14 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
   const [mode, setMode] = useState<Mode>(() => (isWide() ? 'split' : 'edit'));
   const [panel, setPanel] = useState<Panel>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [selection, setSelection] = useState<EditorSelectionInfo | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [approval, setApproval] = useState<{ task: TaskDTO; preview: ContextPreviewDTO } | null>(null);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const askRef = useRef<HTMLTextAreaElement>(null);
+  const { tasks, loaded: tasksLoaded, stream, merge: mergeTask } = useArticleTasks(initial.id);
+  const waitingForReview = tasks.filter((t) => t.status === 'needs_review').length;
   const [slug, setSlug] = useState<SlugView>({
     value: initial.slug,
     state: 'idle',
@@ -274,6 +288,144 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
     else notify(result.network ? 'Could not delete while offline.' : result.error);
   }
 
+  /* ---- AI assistance ---- */
+
+  /** Save what is pending, then say which revision the server holds. The offsets of a selection only mean something against that text. */
+  const settleForAi = useCallback(async (): Promise<{ ok: true; revision: number } | { ok: false; error: string }> => {
+    await controller.flush();
+    const current = controller.getStatus();
+    if (current.state === 'conflict') return { ok: false, error: 'Resolve the save conflict first.' };
+    if (current.state === 'offline' || current.state === 'error') return { ok: false, error: 'Your latest changes are not saved yet. Fix the save problem first.' };
+    return { ok: true, revision: current.revision };
+  }, [controller]);
+
+  const createTaskRequest = useCallback(
+    async (
+      kind: TaskKind,
+      options: { instruction?: string; providerId?: string | null; selection?: { start: number; end: number; text: string } | null; approve?: { ids: string[]; sha: string } } = {},
+    ): Promise<{ ok: true; task: TaskDTO } | { ok: false; error: string }> => {
+      const settled = await settleForAi();
+      if (!settled.ok) return settled;
+      const chosen = options.selection === undefined ? editor.current?.getSelection() ?? null : options.selection;
+      const result = await api<TaskDTO>('/api/ai/tasks', {
+        method: 'POST',
+        json: {
+          articleId: initial.id,
+          kind,
+          expectedRevision: settled.revision,
+          selection: chosen ? { start: chosen.start, end: chosen.end, text: chosen.text } : null,
+          instruction: options.instruction ?? '',
+          providerId: options.providerId ?? null,
+          approvePrivateItemIds: options.approve?.ids ?? [],
+          approvedPromptSha256: options.approve?.sha ?? null,
+        },
+      });
+      if (!result.ok) return { ok: false, error: result.network ? 'Could not reach the server.' : result.error };
+      mergeTask(result.data);
+      return { ok: true, task: result.data };
+    },
+    [initial.id, mergeTask, settleForAi],
+  );
+
+  const runAssist = useCallback(
+    async (kind: TaskKind) => {
+      setStarting(true);
+      const outcome = await createTaskRequest(kind);
+      setStarting(false);
+      if (outcome.ok) setPanel('ai');
+      else notify(outcome.error);
+    },
+    [createTaskRequest, notify],
+  );
+
+  const openAsk = useCallback(() => {
+    setPanel('ai');
+    window.setTimeout(() => askRef.current?.focus(), 80);
+  }, []);
+
+  async function ask(instruction: string, providerId: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+    const outcome = await createTaskRequest('custom', { instruction, providerId });
+    return outcome.ok ? { ok: true } : outcome;
+  }
+
+  /** Apply a result the person accepted. The editor and the save queue move to the server's new copy. */
+  async function acceptTask(task: TaskDTO, titleIndex: number | null): Promise<{ ok: true } | { ok: false; error: string }> {
+    const settled = await settleForAi();
+    if (!settled.ok) return settled;
+    const result = await api<{ task: TaskDTO; article: ArticleDTO }>(`/api/ai/tasks/${task.id}/accept`, {
+      method: 'POST',
+      json: { expectedRevision: settled.revision, ...(titleIndex === null ? {} : { titleIndex }) },
+    });
+    if (!result.ok) return { ok: false, error: result.network ? 'You are offline.' : result.error };
+    const copy = toDraft(result.data.article);
+    controller.adopt({ draft: copy, revision: result.data.article.revision });
+    showCopy(copy);
+    mergeTask(result.data.task);
+    notify('Applied. It is saved as its own version in History, so you can go back.');
+    return { ok: true };
+  }
+
+  const taskActions: TaskActions = {
+    accept: acceptTask,
+    async reject(task) {
+      const result = await api<TaskDTO>(`/api/ai/tasks/${task.id}/reject`, { method: 'POST', json: {} });
+      if (!result.ok) return { ok: false, error: result.network ? 'You are offline.' : result.error };
+      mergeTask(result.data);
+      return { ok: true };
+    },
+    async retry(task) {
+      const result = await api<TaskDTO>(`/api/ai/tasks/${task.id}/retry`, { method: 'POST', json: {} });
+      if (!result.ok) return { ok: false, error: result.network ? 'You are offline.' : result.error };
+      mergeTask(result.data);
+      return { ok: true };
+    },
+    reviewPrivate(task) {
+      void openApproval(task);
+    },
+  };
+
+  /** Show exactly what would be sent if the private notes related to a task were included. */
+  async function openApproval(task: TaskDTO) {
+    setApprovalError(null);
+    const settled = await settleForAi();
+    if (!settled.ok) return notify(settled.error);
+    const base = {
+      articleId: initial.id,
+      kind: task.kind,
+      expectedRevision: settled.revision,
+      selection: task.selection ? { start: task.selection.start, end: task.selection.end, text: task.excerpt } : null,
+      instruction: task.instruction,
+      providerId: task.provider.id,
+    };
+    const first = await api<ContextPreviewDTO>('/api/ai/context-preview', { method: 'POST', json: base });
+    if (!first.ok) return notify(first.network ? 'You are offline.' : first.error);
+    if (first.data.withheld.length === 0) return notify('There are no private notes to add for this task any more.');
+    const second = await api<ContextPreviewDTO>('/api/ai/context-preview', {
+      method: 'POST',
+      json: { ...base, approvePrivateItemIds: first.data.withheld.map((w) => w.id) },
+    });
+    if (!second.ok) return notify(second.network ? 'You are offline.' : second.error);
+    setApproval({ task, preview: second.data });
+  }
+
+  async function confirmApproval() {
+    if (!approval) return;
+    setApprovalBusy(true);
+    setApprovalError(null);
+    const { task, preview } = approval;
+    const outcome = await createTaskRequest(task.kind, {
+      instruction: task.instruction,
+      providerId: task.provider.id,
+      selection: task.selection ? { start: task.selection.start, end: task.selection.end, text: task.excerpt } : null,
+      approve: { ids: preview.included.filter((i) => i.viaApproval).map((i) => i.id), sha: preview.promptSha256 },
+    });
+    setApprovalBusy(false);
+    if (outcome.ok) {
+      setApproval(null);
+      setPanel('ai');
+    } else setApprovalError(outcome.error);
+  }
+
   const words = useMemo(() => countWords(draft.bodyMarkdown), [draft.bodyMarkdown]);
   const minutes = readingMinutes(words);
   const conflict = state.state === 'conflict' ? state.conflict : null;
@@ -314,6 +466,20 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
             >
               <SlidersHorizontal aria-hidden />
               <span className="hidden md:inline">Details</span>
+            </Button>
+            <Button
+              type="button"
+              variant={panel === 'ai' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={panel === 'ai'}
+              onClick={() => setPanel(panel === 'ai' ? null : 'ai')}
+              aria-label={waitingForReview > 0 ? `AI tasks, ${waitingForReview} ready to review` : 'AI tasks'}
+              title="AI tasks for this article"
+              className="relative"
+            >
+              <Sparkles aria-hidden />
+              <span className="hidden md:inline">AI</span>
+              {waitingForReview > 0 ? <span aria-hidden className="absolute right-1 top-1 size-2 rounded-full bg-primary" /> : null}
             </Button>
             <Button
               type="button"
@@ -371,6 +537,10 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
         </div>
       ) : null}
 
+      {mode !== 'preview' ? (
+        <AssistBar available={providers.length > 0} selectedChars={selection ? selection.end - selection.start : 0} busy={starting} onRun={(kind) => void runAssist(kind)} onAsk={openAsk} />
+      ) : null}
+
       <div className="flex min-h-0 flex-1">
         <div className={cn('grid min-h-0 min-w-0 flex-1', mode === 'split' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}>
           <div className={cn('min-h-0 min-w-0', editorCls, mode === 'split' && 'lg:border-r')}>
@@ -382,6 +552,7 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
               onTogglePreview={togglePreview}
               onUploadImage={uploadImage}
               onNotice={notify}
+              onSelectionChange={setSelection}
               onScroll={(fraction) => {
                 const el = previewScroll.current;
                 if (el && mode === 'split') el.scrollTop = fraction * (el.scrollHeight - el.clientHeight);
@@ -395,7 +566,7 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
 
         {panel ? <div className="fixed inset-0 z-30 bg-black/40 2xl:hidden" onClick={() => setPanel(null)} aria-hidden /> : null}
         <aside
-          aria-label={panel === 'history' ? 'Version history' : 'Article details'}
+          aria-label={panel === 'history' ? 'Version history' : panel === 'ai' ? 'AI tasks' : 'Article details'}
           className={cn(
             'z-40 flex w-[min(26rem,100vw)] shrink-0 flex-col border-l bg-card shadow-lg',
             panel ? 'fixed inset-y-0 right-0 2xl:static 2xl:z-auto 2xl:w-96 2xl:shadow-none' : 'hidden',
@@ -408,6 +579,9 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
               </button>
               <button type="button" role="tab" aria-selected={panel === 'history'} className={cn(modeButton(panel === 'history'), 'border-l')} onClick={() => setPanel('history')}>
                 History
+              </button>
+              <button type="button" role="tab" aria-selected={panel === 'ai'} className={cn(modeButton(panel === 'ai'), 'border-l')} onClick={() => setPanel('ai')}>
+                AI{waitingForReview > 0 ? <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[0.6875rem] leading-4 text-primary-foreground">{waitingForReview}</span> : null}
               </button>
             </div>
             <Button type="button" size="icon-sm" variant="ghost" onClick={() => setPanel(null)} aria-label="Close panel">
@@ -432,6 +606,9 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
                 onDelete={() => void deleteArticle()}
               />
             ) : null}
+            {panel === 'ai' ? (
+              <AiPanel providers={providers} tasks={tasks} loaded={tasksLoaded} stream={stream} selection={selection} onAsk={ask} actions={taskActions} askRef={askRef} />
+            ) : null}
             {panel === 'history' ? (
               <HistoryPanel
                 articleId={initial.id}
@@ -451,6 +628,8 @@ export function Studio({ initial }: { initial: ArticleDTO }) {
         <span className="hidden sm:inline">{draft.bodyMarkdown.length.toLocaleString('en')} characters</span>
         <span className="ml-auto hidden md:inline">Ctrl+S save · Ctrl+B bold · Ctrl+I italic · Ctrl+K link · Ctrl+Shift+P preview</span>
       </footer>
+
+      <ApprovalDialog preview={approval?.preview ?? null} busy={approvalBusy} error={approvalError} onConfirm={() => void confirmApproval()} onCancel={() => setApproval(null)} />
 
       <ConflictDialog
         open={Boolean(conflict)}

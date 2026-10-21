@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import type { ReadyProvider } from '@/lib/ai';
 import type { ArticleDTO } from '@/lib/articles';
 
 function StudioSkeleton() {
@@ -22,6 +23,6 @@ function StudioSkeleton() {
 // The studio reads the window size and talks to the browser's storage of focus and scroll; it renders in the browser only.
 const Studio = dynamic(() => import('./studio').then((m) => m.Studio), { ssr: false, loading: () => <StudioSkeleton /> });
 
-export function StudioLoader({ initial }: { initial: ArticleDTO }) {
-  return <Studio initial={initial} />;
+export function StudioLoader({ initial, providers }: { initial: ArticleDTO; providers: ReadyProvider[] }) {
+  return <Studio initial={initial} providers={providers} />;
 }

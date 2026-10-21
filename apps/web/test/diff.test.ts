@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collapseUnchanged, diffLines, diffStats } from '../src/lib/diff';
+import { collapseUnchanged, diffLines, diffStats, diffWords } from '../src/lib/diff';
 
 const rebuild = (lines: ReturnType<typeof diffLines>, side: 'old' | 'new') =>
   lines
@@ -82,5 +82,29 @@ describe('line diff', () => {
       { kind: 'gap', hidden: 17 },
     ]);
     expect(rows.filter((r) => r.kind === 'del' || r.kind === 'add')).toHaveLength(2);
+  });
+});
+
+describe('word diff', () => {
+  const rebuild = (segments: ReturnType<typeof diffWords>, side: 'old' | 'new') =>
+    segments
+      .filter((s) => (side === 'old' ? s.kind !== 'add' : s.kind !== 'del'))
+      .map((s) => s.text)
+      .join('');
+
+  it('marks only the words that changed, and rebuilds both sides exactly', () => {
+    const oldText = 'The queue is long. We measured it twice.';
+    const newText = 'The queue is long; we measured it twice.';
+    const segments = diffWords(oldText, newText);
+    expect(rebuild(segments, 'old')).toBe(oldText);
+    expect(rebuild(segments, 'new')).toBe(newText);
+    expect(segments.filter((s) => s.kind === 'del').map((s) => s.text.trim())).toEqual(['long.', 'We']);
+    expect(segments.filter((s) => s.kind === 'add').map((s) => s.text.trim())).toEqual(['long;', 'we']);
+  });
+
+  it('keeps line breaks and handles an empty side', () => {
+    expect(rebuild(diffWords('a\nb', 'a\nc'), 'new')).toBe('a\nc');
+    expect(diffWords('', 'new words')).toEqual([{ kind: 'add', text: 'new words' }]);
+    expect(diffWords('same', 'same')).toEqual([{ kind: 'equal', text: 'same' }]);
   });
 });

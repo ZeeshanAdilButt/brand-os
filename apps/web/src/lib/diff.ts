@@ -153,3 +153,28 @@ export function collapseUnchanged(lines: DiffLine[], context = 3): DiffRow[] {
   if (hidden > 0) rows.push({ kind: 'gap', hidden });
   return rows;
 }
+
+export interface WordSegment {
+  kind: DiffKind;
+  text: string;
+}
+
+const NEWLINE_MARK = '\u21b5';
+
+/**
+ * Diff two texts word by word (runs of non-space and runs of space are the units), for showing a rewritten
+ * paragraph inline. Adjacent pieces of the same kind are joined. Built on the line diff by giving every
+ * token its own line.
+ */
+export function diffWords(oldText: string, newText: string): WordSegment[] {
+  const tokens = (text: string) => (text.match(/\s+|\S+/g) ?? []).map((t) => t.replace(/\r?\n/g, NEWLINE_MARK));
+  const lines = diffLines(tokens(oldText).join('\n'), tokens(newText).join('\n'));
+  const out: WordSegment[] = [];
+  for (const line of lines) {
+    const text = line.text.split(NEWLINE_MARK).join('\n');
+    const last = out[out.length - 1];
+    if (last && last.kind === line.kind) last.text += text;
+    else out.push({ kind: line.kind, text });
+  }
+  return out;
+}

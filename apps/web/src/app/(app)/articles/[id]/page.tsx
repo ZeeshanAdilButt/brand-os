@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { StudioLoader } from '@/components/articles/studio-loader';
 import type { ArticleDTO } from '@/lib/articles';
+import { aiAvailability } from '@/server/actions/ai-providers';
 import { getArticle } from '@/server/actions/articles';
 import { ActionError, sessionToOwner } from '@/server/actions/owner';
 import { requireSessionUser } from '@/server/auth/session';
@@ -39,5 +40,6 @@ export default async function ArticleStudioPage({ params }: { params: Promise<{ 
     updatedAt: article.updatedAt.toISOString(),
     publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
   };
-  return <StudioLoader initial={initial} />;
+  const { providers } = await aiAvailability(owner);
+  return <StudioLoader initial={initial} providers={providers} />;
 }
