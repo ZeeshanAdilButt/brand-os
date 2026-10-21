@@ -10,8 +10,9 @@ import { requireSessionUser } from '@/server/auth/session';
 export const metadata: Metadata = { title: 'Article studio' };
 export const dynamic = 'force-dynamic';
 
-export default async function ArticleStudioPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ArticleStudioPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ panel?: string }> }) {
   const { id } = await params;
+  const { panel } = await searchParams;
   const user = await requireSessionUser();
   const owner = sessionToOwner(user, user.ctx);
   let article;
@@ -41,5 +42,5 @@ export default async function ArticleStudioPage({ params }: { params: Promise<{ 
     publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
   };
   const { providers } = await aiAvailability(owner);
-  return <StudioLoader initial={initial} providers={providers} />;
+  return <StudioLoader initial={initial} providers={providers} initialPanel={panel === 'publish' ? 'publish' : undefined} />;
 }

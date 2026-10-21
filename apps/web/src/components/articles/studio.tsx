@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, BookOpen, Columns2, Eye, History, PenLine, Save, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Columns2, Eye, History, PenLine, Save, Send, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -10,6 +10,7 @@ import { ApprovalDialog } from '@/components/ai/approval-dialog';
 import { AssistBar } from '@/components/ai/assist-bar';
 import type { TaskActions } from '@/components/ai/task-card';
 import { useArticleTasks } from '@/components/ai/use-task-stream';
+import { PublishPanel } from '@/components/publishing/publish-panel';
 import { Button } from '@/components/ui/button';
 import { type ContextPreviewDTO, type ReadyProvider, type TaskDTO, type TaskKind } from '@/lib/ai';
 import { api, sendSave, toDraft } from '@/lib/api-client';
@@ -37,7 +38,7 @@ function EditorSkeleton() {
 const MarkdownEditor = dynamic(() => import('./markdown-editor').then((m) => m.MarkdownEditor), { ssr: false, loading: () => <EditorSkeleton /> });
 
 type Mode = 'edit' | 'split' | 'preview';
-type Panel = 'details' | 'history' | 'ai' | null;
+type Panel = 'details' | 'history' | 'ai' | 'publish' | null;
 
 const isWide = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
@@ -47,7 +48,7 @@ const modeButton = (active: boolean) =>
     active ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-accent hover:text-foreground',
   );
 
-export function Studio({ initial, providers }: { initial: ArticleDTO; providers: ReadyProvider[] }) {
+export function Studio({ initial, providers, initialPanel }: { initial: ArticleDTO; providers: ReadyProvider[]; initialPanel?: 'publish' | undefined }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const draftRef = useRef(draft);
@@ -55,7 +56,7 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
   const previewScroll = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<ControllerStatus | null>(null);
   const [mode, setMode] = useState<Mode>(() => (isWide() ? 'split' : 'edit'));
-  const [panel, setPanel] = useState<Panel>(null);
+  const [panel, setPanel] = useState<Panel>(initialPanel ?? null);
   const [toast, setToast] = useState<string | null>(null);
   const [selection, setSelection] = useState<EditorSelectionInfo | null>(null);
   const [starting, setStarting] = useState(false);
@@ -483,6 +484,18 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
             </Button>
             <Button
               type="button"
+              variant={panel === 'publish' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={panel === 'publish'}
+              onClick={() => setPanel(panel === 'publish' ? null : 'publish')}
+              aria-label="Publish"
+              title="Publish: destinations, private drafts and approval"
+            >
+              <Send aria-hidden />
+              <span className="hidden md:inline">Publish</span>
+            </Button>
+            <Button
+              type="button"
               variant={panel === 'history' ? 'secondary' : 'ghost'}
               size="sm"
               aria-pressed={panel === 'history'}
@@ -566,16 +579,21 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
 
         {panel ? <div className="fixed inset-0 z-30 bg-black/40 2xl:hidden" onClick={() => setPanel(null)} aria-hidden /> : null}
         <aside
-          aria-label={panel === 'history' ? 'Version history' : panel === 'ai' ? 'AI tasks' : 'Article details'}
+          aria-label={panel === 'history' ? 'Version history' : panel === 'ai' ? 'AI tasks' : panel === 'publish' ? 'Publish' : 'Article details'}
           className={cn(
             'z-40 flex w-[min(26rem,100vw)] shrink-0 flex-col border-l bg-card shadow-lg',
+            panel === 'publish' && 'sm:w-[min(32rem,100vw)] 2xl:w-[32rem]',
             panel ? 'fixed inset-y-0 right-0 2xl:static 2xl:z-auto 2xl:w-96 2xl:shadow-none' : 'hidden',
+            panel === 'publish' && '2xl:w-[32rem]',
           )}
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
             <div role="tablist" aria-label="Side panel" className="inline-flex overflow-hidden rounded-md border">
               <button type="button" role="tab" aria-selected={panel === 'details'} className={modeButton(panel === 'details')} onClick={() => setPanel('details')}>
                 Details
+              </button>
+              <button type="button" role="tab" aria-selected={panel === 'publish'} className={cn(modeButton(panel === 'publish'), 'border-l')} onClick={() => setPanel('publish')}>
+                Publish
               </button>
               <button type="button" role="tab" aria-selected={panel === 'history'} className={cn(modeButton(panel === 'history'), 'border-l')} onClick={() => setPanel('history')}>
                 History
@@ -609,6 +627,7 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
             {panel === 'ai' ? (
               <AiPanel providers={providers} tasks={tasks} loaded={tasksLoaded} stream={stream} selection={selection} onAsk={ask} actions={taskActions} askRef={askRef} />
             ) : null}
+            {panel === 'publish' ? <PublishPanel articleId={initial.id} refreshKey={state.revision} saved={state.state === 'saved'} /> : null}
             {panel === 'history' ? (
               <HistoryPanel
                 articleId={initial.id}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { isActive, NAV_ITEMS } from '@/lib/nav';
+import { activeNavHref, NAV_ITEMS } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 import { AccountBlock, type AccountInfo } from './account-block';
 import { Brand } from './brand';
@@ -10,6 +10,7 @@ import { Brand } from './brand';
 /** Brand, primary navigation and footer note. Shared by the desktop rail and the mobile drawer. */
 export function SidebarNav({ onNavigate, account }: { onNavigate?: () => void; account?: AccountInfo }) {
   const pathname = usePathname();
+  const current = activeNavHref(pathname);
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 shrink-0 items-center px-4">
@@ -18,7 +19,7 @@ export function SidebarNav({ onNavigate, account }: { onNavigate?: () => void; a
       <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-1">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href);
+            const active = current === href;
             return (
               <li key={href}>
                 <Link

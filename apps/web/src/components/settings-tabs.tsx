@@ -8,6 +8,7 @@ const TABS = [
   { href: '/settings', label: 'General' },
   { href: '/settings/profile', label: 'Profile' },
   { href: '/settings/ai', label: 'AI' },
+  { href: '/settings/connections', label: 'Connections' },
   { href: '/settings/agent-access', label: 'Agent access' },
 ] as const;
 
@@ -15,7 +16,7 @@ const TABS = [
 export function SettingsTabs() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Settings sections" className="-mt-4 mb-8 flex gap-1 border-b">
+    <nav aria-label="Settings sections" className="-mt-4 mb-8 flex gap-1 overflow-x-auto border-b">
       {TABS.map((tab) => {
         const active = pathname === tab.href;
         return (
@@ -24,7 +25,7 @@ export function SettingsTabs() {
             href={tab.href}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              '-mb-px rounded-t-md border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
+              '-mb-px shrink-0 whitespace-nowrap rounded-t-md border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
               active ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >

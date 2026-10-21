@@ -23,6 +23,6 @@ function StudioSkeleton() {
 // The studio reads the window size and talks to the browser's storage of focus and scroll; it renders in the browser only.
 const Studio = dynamic(() => import('./studio').then((m) => m.Studio), { ssr: false, loading: () => <StudioSkeleton /> });
 
-export function StudioLoader({ initial, providers }: { initial: ArticleDTO; providers: ReadyProvider[] }) {
-  return <Studio initial={initial} providers={providers} />;
+export function StudioLoader({ initial, providers, initialPanel }: { initial: ArticleDTO; providers: ReadyProvider[]; initialPanel?: 'publish' | undefined }) {
+  return <Studio initial={initial} providers={providers} initialPanel={initialPanel} />;
 }
