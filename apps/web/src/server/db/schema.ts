@@ -4,6 +4,18 @@ import { PROTOCOLS, PROVIDER_KINDS, TASK_KINDS, TASK_STATUSES, TRUST_LEVELS } fr
 import type { TaskResult } from '../../lib/ai-ops';
 import { ARTICLE_SOURCE_KINDS, ARTICLE_STATUSES, VERSION_REASONS } from '../../lib/articles';
 import {
+  APPROVAL_STATUSES,
+  ATTEMPT_KINDS,
+  ATTEMPT_STATUSES,
+  CONNECTION_STATUSES,
+  DRAFT_STATUSES,
+  ERROR_KINDS,
+  PLATFORM_IDS,
+  type DraftPayload,
+  type LintIssue,
+  type TagReport,
+} from '../../lib/publishing';
+import {
   CONFIDENCE_LEVELS,
   CONFIDENTIALITY_LEVELS,
   ITEM_KINDS,
@@ -481,3 +493,146 @@ export type Article = Omit<typeof articles.$inferSelect, 'search'>;
 export type ArticleVersion = typeof articleVersions.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type StudioSettings = typeof studioSettings.$inferSelect;
+
+/*
+ * Publishing (Day 5). Every table carries owner_id and is reached only through the data layer.
+ */
+
+/**
+ * A person's connection to one platform. The key is stored only as AES-256-GCM ciphertext bound to
+ * this row (see src/server/ai/crypto.ts) and is never sent to the browser, the agent API or MCP.
+ */
+export const platformConnections = pgTable(
+  'platform_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    platform: text('platform', { enum: PLATFORM_IDS }).notNull(),
+    encryptedKey: text('encrypted_key').notNull(),
+    keyLast4: text('key_last4').notNull(),
+    status: text('status', { enum: CONNECTION_STATUSES }).notNull().default('unchecked'),
+    /** Who the platform says the key belongs to, from the last read-only probe. */
+    who: text('who'),
+    /** Non-secret settings found by the probe (the Hashnode publication). */
+    config: jsonb('config').$type<{ publicationId?: string; publicationTitle?: string }>().notNull().default({}),
+    lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
+    lastCheckMessage: text('last_check_message'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('platform_connections_owner_platform_idx').on(table.ownerId, table.platform)],
+);
+
+export type PlatformConnection = typeof platformConnections.$inferSelect;
+
+/**
+ * An article adapted for one platform, with the exact payload and its hash. The unique partial index is
+ * the last line of defense against a double publish: no two drafts of one owner can be publishing,
+ * unknown or published with the same payload hash on the same platform.
+ */
+export const platformDrafts = pgTable(
+  'platform_drafts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    platform: text('platform', { enum: PLATFORM_IDS }).notNull(),
+    connectionId: uuid('connection_id').references(() => platformConnections.id, { onDelete: 'set null' }),
+    /** Who the connection was when the draft was built, so the approval names the account. */
+    account: text('account'),
+    status: text('status', { enum: DRAFT_STATUSES }).notNull().default('draft'),
+    payload: jsonb('payload').$type<DraftPayload>().notNull(),
+    payloadSha256: text('payload_sha256').notNull(),
+    tagReport: jsonb('tag_report').$type<TagReport>().notNull(),
+    lint: jsonb('lint').$type<LintIssue[]>().notNull().default([]),
+    /** The article revision and a hash of the fields the payload was built from. */
+    sourceRevision: integer('source_revision').notNull(),
+    sourceHash: text('source_hash').notNull(),
+    stale: boolean('stale').notNull().default(false),
+    remoteId: text('remote_id'),
+    remoteUrl: text('remote_url'),
+    remotePreviewUrl: text('remote_preview_url'),
+    failureKind: text('failure_kind', { enum: ERROR_KINDS }),
+    failureMessage: text('failure_message'),
+    nextAction: text('next_action'),
+    stagedAt: timestamp('staged_at', { withTimezone: true }),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('platform_drafts_owner_article_idx').on(table.ownerId, table.articleId, table.platform),
+    index('platform_drafts_owner_status_idx').on(table.ownerId, table.status),
+    uniqueIndex('platform_drafts_out_once_idx')
+      .on(table.ownerId, table.platform, table.payloadSha256)
+      .where(sql`${table.status} in ('publishing', 'unknown', 'published')`),
+  ],
+);
+
+export type PlatformDraft = typeof platformDrafts.$inferSelect;
+
+/**
+ * A request for the owner's approval of one payload. Single use: it becomes `used` in the same
+ * transaction that moves the draft to `publishing`. It dies when the payload or the article changes.
+ */
+export const approvals = pgTable(
+  'approvals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    draftId: uuid('draft_id')
+      .notNull()
+      .references(() => platformDrafts.id, { onDelete: 'cascade' }),
+    payloadSha256: text('payload_sha256').notNull(),
+    tag: text('tag').notNull(),
+    status: text('status', { enum: APPROVAL_STATUSES }).notNull().default('pending'),
+    requestedBy: text('requested_by', { enum: ['owner', 'agent'] }).notNull().default('owner'),
+    /** The checklist boxes ticked on the card, verbatim. Empty until the approval is used. */
+    checked: text('checked').array().notNull().default(sql`'{}'::text[]`),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    invalidReason: text('invalid_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('approvals_owner_draft_idx').on(table.ownerId, table.draftId, table.createdAt)],
+);
+
+export type Approval = typeof approvals.$inferSelect;
+
+/** One row per call that can change or read a platform: stage, publish, check, and manual resolutions. */
+export const publishAttempts = pgTable(
+  'publish_attempts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    draftId: uuid('draft_id')
+      .notNull()
+      .references(() => platformDrafts.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ATTEMPT_KINDS }).notNull(),
+    status: text('status', { enum: ATTEMPT_STATUSES }).notNull().default('started'),
+    payloadSha256: text('payload_sha256').notNull(),
+    approvalId: uuid('approval_id').references(() => approvals.id, { onDelete: 'set null' }),
+    httpStatus: integer('http_status'),
+    errorKind: text('error_kind', { enum: ERROR_KINDS }),
+    /** Redacted, user-readable. */
+    message: text('message'),
+    remoteId: text('remote_id'),
+    remoteUrl: text('remote_url'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [index('publish_attempts_owner_draft_idx').on(table.ownerId, table.draftId, table.startedAt)],
+);
+
+export type PublishAttempt = typeof publishAttempts.$inferSelect;

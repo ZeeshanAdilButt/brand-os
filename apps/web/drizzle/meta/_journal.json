@@ -50,6 +50,13 @@
       "when": 1792594731091,
       "tag": "0006_fast_valeria_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792598051372,
+      "tag": "0007_kind_plazm",
+      "breakpoints": true
     }
   ]
 }

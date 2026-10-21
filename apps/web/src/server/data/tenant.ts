@@ -7,11 +7,13 @@ import { scopedCredentials } from './agent-credentials';
 import { scopedProviders } from './ai-providers';
 import { scopedTasks } from './ai-tasks';
 import { scopedItems, scopedSources } from './knowledge';
+import { scopedConnections, scopedPlatformDrafts } from './publishing';
 import { scopedPreferences, scopedProfile } from './profile';
 import { makeScope, type DbSource, type Scope } from './scope';
 
 export { NotFoundError, SlugTakenError } from './scope';
 export { ConflictError } from './articles';
+export { PublishRefusal, type PublishRefusalCode } from './publishing';
 export { findCredentialBySecretHash } from './agent-credentials';
 
 /**
@@ -38,6 +40,8 @@ export function forOwner(ownerId: string, db?: AppDb) {
     credentials: scopedCredentials(scope),
     providers: scopedProviders(scope),
     tasks: scopedTasks(scope),
+    connections: scopedConnections(scope),
+    platformDrafts: scopedPlatformDrafts(scope),
     audit: {
       async record(input: AuditInput) {
         return scopedAudit(await scope.db(), scope.ownerId).record(input);
