@@ -30,7 +30,6 @@ let a: TestUser;
 let b: TestUser;
 let aCred: string;
 let aReadOnly: string;
-let bCred: string;
 let aArticle: string;
 let bArticle: string;
 let aTask: string;
@@ -82,7 +81,6 @@ beforeAll(async () => {
   b = await h.signUp('mcp.b@example.test', 'Writer B');
   aCred = (await mint(a, ['read', 'write_articles', 'ai_tasks'])).secret;
   aReadOnly = (await mint(a, ['read'])).secret;
-  bCred = (await mint(b, ['read', 'write_articles', 'ai_tasks'])).secret;
 
   const aData = forOwner(a.userId, h.ctx.db);
   const bData = forOwner(b.userId, h.ctx.db);
