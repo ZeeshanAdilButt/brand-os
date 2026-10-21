@@ -73,6 +73,12 @@ Local mode resolves every request to the `local_owner` row (a real user id, `is_
 
 `profiles` and `brand_preferences` (one row per owner), `knowledge_sources` and `knowledge_items` (one claim per row, with verification, confidence, confidentiality, a public-use flag and a review date). Search is a generated `tsvector` with a GIN index, ranked and highlighted in SQL, always inside the owner filter. `GET /api/export` returns the signed-in user's own rows as JSON.
 
+## Article studio
+
+`articles` (current content, metadata, `revision` for concurrency, generated search vector), `article_versions` (append-only snapshots), `assets` (file facts; bytes live behind the storage adapter) and `studio_settings` (the content folder). All four carry `owner_id` and are reached only through `forOwner(...).articles / .assets / .studioSettings`. Routes: `/api/articles` (list, search, create), `/api/articles/[id]` (get, save with `expectedRevision`, delete), `.../versions` (list, one, restore), `/api/articles/check-slug`, `/api/articles/import/{file,url,folder}`, `/api/assets` (upload, list) and `/api/assets/[id]` (authenticated, tenant-checked download). Pages: `/articles` (list), `/articles/import`, `/articles/[id]` (studio) and `/articles/[id]/read`.
+
+The studio is a client component tree loaded after the page shell: CodeMirror editor, live preview, a side panel for details and history, and a save controller (`src/lib/autosave.ts`) that owns debouncing, retries and conflicts. Rendering is one shared pipeline (`src/lib/markdown/render.ts`) used by the preview and the reading view; Mermaid is drawn in the browser. Imports (`src/server/import/*`) parse files, fetch pages through an SSRF-checked fetcher and read a local folder; all of them end in `createImportedArticle`, which writes a draft and an `import` version. Decisions 18 to 23 explain the choices.
+
 ## Adapter seams
 
 Three seams keep providers replaceable. Day 1 defines the shape; implementations arrive later.

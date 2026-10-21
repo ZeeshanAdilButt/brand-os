@@ -15,8 +15,9 @@ Brand OS is a local-first, self-hostable studio for technical writers and engine
 |---|---|
 | Publishing engine: approval gate, dev.to route, Buffer route, local dashboard, MCP server, `cph` CLI | Built and tested |
 | Web app shell on embedded Postgres, design system, health checks | Built |
-| Accounts, tenant isolation, private knowledge base, onboarding | In progress |
-| Article studio, AI assistance, platform previews, more destinations | Planned (see [roadmap](#roadmap)) |
+| Accounts, tenant isolation, private knowledge base, onboarding | Built |
+| Article studio: Markdown editor, autosave, version history, import, assets, reading view | Built |
+| AI assistance, platform previews, more destinations | Planned (see [roadmap](#roadmap)) |
 | Hosted cloud service, team workspaces | Planned |
 
 Nothing here is a mock-up: unfinished features are hidden or shown as clearly disabled.

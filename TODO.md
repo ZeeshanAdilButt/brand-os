@@ -4,8 +4,8 @@ Working name for the product that content-powerhouse grows into. Days are implem
 
 ## Current Position
 Phase: 1
-Day: 3
-Status: Not started (Day 2 complete)
+Day: 4
+Status: Not started (Day 3 complete)
 
 ## Phase 1: Technical Article Publishing
 
@@ -33,10 +33,12 @@ Acceptance: the owner account holds the private context; a second account starts
 Day 2 results: `pnpm test` 1132 passed, 4 skipped (about 67 new web tests: auth, isolation through the data layer and every route handler, search ranking and highlighting, seed binding and idempotency, source rules, hygiene, local-mode API); `pnpm typecheck`, `pnpm build`, `pnpm web:build` and `pnpm web:lint` clean. Local mode, `next start` on a spare port: health ok, every page 200 with no login, cross-site and rebinding requests refused with 403. Checked at 1280px and 400px. Hosted sign-in is tested on in-memory Postgres with real sessions; a run against a real Postgres server is still outstanding (no server available), as on Day 1. Choices and trade-offs: DECISIONS.md 11 to 17. Not done on purpose: row level security (decision 13), email verification and password reset (no mail provider), account deletion (Day 27; the UI says so), resume upload, GitHub import and source connections (shown disabled with their planned day).
 
 ### Day 3: Article studio
-- [ ] Markdown editor; import from files, URLs and the personal site; keep code, links, tables, diagrams
-- [ ] Metadata and assets; autosave and version history; draft states; reading and editing previews
+- [x] Markdown editor; import from files, URLs and a content site; keep code, links, tables, diagrams
+- [x] Metadata and assets; autosave and version history; draft states; reading and editing previews
 
-Acceptance: import, edit, save, reopen and preview a real technical article with no AI.
+Acceptance: import, edit, save, reopen and preview a real technical article with no AI. **Met 2026-10-21.**
+
+Day 3 results: CodeMirror 6 editor (lazy loaded) with toolbar, shortcuts, image paste and drop, word count and reading time; one unified/remark/rehype pipeline for the live preview and the reading view (GFM, footnotes, highlighting for go, rust, python, sql, bash, yaml, json, typescript, Mermaid with a visible fallback, sanitizing that reports every removal as "N items were not rendered"); metadata panel with per-owner slug check; debounced autosave with a visible state, optimistic concurrency and a keep-mine or use-saved conflict dialog; version history with coalesced autosaves, line diff between any two versions and restore as a new version; assets behind a storage adapter with sniffed types, an SVG policy, sha256 dedupe and an authenticated tenant-checked route; file, URL (SSRF-checked on every hop) and local folder import. `pnpm test` 1362 passed, 6 skipped (about 230 new web tests: tenant isolation for articles, versions, assets, search and imports through the data layer and the routes; autosave and conflicts; coalescing, diff and restore; rendering; frontmatter variants; SSRF cases; asset limits and traversal; folder traversal and links; source rules); `pnpm typecheck`, `pnpm build`, `pnpm web:build` and `pnpm web:lint` clean. Real flow on `next start` with a temporary data folder: new article, long technical paste with code, a table and a Mermaid diagram, pasted image, autosave, Ctrl+S, history, diff, restore, a forced conflict, a real page import, reading view; checked at 1280px and 400px, light and dark. Choices and trade-offs: DECISIONS.md 18 to 23. Not done on purpose: math rendering, embeds (every iframe is removed and reported), an S3 storage adapter (the seam is documented), in-editor find and replace, copying imported images (they stay linked), a real Postgres run of the hosted driver (no server available, as on Days 1 and 2). Two file-link tests skip on machines where creating file links needs a privilege (Windows without developer mode); the directory-link tests run everywhere.
 
 ### Day 4: AI and Claude MCP
 - [ ] MCP server (profile, articles, drafts, search, AI tasks) on the shared action layer; extend the Phase 0 MCP
