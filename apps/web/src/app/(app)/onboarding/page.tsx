@@ -28,7 +28,7 @@ function Step({ n, done, title, children }: { n: number; done: boolean; title: s
         {done ? <Check className="size-4" /> : n}
       </div>
       <div className="min-w-0">
-        <h2 id={`step-${n}`} className="font-serif text-xl font-semibold">
+        <h2 id={`step-${n}`} className=" text-xl font-semibold">
           {title}
           {done ? <span className="ml-2 align-middle font-sans text-xs font-medium text-success">Done</span> : null}
         </h2>

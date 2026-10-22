@@ -2,101 +2,149 @@
 @import "tw-animate-css";
 @import "./article-prose.css";
 
-@custom-variant dark (&:is([data-theme="dark"], [data-theme="dark"] *));
+@custom-variant dark (
+  &:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *)
+);
 
 /*
- * Design tokens. Palette from the personal site (cream, ink, rust, teal, sand), with a warm dark
- * theme. Foreground/background pairs are checked for WCAG AA in test/design-tokens.test.ts.
- * Fonts are local stacks only: no network fonts, nothing to download.
+ * Design system v2 (see DECISIONS.md). A cool neutral workspace, indigo actions, quiet white surfaces and
+ * semantic status colours. Category colours appear only on small icons and labels. Text pairs are checked for
+ * WCAG AA, and the boundary of every form control for 3:1, in test/design-tokens.test.ts. Fonts are local stacks
+ * only: no network fonts, nothing to download. Serif is reserved for the reading view and article previews.
  */
 :root {
   color-scheme: light;
 
-  /* Brand palette */
-  --cream: #f7f3eb;
-  --cream-dark: #ebe5d9;
-  --ink: #1a1a18;
-  --rust: #c45d35;
-  --teal: #2d5a5a;
-  --sand: #d4c5a9;
+  --background: #f6f8fc;
+  --foreground: #172033;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
 
-  /* Semantic roles (shadcn names) */
-  --background: #f7f3eb;
-  --foreground: #1a1a18;
-  --card: #fcfaf6;
-  --card-foreground: #1a1a18;
-  --popover: #fcfaf6;
-  --popover-foreground: #1a1a18;
-  --primary: #a94a24;
-  --primary-foreground: #fffaf3;
-  --secondary: #ebe5d9;
-  --secondary-foreground: #1a1a18;
-  --muted: #ebe5d9;
-  --muted-foreground: #5c5c54;
-  --accent: #efe9dd;
-  --accent-foreground: #1a1a18;
-  --destructive: #b3261e;
-  --border: #ddd2ba;
-  --input: #bfae8b;
-  --ring: #c45d35;
+  --border: #d8deea;
+  /* The boundary of a form control: 3:1 against the page, so a field is findable without hovering. */
+  --input: #7c879b;
+  --muted: #eef2f6;
+  --muted-foreground: #526079;
 
-  /* Text-safe accent colors (the brand rust and teal fail AA as small text on cream) */
-  --link: #a94a24;
-  --teal-text: #2d5a5a;
-  --success: #2d5a5a;
-  --warning: #96600a;
+  --primary: #4338ca;
+  --primary-foreground: #ffffff;
+  --primary-hover: #3730a3;
+  --primary-active: #312e81;
 
-  --sidebar: #f1ebdf;
-  --sidebar-foreground: #1a1a18;
-  --sidebar-border: #ddd2ba;
+  --accent: #eef2ff;
+  --accent-foreground: #3730a3;
 
-  --radius: 0.625rem;
-  --shadow-soft: 0 1px 2px rgb(26 26 24 / 0.05), 0 4px 16px -6px rgb(26 26 24 / 0.08);
+  --neutral: #526079;
+  --neutral-subtle: #eef2f6;
+  --success: #166534;
+  --success-subtle: #ecfdf3;
+  --warning: #92400e;
+  --warning-subtle: #fff7e6;
+  --danger: #b42318;
+  --danger-subtle: #fef3f2;
+  --danger-foreground: #ffffff;
+  --info: #1d4ed8;
+  --info-subtle: #eff6ff;
+
+  --ring: #4f46e5;
+  --selection: #dbe4ff;
+  --selection-foreground: #172033;
+  --code-background: #eef2f6;
+
+  --category-blogs: #4338ca;
+  --category-social: #0369a1;
+  --category-communities: #0f766e;
+  --category-video: #be123c;
+  --category-conferences: #6d28d9;
+  --category-editorial: #a21caf;
+  --category-launches: #9a3412;
+  --category-aggregators: #4d5f18;
+
+  /* Names the components already use. */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--foreground);
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-foreground);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --link: var(--primary);
+  --teal-text: var(--success);
+
+  --radius: 0.75rem;
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-raised: 0 8px 24px rgb(15 23 42 / 0.1), 0 2px 6px rgb(15 23 42 / 0.06);
 }
 
+.dark,
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --background: #141411;
-  --foreground: #ece6d8;
-  --card: #1b1a16;
-  --card-foreground: #ece6d8;
-  --popover: #1b1a16;
-  --popover-foreground: #ece6d8;
-  --primary: #e0794f;
-  --primary-foreground: #1a1a18;
-  --secondary: #26241f;
-  --secondary-foreground: #ece6d8;
-  --muted: #26241f;
-  --muted-foreground: #aaa597;
-  --accent: #2a2823;
-  --accent-foreground: #ece6d8;
-  --destructive: #f07167;
-  --border: #38352d;
-  --input: #5a5546;
-  --ring: #e0794f;
+  --background: #0f1420;
+  --foreground: #edf2fa;
+  --surface: #171f2e;
+  --surface-raised: #202b3d;
 
-  --link: #ef9a74;
-  --teal-text: #86bdb8;
-  --success: #86bdb8;
-  --warning: #e3b05a;
+  --border: #35435a;
+  --input: #73839b;
+  --muted: #273247;
+  --muted-foreground: #aab8ce;
 
-  --sidebar: #181714;
-  --sidebar-foreground: #ece6d8;
-  --sidebar-border: #38352d;
+  --primary: #a5b4fc;
+  --primary-foreground: #171b35;
+  --primary-hover: #c7d2fe;
+  --primary-active: #818cf8;
 
-  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px -6px rgb(0 0 0 / 0.5);
+  --accent: #293457;
+  --accent-foreground: #c7d2fe;
+
+  --neutral: #becadf;
+  --neutral-subtle: #273247;
+  --success: #86efac;
+  --success-subtle: #143326;
+  --warning: #fcd34d;
+  --warning-subtle: #3a2c16;
+  --danger: #fda4af;
+  --danger-subtle: #411f29;
+  --danger-foreground: #0f1420;
+  --info: #93c5fd;
+  --info-subtle: #172f4f;
+
+  --ring: #a5b4fc;
+  --selection: #344675;
+  --selection-foreground: #edf2fa;
+  --code-background: #111827;
+
+  --category-blogs: #a5b4fc;
+  --category-social: #7dd3fc;
+  --category-communities: #5eead4;
+  --category-video: #fda4af;
+  --category-conferences: #c4b5fd;
+  --category-editorial: #f0abfc;
+  --category-launches: #fdba74;
+  --category-aggregators: #d9f99d;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.24);
+  --shadow-raised: 0 12px 32px rgb(0 0 0 / 0.36), 0 2px 8px rgb(0 0 0 / 0.24);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -104,6 +152,9 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-foreground: var(--danger-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -111,27 +162,39 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-border: var(--sidebar-border);
 
-  --color-cream: var(--cream);
-  --color-cream-dark: var(--cream-dark);
-  --color-ink: var(--ink);
-  --color-rust: var(--rust);
-  --color-teal: var(--teal);
-  --color-sand: var(--sand);
+  --color-neutral: var(--neutral);
+  --color-neutral-subtle: var(--neutral-subtle);
   --color-link: var(--link);
   --color-teal-text: var(--teal-text);
   --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
   --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-code-background: var(--code-background);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-category-blogs: var(--category-blogs);
+  --color-category-social: var(--category-social);
+  --color-category-communities: var(--category-communities);
+  --color-category-video: var(--category-video);
+  --color-category-conferences: var(--category-conferences);
+  --color-category-editorial: var(--category-editorial);
+  --color-category-launches: var(--category-launches);
+  --color-category-aggregators: var(--category-aggregators);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
-  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+
+  --font-sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Arial, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-mono: "Cascadia Code", ui-monospace, Consolas, Menlo, monospace;
 
   --shadow-soft: var(--shadow-soft);
+  --shadow-raised: var(--shadow-raised);
 }
 
 @layer base {
@@ -146,23 +209,24 @@
 
   body {
     @apply bg-background font-sans text-foreground antialiased;
-    font-size: 0.9375rem;
-    line-height: 1.6;
+    font-size: 0.875rem;
+    line-height: 1.5714;
   }
 
   h1,
   h2,
   h3 {
-    @apply font-serif text-foreground;
-    letter-spacing: -0.01em;
+    @apply font-sans text-foreground;
+    letter-spacing: -0.02em;
     text-wrap: balance;
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--rust) 28%, transparent);
+    background: var(--selection);
+    color: var(--selection-foreground);
   }
 
-  /* One focus treatment everywhere: visible, high contrast, never removed. */
+  /* One focus treatment everywhere: opaque, visible on both themes, never removed. */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -177,15 +241,20 @@
 }
 
 @layer utilities {
+  /* A small section label: sans, semibold, no shouting. */
   .label-caps {
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .shadow-soft {
     box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-raised {
+    box-shadow: var(--shadow-raised);
   }
 }
 

@@ -57,7 +57,7 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
           sources={sources.map((s) => ({ id: s.id, title: s.title }))}
         />
         <section aria-labelledby="actions-heading" className="rounded-xl border bg-card p-4 sm:p-5">
-          <h2 id="actions-heading" className="font-serif text-lg font-semibold">
+          <h2 id="actions-heading" className=" text-lg font-semibold">
             Review and removal
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">

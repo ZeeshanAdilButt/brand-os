@@ -31,7 +31,7 @@ export function ComingSoon({ day, icon: Icon, heading, lead, items, today }: Com
             <span aria-hidden>&middot;</span>
             Arrives Day {day}
           </Badge>
-          <h2 id="coming-soon-heading" className="font-serif text-2xl font-semibold">
+          <h2 id="coming-soon-heading" className=" text-2xl font-semibold">
             {heading}
           </h2>
           <p className="mt-2 max-w-2xl leading-relaxed text-muted-foreground">{lead}</p>

@@ -108,7 +108,7 @@ export function ProvidersManager({ initial, mode }: { initial: ProviderDTO[]; mo
   return (
     <div className="grid gap-10">
       <section aria-labelledby="state-heading" className="rounded-xl border bg-card p-4 sm:p-5">
-        <h2 id="state-heading" className="font-serif text-lg font-semibold">
+        <h2 id="state-heading" className=" text-lg font-semibold">
           {ready.length > 0 ? 'AI is on' : 'AI is off, and that is fine'}
         </h2>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
@@ -122,7 +122,7 @@ export function ProvidersManager({ initial, mode }: { initial: ProviderDTO[]; mo
 
       {providers.length > 0 ? (
         <section aria-labelledby="providers-heading">
-          <h2 id="providers-heading" className="font-serif text-xl font-semibold">
+          <h2 id="providers-heading" className=" text-xl font-semibold">
             Your providers
           </h2>
           <ul className="mt-4 grid gap-3">
@@ -247,7 +247,7 @@ export function ProvidersManager({ initial, mode }: { initial: ProviderDTO[]; mo
       ) : null}
 
       <section aria-labelledby="add-heading">
-        <h2 id="add-heading" className="font-serif text-xl font-semibold">
+        <h2 id="add-heading" className=" text-xl font-semibold">
           Add a provider
         </h2>
         <div role="group" aria-label="Provider type" className="mt-4 grid gap-2 sm:grid-cols-2">

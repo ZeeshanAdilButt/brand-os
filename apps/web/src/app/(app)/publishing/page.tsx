@@ -52,7 +52,7 @@ export default async function PublishingPage() {
               <Send className="size-6" />
             </div>
             <div className="min-w-0">
-              <h2 className="font-serif text-2xl font-semibold">Nothing prepared yet</h2>
+              <h2 className=" text-2xl font-semibold">Nothing prepared yet</h2>
               <p className="mt-2 max-w-2xl leading-relaxed text-muted-foreground">
                 Open an article and choose Publish. You pick a destination, build the post, look at a private copy on the platform, and approve it yourself.
               </p>
@@ -85,7 +85,7 @@ export default async function PublishingPage() {
             <li key={d.id} className="rounded-xl border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <Link href={`/articles/${d.articleId}?panel=publish`} className="font-serif text-lg font-semibold underline-offset-2 hover:underline">
+                  <Link href={`/articles/${d.articleId}?panel=publish`} className=" text-lg font-semibold underline-offset-2 hover:underline">
                     {d.payload.title || 'Untitled article'}
                   </Link>
                   <p className="mt-0.5 text-sm text-muted-foreground">

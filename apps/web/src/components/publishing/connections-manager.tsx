@@ -52,7 +52,7 @@ export function ConnectionsManager({ initial }: { initial: ConnectionView[] }) {
   return (
     <div className="grid gap-8">
       <section aria-labelledby="how-heading" className="rounded-xl border bg-card p-4 sm:p-5">
-        <h2 id="how-heading" className="font-serif text-lg font-semibold">
+        <h2 id="how-heading" className=" text-lg font-semibold">
           Your keys stay here
         </h2>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
@@ -139,7 +139,7 @@ function PlatformCard({ view, onChange }: { view: ConnectionView; onChange(conne
     <article aria-labelledby={`${id}-name`} className="rounded-xl border bg-card p-4 sm:p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={`${id}-name`} className="font-serif text-xl font-semibold">
+          <h2 id={`${id}-name`} className=" text-xl font-semibold">
             {info.name}
           </h2>
           {connection?.who ? <p className="mt-0.5 text-sm text-muted-foreground">Signed in as {connection.who}</p> : null}

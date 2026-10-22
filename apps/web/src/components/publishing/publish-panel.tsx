@@ -293,7 +293,7 @@ function DestinationCard({ articleId, destination, saved, notice, onNotice, onDr
     <section aria-labelledby={`${idBase}-title`} className="min-w-0 rounded-xl border bg-background p-3.5 sm:p-4">
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 id={`${idBase}-title`} className="font-serif text-lg font-semibold">
+          <h3 id={`${idBase}-title`} className=" text-lg font-semibold">
             {info.name}
           </h3>
           <p className="text-xs text-muted-foreground">
@@ -591,7 +591,7 @@ function ApprovalCard({ draft, info, onDraft, onNotice }: { draft: PlatformDraft
   return (
     <section aria-labelledby={`approval-${approval.id}`} className="min-w-0 rounded-xl border-2 border-warning/70 bg-card p-3.5">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h4 id={`approval-${approval.id}`} className="font-serif text-base font-semibold">
+        <h4 id={`approval-${approval.id}`} className=" text-base font-semibold">
           Approve this exact post
         </h4>
         <span className="rounded-md border bg-background px-2 py-0.5 font-mono text-xs font-semibold" title="Short tag of the payload hash. It changes if anything in the post changes.">

@@ -121,7 +121,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
           <div aria-hidden className="mx-auto mb-4 grid size-12 place-items-center rounded-xl border bg-background text-link shadow-soft">
             <FileText className="size-6" />
           </div>
-          <h2 className="font-serif text-2xl font-semibold">No articles yet</h2>
+          <h2 className=" text-2xl font-semibold">No articles yet</h2>
           <p className="mx-auto mt-2 max-w-xl leading-relaxed text-muted-foreground">
             Start a new article, or bring in one you have already written: a Markdown file, a page on your site, or a folder of posts. Code blocks, tables and
             diagrams come across intact.
@@ -138,7 +138,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
 
       {!problem && result && shown.length === 0 && (counts.total > 0 || filtered) ? (
         <section className="rounded-xl border border-dashed border-input bg-card/60 p-8 text-center">
-          <h2 className="font-serif text-xl font-semibold">{q ? 'No matches' : 'Nothing with this status'}</h2>
+          <h2 className=" text-xl font-semibold">{q ? 'No matches' : 'Nothing with this status'}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {q ? 'Search looks at titles, descriptions, tags and text, and matches word stems (run finds running). Try fewer or different words.' : 'Pick another tab above.'}
           </p>
@@ -165,7 +165,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
                       <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">{SOURCE_KIND_LABELS[article.sourceKind]}</span>
                     ) : null}
                   </div>
-                  <h2 className="mt-3 font-serif text-lg font-semibold leading-snug">
+                  <h2 className="mt-3  text-lg font-semibold leading-snug">
                     <Link href={`/articles/${article.id}`} className="rounded-sm hover:underline">
                       {hit ? <MarkedText text={hit.titleMarked} /> : article.title || 'Untitled article'}
                     </Link>

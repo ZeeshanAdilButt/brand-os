@@ -165,7 +165,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
           <div aria-hidden className="mx-auto mb-4 grid size-12 place-items-center rounded-xl border bg-background text-link shadow-soft">
             <BookOpen className="size-6" />
           </div>
-          <h2 className="font-serif text-2xl font-semibold">Nothing here yet</h2>
+          <h2 className=" text-2xl font-semibold">Nothing here yet</h2>
           <p className="mx-auto mt-2 max-w-xl leading-relaxed text-muted-foreground">
             Add what your writing should be built on: projects, results with their numbers, reading notes, certifications. Every item starts private and
             unverified, and stays out of public writing until you allow it.
@@ -184,7 +184,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
 
       {!problem && items && shown.length === 0 && (counts.total > 0 || filtered) ? (
         <section className="rounded-xl border border-dashed border-input bg-card/60 p-8 text-center">
-          <h2 className="font-serif text-xl font-semibold">{q ? 'No matches' : 'No items match these filters'}</h2>
+          <h2 className=" text-xl font-semibold">{q ? 'No matches' : 'No items match these filters'}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {q
               ? 'Search looks at titles, details and tags, and matches word stems (run finds running). Try fewer or different words.'
@@ -214,7 +214,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
                     <ConfidentialityBadge level={item.confidentiality} />
                     <PublicUseBadge permitted={item.publicUsePermitted} />
                   </div>
-                  <h2 className="mt-3 font-serif text-lg font-semibold leading-snug">
+                  <h2 className="mt-3  text-lg font-semibold leading-snug">
                     <Link href={`/knowledge/${item.id}`} className="rounded-sm hover:underline">
                       {hit ? <MarkedText text={hit.titleMarked} /> : item.title}
                     </Link>

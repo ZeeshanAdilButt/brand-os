@@ -64,7 +64,7 @@ export function CredentialsManager({ initial }: { initial: CredentialDTO[] }) {
     <div className="grid gap-10">
       {fresh ? (
         <section aria-labelledby="fresh-heading" className="rounded-xl border-2 border-primary/50 bg-card p-4 sm:p-5">
-          <h2 id="fresh-heading" className="font-serif text-lg font-semibold">
+          <h2 id="fresh-heading" className=" text-lg font-semibold">
             Copy the credential for &ldquo;{fresh.name}&rdquo; now
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -90,7 +90,7 @@ export function CredentialsManager({ initial }: { initial: CredentialDTO[] }) {
       ) : null}
 
       <section aria-labelledby="create-heading">
-        <h2 id="create-heading" className="font-serif text-xl font-semibold">
+        <h2 id="create-heading" className=" text-xl font-semibold">
           New credential
         </h2>
         <p className="mt-1 mb-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -137,7 +137,7 @@ export function CredentialsManager({ initial }: { initial: CredentialDTO[] }) {
       </section>
 
       <section aria-labelledby="list-heading">
-        <h2 id="list-heading" className="font-serif text-xl font-semibold">
+        <h2 id="list-heading" className=" text-xl font-semibold">
           Your credentials
         </h2>
         {active.length === 0 ? (

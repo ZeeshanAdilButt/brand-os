@@ -452,7 +452,7 @@ export function Studio({ initial, providers, initialPanel }: { initial: ArticleD
             maxLength={200}
             placeholder="Untitled article"
             aria-label="Article title"
-            className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 font-serif text-lg font-semibold outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring sm:text-xl"
+            className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1  text-lg font-semibold outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring sm:text-xl"
           />
           <span className="hidden rounded-full border px-2 py-0.5 text-xs text-muted-foreground sm:inline">{STATUS_LABELS[draft.status]}</span>
           <div className="flex shrink-0 items-center gap-1">

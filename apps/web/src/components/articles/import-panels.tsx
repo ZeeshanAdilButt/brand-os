@@ -24,7 +24,7 @@ function Card({ icon, title, intro, children, id }: { icon: ReactNode; title: st
           {icon}
         </div>
         <div className="min-w-0">
-          <h2 id={id} className="font-serif text-lg font-semibold">
+          <h2 id={id} className=" text-lg font-semibold">
             {title}
           </h2>
           <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{intro}</p>

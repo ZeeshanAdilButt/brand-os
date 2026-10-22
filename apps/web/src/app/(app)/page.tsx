@@ -87,7 +87,7 @@ export default async function OverviewPage() {
       </section>
 
       <section aria-labelledby="areas-heading" className="mb-12">
-        <h2 id="areas-heading" className="mb-4 font-serif text-2xl font-semibold">
+        <h2 id="areas-heading" className="mb-4  text-2xl font-semibold">
           Where things live
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2">
@@ -112,7 +112,7 @@ export default async function OverviewPage() {
       </section>
 
       <section aria-labelledby="roadmap-heading">
-        <h2 id="roadmap-heading" className="mb-1 font-serif text-2xl font-semibold">
+        <h2 id="roadmap-heading" className="mb-1  text-2xl font-semibold">
           Phase 1 plan
         </h2>
         <p className="mb-4 text-sm text-muted-foreground">Technical article publishing, built one working slice at a time.</p>

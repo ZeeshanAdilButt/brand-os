@@ -19,7 +19,7 @@ export default async function ProfileSettingsPage() {
       <SettingsTabs />
       <div className="grid max-w-3xl gap-12">
         <section aria-labelledby="profile-heading">
-          <h2 id="profile-heading" className="font-serif text-xl font-semibold">
+          <h2 id="profile-heading" className=" text-xl font-semibold">
             About you
           </h2>
           <p className="mt-1 mb-5 text-sm text-muted-foreground">
@@ -38,7 +38,7 @@ export default async function ProfileSettingsPage() {
           />
         </section>
         <section aria-labelledby="prefs-heading">
-          <h2 id="prefs-heading" className="font-serif text-xl font-semibold">
+          <h2 id="prefs-heading" className=" text-xl font-semibold">
             Brand preferences
           </h2>
           <p className="mt-1 mb-5 text-sm text-muted-foreground">Tone, audience and things to avoid. These guide drafts once the article studio and AI assistance arrive.</p>
@@ -52,7 +52,7 @@ export default async function ProfileSettingsPage() {
           />
         </section>
         <section aria-labelledby="account-heading" className="rounded-xl border bg-card p-4 sm:p-5">
-          <h2 id="account-heading" className="font-serif text-lg font-semibold">
+          <h2 id="account-heading" className=" text-lg font-semibold">
             Account
           </h2>
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-[10rem_1fr]">

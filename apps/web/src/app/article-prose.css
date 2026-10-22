@@ -5,7 +5,7 @@
  */
 @layer components {
   .article-prose {
-    --code-bg: color-mix(in srgb, var(--foreground) 5%, var(--card));
+    --code-bg: var(--code-background);
     --code-border: color-mix(in srgb, var(--foreground) 12%, var(--card));
     font-family: var(--font-serif);
     font-size: 1.0625rem;
@@ -95,7 +95,7 @@
   }
   .article-prose blockquote {
     padding: 0.2em 0 0.2em 1.1em;
-    border-left: 3px solid var(--rust);
+    border-left: 3px solid var(--primary);
     color: var(--muted-foreground);
   }
   .article-prose blockquote > :last-child {
