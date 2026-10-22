@@ -59,7 +59,7 @@ describe('the destination catalog', () => {
     expect(PLATFORMS.medium.reason).toMatch(/no API/i);
     expect(PLATFORMS.hackernews.reason).toMatch(/no submission API/i);
     expect(PLATFORMS.hackernews.reason).toMatch(/pre-filled submit link/i);
-    expect(PLATFORMS.linkedin.roadmap).toBe('Phase 2, Day 9');
+    expect(PLATFORMS.linkedin.roadmap).toBe('Phase 2');
     expect(PLATFORMS.x.capabilities.cost).toMatch(/\$0\.20/);
     expect(PLATFORMS.x.unverified.length).toBeGreaterThan(0);
   });

@@ -35,7 +35,7 @@ export const KIND_LABELS: Record<CatalogKind, string> = {
 
 /**
  * How the owner connects: paste a key with a guided wizard, authorize with OAuth (the framework for that is the next
- * task after Day 6), or nothing at all because the platform has no API (the owner posts by hand).
+ * task), or nothing at all because the platform has no API (the owner posts by hand).
  */
 export type ConnectMethod = 'api_key_guided' | 'oauth' | 'manual_only';
 
@@ -95,7 +95,7 @@ export interface ManualGuide {
 export interface PlatformCapabilities {
   formats: string[];
   drafts: boolean;
-  /** Scheduling is not built on Day 6 whatever the platform allows. */
+  /** Scheduling is not built yet whatever the platform allows. */
   scheduling: false;
   /** What the app can do with images. */
   media: string;
@@ -134,7 +134,7 @@ export interface PlatformInfo {
   verification: { level: 'docs_and_fake' | 'docs_only' | 'research_only' | 'not_built'; label: string; detail: string };
 }
 
-const OAUTH_NOTE = 'OAuth connections arrive with the next task after Day 6. Until then the Connect button stays off, and you can still preview the post and post it by hand.';
+const OAUTH_NOTE = 'OAuth connections are coming next. Until then the Connect button stays off, and you can still preview the post and post it by hand.';
 const NOT_BUILT = { level: 'not_built', label: 'Not built yet', detail: 'No adapter exists yet, so nothing is sent to this platform. Preview and manual posting work.' } as const;
 
 const none = (cost: string, restrictions: string[], media: string): PlatformCapabilities => ({
@@ -367,8 +367,8 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     kind: 'short_form',
     connectMethod: 'oauth',
     state: 'coming_later',
-    roadmap: 'Phase 2, Day 9',
-    reason: 'Posting arrives in Phase 2 (Day 9). Preview it now and post it by hand.',
+    roadmap: 'Phase 2',
+    reason: 'Posting arrives in Phase 2. Preview it now and post it by hand.',
     authKind: 'oauth',
     secretLabel: '',
     secretHelp: '',
@@ -403,8 +403,8 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     kind: 'short_form',
     connectMethod: 'oauth',
     state: 'coming_later',
-    roadmap: 'Phase 2, Day 9',
-    reason: 'Posting arrives in Phase 2 (Day 9) and costs money per post. Preview it now; the intent link posts by hand for free.',
+    roadmap: 'Phase 2',
+    reason: 'Posting arrives in Phase 2 and costs money per post. Preview it now; the intent link posts by hand for free.',
     authKind: 'oauth',
     secretLabel: '',
     secretHelp: '',
@@ -443,8 +443,8 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     kind: 'short_form',
     connectMethod: 'api_key_guided',
     state: 'coming_later',
-    roadmap: 'Phase 2, Day 9',
-    reason: 'Posting arrives in Phase 2 (Day 9). Preview it now and post it by hand.',
+    roadmap: 'Phase 2',
+    reason: 'Posting arrives in Phase 2. Preview it now and post it by hand.',
     authKind: 'app_password',
     secretLabel: 'Bluesky app password',
     secretHelp: 'Create one in the Bluesky app under Settings, Privacy and security, App passwords. Never use your main password.',
@@ -473,8 +473,8 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     kind: 'short_form',
     connectMethod: 'oauth',
     state: 'coming_later',
-    roadmap: 'Phase 2, Day 9',
-    reason: 'Posting arrives in Phase 2 (Day 9). Preview it now and post it by hand.',
+    roadmap: 'Phase 2',
+    reason: 'Posting arrives in Phase 2. Preview it now and post it by hand.',
     authKind: 'oauth',
     secretLabel: '',
     secretHelp: '',
@@ -545,7 +545,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     kind: 'link_submission',
     connectMethod: 'manual_only',
     state: 'manual_only',
-    roadmap: 'Phase 2, Day 10',
+    roadmap: 'Phase 2',
     reason: 'Reddit gates API access and bans automated link drops: this opens a pre-filled submit link for you to review.',
     authKind: 'none',
     secretLabel: '',
@@ -571,7 +571,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     kind: 'link_submission',
     connectMethod: 'manual_only',
     state: 'manual_only',
-    roadmap: 'Phase 2, Day 10',
+    roadmap: 'Phase 2',
     reason: 'Hacker News has no submission API: this opens a pre-filled submit link for you to review.',
     authKind: 'none',
     secretLabel: '',
@@ -597,7 +597,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     kind: 'video',
     connectMethod: 'oauth',
     state: 'preview_only',
-    roadmap: 'Phase 5, Day 24',
+    roadmap: 'Phase 5',
     reason: 'There is no video yet, so this shows the metadata only. Uploads arrive with the video pipeline (Phase 5).',
     authKind: 'oauth',
     secretLabel: '',

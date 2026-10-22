@@ -100,10 +100,10 @@ export interface DirectoryEntry {
   directoryOnly: boolean;
 }
 
-const PHASE2 = 'Phase 2, Days 8 to 12';
-const PHASE3 = 'Phase 3, Days 13 to 16';
-const PHASE4 = 'Phase 4, Days 17 to 20';
-const PHASE5 = 'Phase 5, Days 21 to 24';
+const PHASE2 = 'Phase 2';
+const PHASE3 = 'Phase 3';
+const PHASE4 = 'Phase 4';
+const PHASE5 = 'Phase 5';
 const PHASE7 = 'Phase 7, after Phase 6';
 
 interface Extra {
@@ -357,7 +357,7 @@ const EXTRAS: Extra[] = [
     url: 'https://news.ycombinator.com/showhn.html',
     method: 'manual_only',
     plan: 'Check the Show HN rules against your project and open a pre-filled submit link. You submit it.',
-    roadmap: `${PHASE2} (Day 10)`,
+    roadmap: PHASE2,
     restrictions: ['Show HN has its own guidelines (something people can try, no sign-up wall). Read them first.'],
     cost: 'Free.',
     unverified: [],
@@ -526,7 +526,7 @@ function fromExtra(extra: Extra): DirectoryEntry {
     secretLabel: extra.secretLabel ?? '',
     secretHelp: extra.secretHelp ?? '',
     assisted: extra.assisted ?? null,
-    oauth: extra.method === 'oauth' ? { scopes: extra.oauthScopes ?? [], redirectPath: oauthRedirect, register: ['An application registered in the platform’s developer console'], note: 'OAuth connections arrive with the next task after Day 6.' } : null,
+    oauth: extra.method === 'oauth' ? { scopes: extra.oauthScopes ?? [], redirectPath: oauthRedirect, register: ['An application registered in the platform’s developer console'], note: 'OAuth connections are coming next.' } : null,
     directoryOnly: extra.directoryOnly ?? false,
   };
 }
