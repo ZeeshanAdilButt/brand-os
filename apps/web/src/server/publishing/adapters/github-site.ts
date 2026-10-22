@@ -88,7 +88,7 @@ function planFor(draft: AdapterDraft): Plan {
   const options = draft.extras?.site;
   if (!options) throw new PlatformError('config', 'This draft has no personal-site options. Rebuild it.', { notSent: true });
   const parsed = options.repo ? parseRepo(options.repo) : null;
-  if (!parsed) throw new PlatformError('config', 'No repository is set. Add owner/name in Settings > Connections.', { notSent: true });
+  if (!parsed) throw new PlatformError('config', 'No repository is set. Add owner/name in Platforms > Integrations.', { notSent: true });
   if (!isSafeBranch(options.baseBranch)) throw new PlatformError('config', 'The base branch name is not valid.', { notSent: true });
   const path = validateRepoPath(options.path);
   if (!path.ok) throw new PlatformError('config', path.reason, { notSent: true });
@@ -209,7 +209,7 @@ export const githubSiteAdapter: PlatformAdapter = {
     const path = validateRepoPath(site.path);
     if (!path.ok) issues.push({ code: 'path_invalid', severity: 'error', message: path.reason, items: [site.path] });
     if (!site.repo || !parseRepo(site.repo)) {
-      issues.push({ code: 'repo_missing', severity: 'error', message: 'No repository is set, so a pull request cannot be opened. Markdown export and posting by hand still work. Set owner/name in Settings > Connections.' });
+      issues.push({ code: 'repo_missing', severity: 'error', message: 'No repository is set, so a pull request cannot be opened. Markdown export and posting by hand still work. Set owner/name in Platforms > Integrations.' });
     }
     if (site.updateExisting && !site.expectedSha) {
       issues.push({ code: 'sha_missing', severity: 'error', message: 'This draft is marked “update existing” but no file has been looked at yet. Stage the draft to read the file, then mark it.' });

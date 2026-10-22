@@ -172,10 +172,43 @@ describe('connections', () => {
 });
 
 describe('preparing a draft', () => {
-  it('needs a connection', async () => {
-    const article = await newArticle({}, other);
-    const err = await expectError(() => prepareDraft(other, env, { articleId: article.id, platform: 'devto' }), 'conflict');
+  async function disconnectOwner() {
+    const row = (await owner.data.connections.getByPlatform('devto'))!;
+    await owner.data.connections.remove(row.id);
+  }
+
+  it('does not need a connection: it builds the post and sends nothing, with no account yet', async () => {
+    await disconnectOwner();
+    const article = await newArticle();
+    const before = fake.requests.length;
+    const draft = await prepareDraft(owner, env, { articleId: article.id, platform: 'devto' });
+    expect(draft.status).toBe('draft');
+    expect(draft.account).toBeNull();
+    expect(fake.requests.length).toBe(before);
+  });
+
+  it('staging a post prepared before connecting says to connect first, and sends nothing', async () => {
+    await disconnectOwner();
+    const article = await newArticle();
+    const draft = await prepareDraft(owner, env, { articleId: article.id, platform: 'devto' });
+    const before = fake.requests.length;
+    const err = await expectError(() => stageDraft(owner, env, draft.id), 'conflict');
     expect(err.message).toContain('Connect DEV.to first');
+    expect(fake.requests.length).toBe(before);
+  });
+
+  it('a post prepared before connecting takes the account at staging, with a new hash, and then goes the normal way', async () => {
+    await disconnectOwner();
+    const article = await newArticle();
+    const draft = await prepareDraft(owner, env, { articleId: article.id, platform: 'devto' });
+    await connectPlatform(owner, env, { platform: 'devto', secret: KEY });
+    const staged = await stageDraft(owner, env, draft.id);
+    expect(staged.ok).toBe(true);
+    expect(staged.draft.account).toBe('@fakeauthor');
+    expect(staged.draft.payloadSha256).not.toBe(draft.payloadSha256);
+    const asked = await requestApproval(owner, env, draft.id);
+    expect(asked.draft.status).toBe('pending_approval');
+    expect(publishWrites()).toHaveLength(0);
   });
 
   it('builds the payload, reports tags and lint, and sends nothing', async () => {

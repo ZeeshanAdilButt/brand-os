@@ -136,7 +136,7 @@ export function describeFailure(platform: keyof typeof PLATFORMS, error: Platfor
   const base = error.message;
   switch (error.kind) {
     case 'auth':
-      return { kind: error.kind, message: base, nextAction: isSite ? 'Replace the GitHub token in Settings > Connections with one that has Contents and Pull requests write access to the repository.' : `Reconnect ${name} in Settings with a new key.` };
+      return { kind: error.kind, message: base, nextAction: isSite ? 'Replace the GitHub token in Platforms > Integrations with one that has Contents and Pull requests write access to the repository.' : `Reconnect ${name} in Settings with a new key.` };
     case 'forbidden_plan':
       return { kind: error.kind, message: base, nextAction: 'Upgrade the publication to Pro on Hashnode, then try again.' };
     case 'validation':

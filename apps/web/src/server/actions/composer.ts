@@ -301,7 +301,7 @@ export async function editDraft(owner: OwnerContext, env: Pick<PublishEnv, 'now'
 
   const article = await owner.data.articles.get(draft.articleId);
   const connection = await owner.data.connections.getByPlatform(draft.platform);
-  const lint = article ? [...adapter.validate(payload, extras), ...contextLint(draft.platform, article, payload, connection?.config ?? {})] : adapter.validate(payload, extras);
+  const lint = article ? [...adapter.validate(payload, extras), ...contextLint(draft.platform, article, payload, connection ? connection.config : null)] : adapter.validate(payload, extras);
   const payloadSha256 = payloadHashOf(draft.platform, draft.account, payload, extras);
   const changedFields: string[] = [...diffPayload(draft.payload, payload)];
   if (JSON.stringify(extras) !== JSON.stringify(draft.extras)) changedFields.push('options');

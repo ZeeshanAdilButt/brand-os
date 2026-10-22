@@ -355,6 +355,28 @@ export function scopedPlatformDrafts(scope: Scope) {
       });
     },
 
+    /**
+     * Attach the connected account to a draft that was prepared before the platform was connected. The payload is the
+     * same; the account is part of what is hashed, so the hash changes and any open approval is void. Only while
+     * nothing is staged, and only if the draft still has the hash the caller saw. Null when refused.
+     */
+    async bindConnection(id: string, input: { expectedHash: string; connectionId: string; account: string | null; payloadSha256: string; lint: LintIssue[] }): Promise<PlatformDraft | null> {
+      const db = await scope.db();
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(platformDrafts)
+          .set({ connectionId: input.connectionId, account: input.account, payloadSha256: input.payloadSha256, lint: input.lint, updatedAt: new Date() })
+          .where(and(owned(id), inArray(platformDrafts.status, ['draft', 'failed']), eq(platformDrafts.payloadSha256, input.expectedHash), eq(platformDrafts.stale, false)))
+          .returning();
+        if (!row) return null;
+        await tx
+          .update(approvals)
+          .set({ status: 'invalidated', invalidReason: 'The account changed, so this approval no longer applies.' })
+          .where(and(eq(approvals.ownerId, scope.ownerId), eq(approvals.draftId, id), eq(approvals.status, 'pending')));
+        return row;
+      });
+    },
+
     /** Delete a draft that never went out, with its approvals and attempts. Returns false when it is out, in flight or absent. */
     async removeUnsent(id: string): Promise<boolean> {
       const db = await scope.db();

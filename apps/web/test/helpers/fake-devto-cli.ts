@@ -14,7 +14,7 @@ import { createFakeDevto, serveFakeDevto } from './fake-devto';
 const port = Number(process.env.FAKE_DEVTO_PORT ?? '4731');
 const apiKey = process.env.FAKE_DEVTO_KEY ?? '';
 if (!apiKey) {
-  console.error('Set FAKE_DEVTO_KEY to the key you will paste into Settings > Connections.');
+  console.error('Set FAKE_DEVTO_KEY to the key you will paste into Platforms > Integrations.');
   process.exit(1);
 }
 

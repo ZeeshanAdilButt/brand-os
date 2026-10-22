@@ -78,7 +78,7 @@ function submitLink(kind: SubmitLinkKind, payload: DraftPayload, platform: Platf
       return { url: `https://${instance}/share?text=${enc(firstPost)}`, note: 'Opens your instance’s compose box with the text filled in.' };
     }
     case 'github': {
-      if (!ctx.siteRepo || !ctx.sitePath) return { url: null, note: 'Set the repository and path in Settings > Connections to get a link.' };
+      if (!ctx.siteRepo || !ctx.sitePath) return { url: null, note: 'Set the repository and path in Platforms > Integrations to get a link.' };
       return { url: `https://github.com/${ctx.siteRepo}/new/${enc(ctx.siteBase ?? 'main')}?filename=${enc(ctx.sitePath)}`, note: 'Opens GitHub’s new-file page for the path. Paste the copied file into it. This is your own commit; the app does not make it.' };
     }
   }
@@ -158,7 +158,7 @@ export function validateManualUrl(platform: PlatformId, raw: string, ctx: Manual
   const info = PLATFORMS[platform];
 
   if (platform === 'site') {
-    if (!ctx.siteHost) return { ok: false, reason: 'Set your site’s address in Settings > Connections first, so the link can be checked against it.' };
+    if (!ctx.siteHost) return { ok: false, reason: 'Set your site’s address in Platforms > Integrations first, so the link can be checked against it.' };
     const site = ctx.siteHost.toLowerCase().replace(/^www\./, '');
     if (host.replace(/^www\./, '') !== site) return { ok: false, reason: `That address is not on your site (${ctx.siteHost}).` };
     return { ok: true, url: parsed.toString(), host };

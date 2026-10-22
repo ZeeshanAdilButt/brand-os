@@ -391,13 +391,14 @@ export interface BuiltDraft {
 }
 
 /** Lint that depends on the surroundings, not just the payload: the article's local cover, a missing publication. */
-export function contextLint(platform: PlatformId, article: Pick<Article, 'coverAssetId'>, payload: DraftPayload, config: { publicationId?: string }): PlatformDraft['lint'] {
+export function contextLint(platform: PlatformId, article: Pick<Article, 'coverAssetId'>, payload: DraftPayload, config: { publicationId?: string } | null): PlatformDraft['lint'] {
   const issues: PlatformDraft['lint'] = [];
   if (article.coverAssetId && !payload.coverImageUrl && PLATFORMS[platform].kind === 'long_form') {
     issues.push({ code: 'cover_local_only', severity: 'warning', message: 'The article’s cover image only exists in this app, so no cover will be sent. Add a public https URL for the cover to include one.' });
   }
-  if (platform === 'hashnode' && !config.publicationId) {
-    issues.push({ code: 'publication_missing', severity: 'error', message: 'No Hashnode publication is selected. Choose one in Settings > Connections.' });
+  // Without a connection there is no publication to choose yet; the review says to connect first.
+  if (platform === 'hashnode' && config && !config.publicationId) {
+    issues.push({ code: 'publication_missing', severity: 'error', message: 'No Hashnode publication is selected. Choose one in Platforms > Integrations.' });
   }
   return issues;
 }
@@ -407,7 +408,7 @@ export function buildDraft(input: {
   article: Article;
   platform: PlatformId;
   who: string | null;
-  config: { publicationId?: string };
+  config: { publicationId?: string } | null;
   site: SiteSettingsDTO;
   previous: PlatformDraft | null;
   cover: string | null;
@@ -435,12 +436,10 @@ export async function prepareDraft(owner: OwnerContext, env: Pick<PublishEnv, 'n
   const article = await owner.data.articles.get(values.articleId);
   if (!article) throw new ActionError('not_found', 'Article not found');
   const info = PLATFORMS[values.platform];
+  // Preparing never needs an account: it builds the post from the article and sends nothing, and the owner can still
+  // copy it and post by hand. The account is attached when the platform is connected (see bindToConnection), and
+  // staging, approving and publishing need it.
   const connection = await owner.data.connections.getByPlatform(values.platform);
-  // A destination with a connector asks for its account first. The personal site does not (export needs none),
-  // and the rest have nothing to connect.
-  if (isPublishable(values.platform) && values.platform !== 'site' && !connection) {
-    throw new ActionError('conflict', `Connect ${info.name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
-  }
 
   await refresh(owner, env, article.id);
   const existing = await owner.data.platformDrafts.current(article.id, values.platform);
@@ -462,7 +461,7 @@ export async function prepareDraft(owner: OwnerContext, env: Pick<PublishEnv, 'n
   const series = values.series === undefined ? (existing?.generatedPayload.series ?? existing?.payload.series ?? null) : values.series || null;
   const site = toSiteSettingsDTO(await owner.data.siteSettings.get());
   const now = (env.now ?? (() => new Date()))();
-  const built = buildDraft({ article, platform: values.platform, who: connection?.who ?? null, config: connection?.config ?? {}, site, previous: existing, cover, series, now });
+  const built = buildDraft({ article, platform: values.platform, who: connection?.who ?? null, config: connection ? connection.config : null, site, previous: existing, cover, series, now });
   const rowValues = {
     connectionId: connection?.id ?? null,
     account: built.account,
@@ -530,6 +529,23 @@ const STATUS_WHY: Partial<Record<DraftStatus, string>> = {
   source_changed: 'The article changed after the draft was built. Rebuild the draft first.',
 };
 
+/**
+ * Give a draft that was prepared before its platform was connected the connected account. The post itself is not
+ * touched. Because the account is part of what is hashed, the hash changes, so this happens only before staging.
+ */
+async function bindToConnection(owner: OwnerContext, draft: PlatformDraft, connection: { id: string; who: string | null; config: { publicationId?: string } }): Promise<PlatformDraft> {
+  const site = toSiteSettingsDTO(await owner.data.siteSettings.get());
+  const account = accountFor(draft.platform, connection.who, site);
+  if (draft.connectionId === connection.id && draft.account === account) return draft;
+  if (draft.status !== 'draft' && draft.status !== 'failed') return draft;
+  const article = await owner.data.articles.get(draft.articleId);
+  if (!article) return draft;
+  const lint = [...adapterFor(draft.platform).validate(draft.payload, draft.extras), ...contextLint(draft.platform, article, draft.payload, connection.config)];
+  const payloadSha256 = payloadHashOf(draft.platform, account, draft.payload, draft.extras);
+  const row = await owner.data.platformDrafts.bindConnection(draft.id, { expectedHash: draft.payloadSha256, connectionId: connection.id, account, payloadSha256, lint });
+  return row ?? draft;
+}
+
 export interface StageOutcome {
   ok: boolean;
   message: string;
@@ -552,17 +568,19 @@ export async function stageDraft(owner: OwnerContext, env: PublishEnv, id: unkno
   const first = await loadDraft(owner, id);
   requirePublishable(first.platform, 'staged');
   await refresh(owner, env, first.articleId);
-  const draft = await loadDraft(owner, id);
+  let draft = await loadDraft(owner, id);
   const name = PLATFORMS[draft.platform].name;
   if (!(STAGEABLE_STATUSES as readonly string[]).includes(draft.status)) {
     throw new ActionError('conflict', `This draft cannot be staged. ${STATUS_WHY[draft.status] ?? ''}`.trim(), {}, { code: 'STATUS' });
   }
+  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform).then((c) => (c ? owner.data.connections.getWithKey(c.id) : null));
+  if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Platforms > Integrations.`, {}, { code: 'NOT_CONNECTED' });
+  // A post prepared before the account was connected picks the account up here, before anything is sent.
+  draft = await bindToConnection(owner, draft, connection);
   const errors = draft.lint.filter((i) => i.severity === 'error');
   if (errors.length > 0) {
     throw new ActionError('invalid', `Fix ${errors.length} problem${errors.length === 1 ? '' : 's'} before staging: ${errors[0]!.message}`, {}, { code: 'LINT' });
   }
-  const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform).then((c) => (c ? owner.data.connections.getWithKey(c.id) : null));
-  if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
   let secret: string;
   try {
     secret = plainSecret(env, connection);
@@ -653,7 +671,7 @@ export async function requestApproval(owner: OwnerContext, env: PublishEnv, id: 
     const errors = draft.lint.filter((i) => i.severity === 'error');
     if (errors.length > 0) throw new ActionError('invalid', `Fix ${errors.length} problem${errors.length === 1 ? '' : 's'} first: ${errors[0]!.message}`, {}, { code: 'LINT' });
     const connection = draft.connectionId ? await owner.data.connections.get(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform);
-    if (!connection || connection.status !== 'connected') throw new ActionError('conflict', `${name} is not connected. Reconnect it in Settings > Connections.`, {}, { code: 'UNHEALTHY' });
+    if (!connection || connection.status !== 'connected') throw new ActionError('conflict', `${name} is not connected. Reconnect it in Platforms > Integrations.`, {}, { code: 'UNHEALTHY' });
     if (draft.platform === 'site') {
       const options = draft.extras.site;
       const seen = draft.remoteInfo;
@@ -731,7 +749,7 @@ export async function approveAndPublish(owner: OwnerContext, env: PublishEnv, ap
   }
 
   const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform).then((c) => (c ? owner.data.connections.getWithKey(c.id) : null));
-  if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
+  if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Platforms > Integrations.`, {}, { code: 'NOT_CONNECTED' });
   let secret: string;
   try {
     secret = plainSecret(env, connection);
@@ -818,7 +836,7 @@ export async function checkOnPlatform(owner: OwnerContext, env: PublishEnv, id: 
   const name = PLATFORMS[draft.platform].name;
   const isSite = draft.platform === 'site';
   const connection = draft.connectionId ? await owner.data.connections.getWithKey(draft.connectionId) : await owner.data.connections.getByPlatform(draft.platform).then((c) => (c ? owner.data.connections.getWithKey(c.id) : null));
-  if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Settings > Connections.`, {}, { code: 'NOT_CONNECTED' });
+  if (!connection) throw new ActionError('conflict', `Connect ${name} first, in Platforms > Integrations.`, {}, { code: 'NOT_CONNECTED' });
   let secret: string;
   try {
     secret = plainSecret(env, connection);

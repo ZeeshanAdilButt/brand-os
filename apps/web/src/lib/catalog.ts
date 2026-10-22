@@ -1,6 +1,6 @@
 /**
  * The destination catalog: every platform on the roadmap, with what the app can and cannot do for it today.
- * One registry, no server imports, so the composer, Settings > Connections, the previews, the limits and the
+ * One registry, no server imports, so the composer, Platforms > Integrations, the previews, the limits and the
  * manual-posting kit all read the same facts. Nothing here implies a capability that is not built: a platform
  * without an adapter says why, and says when it is planned. Figures come from docs/research/01-06 and
  * INTEGRATIONS.md; anything not confirmed from a primary source is listed under `unverified`.

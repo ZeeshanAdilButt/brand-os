@@ -118,7 +118,7 @@ describe('recording a post made by hand: the link is checked against the platfor
     expect(ok('site', 'https://other.example.test/posts/write-path')).toBe(false);
     const none = validateManualUrl('site', 'https://example-blog.dev/x', { siteHost: null });
     expect(none).toMatchObject({ ok: false });
-    expect((none as { reason: string }).reason).toMatch(/Settings/);
+    expect((none as { reason: string }).reason).toMatch(/Integrations/);
   });
 
   it('says why in words the owner can act on', () => {
