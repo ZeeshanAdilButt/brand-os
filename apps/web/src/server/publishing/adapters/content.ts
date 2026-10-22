@@ -100,7 +100,7 @@ export function lintContent(platform: PlatformId, payload: DraftPayload, extras:
     }
     if (platform === 'threads' && tags.length > 1) issues.push(issue('threads_topic', 'warning', 'Threads keeps one topic tag per post. Only the first hashtag is used.', tags));
     if (platform === 'mastodon') {
-      const bad = tags.filter((t) => /[^#\p{L}\p{N}_]/u.test(t));
+      const bad = (body.match(/(?:^|\s)#[\p{L}\p{N}_]*[-.+][\p{L}\p{N}_.+-]*/gu) ?? []).map((t) => t.trim());
       if (bad.length > 0) issues.push(issue('hashtag_form', 'warning', 'Mastodon hashtags are letters, numbers and underscores only.', bad));
       if (!extras.options?.instance) issues.push(issue('instance_missing', 'warning', 'Set your instance in the destination options to get a share link. The character limit is the instance’s own: 500 is only the default.'));
     }
