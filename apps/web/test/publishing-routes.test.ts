@@ -50,7 +50,7 @@ let fake: FakeDevto;
 let aAgent: string;
 let aReadOnly: string;
 let bAgent: string;
-let deps: { publish: { fetchFn: typeof fetch; sleep: () => Promise<void>; timeoutMs: number } };
+let deps: { publish: { fetchFn: typeof fetch; canonical: ReturnType<typeof liveCanonical>; sleep: () => Promise<void>; timeoutMs: number } };
 let counter = 0;
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });

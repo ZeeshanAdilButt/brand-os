@@ -18,6 +18,8 @@ function task(over: Partial<TaskDTO> = {}): TaskDTO {
     status: 'needs_review',
     articleId: '22222222-2222-4222-8222-222222222222',
     articleRevision: 3,
+    draftId: null,
+    platform: null,
     selection: { start: 10, end: 52 },
     excerpt: 'The queue is long. We measured it twice.',
     excerptTruncated: false,

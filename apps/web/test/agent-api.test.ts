@@ -178,7 +178,7 @@ describe('agent API: writing', () => {
 });
 
 describe('agent API: surface', () => {
-  it('has no route that approves, declines, publishes, checks, marks or connects (platform drafts only prepare, stage and ask)', async () => {
+  it('has no route that approves, declines, publishes, checks, marks or connects (platform drafts only prepare, edit, preview, stage and ask)', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const root = path.resolve(import.meta.dirname, '../src/app/api/agent');
@@ -187,6 +187,7 @@ describe('agent API: surface', () => {
     const routes = walk(root).map((f) => path.relative(root, f).split(path.sep).join('/'));
     expect(routes.join(' ')).not.toMatch(/approve|decline|publish|hand-?off|connect|mark|check|resolve/i);
     expect(routes.filter((r) => /platform-drafts/.test(r)).sort()).toEqual([
+      'platform-drafts/[id]/preview/route.ts',
       'platform-drafts/[id]/request-approval/route.ts',
       'platform-drafts/[id]/route.ts',
       'platform-drafts/[id]/stage/route.ts',
