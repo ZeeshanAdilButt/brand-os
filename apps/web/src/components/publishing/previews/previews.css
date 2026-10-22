@@ -32,6 +32,14 @@
   --sim-card: #22272e;
 }
 
+/* The app sets heading colours for its own theme; a simulated platform keeps its own, light or dark. */
+.sim h1,
+.sim h2,
+.sim h3,
+.sim h4 {
+  color: inherit;
+}
+
 .sim a,
 .sim .sim-link {
   color: var(--sim-link);

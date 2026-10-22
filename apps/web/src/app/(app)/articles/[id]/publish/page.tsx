@@ -39,7 +39,7 @@ export default async function PublishPage({ params, searchParams }: { params: Pr
 
   return (
     <>
-      <PageHeader title={initial.view === 'composer' ? 'Composer' : 'Approve'} description={article.title ? `Review and approve each post of “${article.title}”, one at a time.` : 'Review and approve each post, one at a time.'} />
+      <PageHeader title={initial.view === 'composer' ? 'Composer' : 'Approve'} description={initial.view === 'composer' ? 'The article, every destination and the checks side by side.' : article.title ? `Review and approve each post of “${article.title}”, one at a time.` : 'Review and approve each post, one at a time.'} />
       <PublishScreen
         articleId={article.id}
         article={{ title: article.title, body: article.bodyMarkdown }}

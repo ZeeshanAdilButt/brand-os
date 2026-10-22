@@ -36,13 +36,11 @@ export function NextStepBar({ articleId, title, hasText, destinations, reloadKey
   const list = destinations ?? fetched;
   if (!list) return <div aria-hidden className="h-12 rounded-lg border bg-surface" />;
   const journey: Journey = computeJourney({ articleCount: 1, article: { id: articleId, title, hasText }, destinations: toJourneyDestinations(list) });
-  const current = journey.steps.find((s) => s.state === 'current');
   return (
     <div role="region" aria-label="Next step" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-surface px-4 py-2.5">
       <p className="min-w-0 flex-1 text-sm">
         <span className="font-semibold">Next step</span>
-        {current ? <span className="text-muted-foreground"> · {current.label}</span> : null}
-        <span className="ml-2 hidden text-muted-foreground md:inline">{journey.next.why}</span>
+        <span className="ml-2 text-muted-foreground">{journey.next.why}</span>
       </p>
       <Link href={journey.next.href} className={buttonVariants({ size: 'sm' })}>
         {journey.next.label}

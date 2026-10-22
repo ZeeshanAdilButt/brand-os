@@ -69,7 +69,7 @@ export function directoryChip(status: DirectoryStatus, roadmap: string | null): 
     case 'available_now':
       return { label: 'Available now', tone: 'success', icon: 'plug-check' };
     case 'needs_connection':
-      return { label: 'Needs connection', tone: 'warning', icon: 'plug' };
+      return { label: 'Needs connection', tone: 'neutral', icon: 'plug' };
     case 'preview_only':
       return { label: 'Preview only', tone: 'neutral', icon: 'eye' };
     case 'manual_only':
