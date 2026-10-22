@@ -734,3 +734,29 @@ export const canonicalChecks = pgTable(
 );
 
 export type CanonicalCheck = typeof canonicalChecks.$inferSelect;
+
+/**
+ * Credentials the owner saved for integrations that are not built yet (an OAuth client id and secret, a key for a
+ * platform whose adapter arrives later). AES-256-GCM ciphertext bound to the owner and this row, exactly like the
+ * platform and AI provider keys. They are labelled "Saved. Not used yet." and are never sent to the browser, the
+ * agent API, MCP, logs or exports. `hint` is the last four characters of the key or client id, for display only.
+ */
+export const integrationSecrets = pgTable(
+  'integration_secrets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** An id from the platform directory. */
+    platform: text('platform').notNull(),
+    kind: text('kind', { enum: ['api_key', 'oauth_client'] }).notNull(),
+    encrypted: text('encrypted').notNull(),
+    hint: text('hint').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('integration_secrets_owner_platform_kind_idx').on(table.ownerId, table.platform, table.kind)],
+);
+
+export type IntegrationSecret = typeof integrationSecrets.$inferSelect;

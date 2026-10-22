@@ -7,6 +7,7 @@ import { scopedCredentials } from './agent-credentials';
 import { scopedProviders } from './ai-providers';
 import { scopedTasks } from './ai-tasks';
 import { scopedItems, scopedSources } from './knowledge';
+import { scopedIntegrationSecrets } from './integrations';
 import { scopedCanonicalChecks, scopedDestinations, scopedSiteSettings } from './composer';
 import { scopedConnections, scopedPlatformDrafts } from './publishing';
 import { scopedPreferences, scopedProfile } from './profile';
@@ -44,6 +45,7 @@ export function forOwner(ownerId: string, db?: AppDb) {
     connections: scopedConnections(scope),
     platformDrafts: scopedPlatformDrafts(scope),
     destinations: scopedDestinations(scope),
+    integrationSecrets: scopedIntegrationSecrets(scope),
     siteSettings: scopedSiteSettings(scope),
     canonicalChecks: scopedCanonicalChecks(scope),
     audit: {

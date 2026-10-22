@@ -64,6 +64,13 @@
       "when": 1792604091789,
       "tag": "0008_unusual_firelord",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792645485529,
+      "tag": "0009_magenta_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }

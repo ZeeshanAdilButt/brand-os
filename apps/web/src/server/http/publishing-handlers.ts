@@ -28,6 +28,7 @@ import {
   resetDraft,
   saveSiteSettings,
 } from '../actions/composer';
+import { listIntegrations, removeIntegrationSecret, saveIntegrationSecret } from '../actions/integrations';
 import { ActionError } from '../actions/owner';
 import type { AppConfig } from '../config';
 import { publishEnvFrom, type PublishEnv } from '../publishing/registry';
@@ -204,5 +205,29 @@ export function handleApprovalDecline(request: Request, id: string, deps: Publis
   return withOwner(request, deps, async (owner, ctx) => {
     requireBrowserOrigin(request);
     return json(await declineApproval(owner, envFor(deps, ctx), id));
+  });
+}
+
+// ---- integrations (credentials for platforms that are not built yet) -------------------------------------
+
+export function handleIntegrationsGet(request: Request, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => json({ integrations: await listIntegrations(owner) }));
+}
+
+/** The platform comes from the path, never from the body. Browser session only. */
+export function handleIntegrationSave(request: Request, platform: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner, ctx) => {
+    requireBrowserOrigin(request);
+    const body = await readJson(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ActionError('invalid', 'Send a JSON object.');
+    return json(await saveIntegrationSecret(owner, { config: ctx.config }, { ...(body as Record<string, unknown>), platform }), 201);
+  });
+}
+
+export function handleIntegrationRemove(request: Request, platform: string, kind: string, deps: PublishHandlerDeps = {}) {
+  return withOwner(request, deps, async (owner) => {
+    requireBrowserOrigin(request);
+    await removeIntegrationSecret(owner, platform, kind);
+    return json({ removed: true });
   });
 }
