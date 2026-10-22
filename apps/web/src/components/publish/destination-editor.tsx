@@ -1,6 +1,7 @@
 'use client';
 
 import { RotateCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DiffView } from '@/components/articles/diff-view';
 import { WordDiff } from '@/components/ai/result-view';
@@ -76,6 +77,7 @@ const IDLE_MS = 700;
  * staged and approved again. The preview always shows what was saved, in that platform’s typography.
  */
 export function DestinationEditor({ destination, api, article, ai, onApplied, heading = true }: { destination: DestinationDTO; api: PublishApi; article: { title: string; body: string }; ai: AiState; onApplied(): void; heading?: boolean }) {
+  const router = useRouter();
   const draft = destination.draft!;
   const info = PLATFORMS[destination.platform];
   const [values, setValues] = useState<Values>(() => valuesOf(draft));
@@ -92,7 +94,6 @@ export function DestinationEditor({ destination, api, article, ai, onApplied, he
   useEffect(() => {
     if (draft.payloadSha256 === own.current || saving.current || Object.keys(dirty.current).length > 0) return;
     own.current = draft.payloadSha256;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setValues(valuesOf(draft));
   }, [draft]);
 
@@ -151,7 +152,7 @@ export function DestinationEditor({ destination, api, article, ai, onApplied, he
     cover_not_public: { label: 'Remove the cover', run: () => change('coverImageUrl', '') },
     ...(tagsMax ? { tags_too_many: { label: `Keep the first ${tagsMax}`, run: () => change('tags', parseTags(values.tags).slice(0, tagsMax).join(', ')) } } : {}),
     ...(info.limits.thread ? { post_too_long: { label: 'Split into a thread', run: () => change('bodyMarkdown', splitPosts(destination.platform, values.bodyMarkdown).map((p) => p.text).join('\n---\n')) } } : {}),
-    repo_missing: { label: 'Open site settings', run: () => window.location.assign('/platforms/integrations#site') },
+    repo_missing: { label: 'Open site settings', run: () => router.push('/platforms/integrations#site') },
   };
 
   const edited = draft.divergence.edited;

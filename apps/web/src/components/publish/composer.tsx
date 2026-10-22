@@ -161,7 +161,7 @@ export function Composer({
   ];
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <div role="tablist" aria-label="Sections" className="flex gap-1.5 md:hidden">
         {tabs.map((t) => (
           <button

@@ -134,7 +134,6 @@ export interface PlatformInfo {
   verification: { level: 'docs_and_fake' | 'docs_only' | 'research_only' | 'not_built'; label: string; detail: string };
 }
 
-const OAUTH_NOTE = 'OAuth connections are coming next. Until then the Connect button stays off, and you can still preview the post and post it by hand.';
 const NOT_BUILT = { level: 'not_built', label: 'Not built yet', detail: 'No adapter exists yet, so nothing is sent to this platform. Preview and manual posting work.' } as const;
 
 const none = (cost: string, restrictions: string[], media: string): PlatformCapabilities => ({

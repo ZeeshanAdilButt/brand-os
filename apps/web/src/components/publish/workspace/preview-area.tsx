@@ -40,7 +40,6 @@ export function QuickEdit({ destination, api }: { destination: DestinationDTO; a
   useEffect(() => {
     if (draft.payloadSha256 === own.current || busy.current || Object.keys(dirty.current).length > 0) return;
     own.current = draft.payloadSha256;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(draft.payload.title);
     setDescription(draft.payload.description);
     setTags(draft.payload.tags.join(', '));

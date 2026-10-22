@@ -2,6 +2,7 @@
 
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { api as http } from '@/lib/api-client';
@@ -39,6 +40,7 @@ export interface WizardProps {
  * "approve all": each destination shows its own exact post and has its own button.
  */
 export function GuidedWizard({ api, articleId, facts, initialStep, initialFocus, onChangeStep }: WizardProps) {
+  const router = useRouter();
   const [step, setStepState] = useState<3 | 4>(initialStep === 4 ? 4 : 3);
   const [focus, setFocus] = useState<PlatformId | null>(initialFocus);
   const [queue, setQueue] = useState<QueueState | null>(null);
@@ -212,7 +214,7 @@ export function GuidedWizard({ api, articleId, facts, initialStep, initialFocus,
                       {...(queue.order.filter((p) => queue.items[p] === 'waiting').length > 0 ? { approveLabel: 'Approve and next' } : {})}
                       onSettled={(outcome) => onSettled(reviewDestination.platform, outcome)}
                       onEdit={() => {
-                        window.location.assign(workspaceHref(articleId, reviewDestination.platform));
+                        router.push(workspaceHref(articleId, reviewDestination.platform));
                       }}
                     />
                   </div>
