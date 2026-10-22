@@ -24,12 +24,15 @@ export function PlatformSelector({
   selected,
   busy,
   onToggle,
+  onChooseAll,
   recommendations,
 }: {
   rows: SelectorRow[];
   selected: ReadonlySet<PlatformId>;
   busy: ReadonlySet<PlatformId>;
   onToggle(platform: PlatformId): void;
+  /** Choose every recommended platform that is not chosen yet, in one go. */
+  onChooseAll?(platforms: PlatformId[]): void;
   recommendations: Recommendation[];
 }) {
   const [area, setArea] = useState<Area | 'all'>('all');
@@ -40,10 +43,21 @@ export function PlatformSelector({
     <div className="grid gap-3">
       {recommendations.length > 0 ? (
         <section aria-labelledby="rec-heading" className="rounded-lg bg-accent px-3 py-2.5">
-          <h3 id="rec-heading" className="flex items-center gap-1.5 text-sm font-semibold">
-            <Sparkles aria-hidden className="size-4 text-primary" />
-            Recommended for this article
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="rec-heading" className="flex items-center gap-1.5 text-sm font-semibold">
+              <Sparkles aria-hidden className="size-4 text-primary" />
+              Recommended for this article
+            </h3>
+            {onChooseAll && recommendations.some((r) => !selected.has(r.platform)) ? (
+              <button
+                type="button"
+                onClick={() => onChooseAll(recommendations.filter((r) => !selected.has(r.platform)).map((r) => r.platform))}
+                className="inline-flex h-8 items-center rounded-md border border-input bg-surface px-3 text-sm font-medium hover:bg-accent"
+              >
+                Choose all {recommendations.length}
+              </button>
+            ) : null}
+          </div>
           <ul className="mt-2 flex flex-wrap gap-2">
             {recommendations.map((r) => {
               const on = selected.has(r.platform);

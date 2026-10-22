@@ -158,6 +158,11 @@ function WorkspaceBody({
     await api.reload();
   }
 
+  async function chooseAll(platforms: PlatformId[]) {
+    // One after another, so each preview appears as soon as it is ready and none can race another.
+    for (const platform of platforms) if (!selected.has(platform)) await toggle(platform);
+  }
+
   // The latest choice is remembered in this browser, so the next article starts from what you used last.
   const lastSaved = useRef('');
   useEffect(() => {
@@ -193,7 +198,7 @@ function WorkspaceBody({
             <ArticlePicker articles={articles} selectedId={article.id} onSelect={onChooseArticle} />
           </Area>
           <Area n={2} title="Platforms" note="Tick as many as you like. Each gets a preview at once. Nothing is sent.">
-            <PlatformSelector rows={rows} selected={selected} busy={working} onToggle={(p) => void toggle(p)} recommendations={recommendations} />
+            <PlatformSelector rows={rows} selected={selected} busy={working} onToggle={(p) => void toggle(p)} onChooseAll={(list) => void chooseAll(list)} recommendations={recommendations} />
           </Area>
         </div>
         <Area n={3} title="Previews" note="An approximate preview of this article on each platform you chose.">

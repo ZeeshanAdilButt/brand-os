@@ -258,6 +258,19 @@ describe('the publishing workspace', () => {
     expect(review.getAttribute('href')).toBe(`/articles/${A1}/publish?view=guided&step=3`);
   });
 
+  it('chooses every recommended platform in one click, one after another, still sending nothing', async () => {
+    const calls = serve({ added: new Set() });
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(), platform: null }} />);
+    const group = screen.getByRole('region', { name: /recommended for this article/i });
+    const names = within(group).getAllByRole('button', { pressed: false }).map((b) => b.textContent);
+    fireEvent.click(within(group).getByRole('button', { name: /^Choose all/ }));
+    await waitFor(() => expect(screen.getByText(`${names.length} platforms selected`)).toBeTruthy(), { timeout: 4000 });
+    const writes = calls.filter((c) => c.method !== 'GET').map((c) => c.method + ' ' + c.url.replace(/[0-9a-f-]{36}/, ':id'));
+    expect(writes.filter((w) => w === 'POST /api/articles/:id/destinations')).toHaveLength(names.length);
+    expect(writes.filter((w) => w === 'POST /api/platform-drafts')).toHaveLength(names.length);
+    expect(calls.some((c) => /stage|approve|request-approval|publish\b/.test(c.url))).toBe(false);
+  });
+
   it('shows one preview per chosen platform, switches between them, and removes one when unticked', async () => {
     const calls = serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
     render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />);
