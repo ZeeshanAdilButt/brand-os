@@ -73,7 +73,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
 
       {counts.total > 0 || filtered ? (
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <nav aria-label="Filter by status" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:pb-0">
+          <nav aria-label="Filter by status" className="-mx-1 flex gap-1 overflow-x-auto border-b px-1 lg:border-b-0">
             {tabs.map((tab) => {
               const current = (status || '') === tab.key;
               return (
@@ -82,12 +82,12 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
                   href={href({ q, status: tab.key })}
                   aria-current={current ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-[120ms]',
-                    current ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    '-mb-px inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm transition-colors duration-[120ms]',
+                    current ? 'border-primary font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {tab.label}
-                  <span className={cn('rounded-full px-1.5 text-xs', current ? 'bg-surface' : 'bg-muted')}>{tab.count}</span>
+                  <span className="text-xs font-normal text-muted-foreground">{tab.count}</span>
                 </Link>
               );
             })}
@@ -113,7 +113,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
       {problem ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{problem}</p> : null}
 
       {!problem && counts.total === 0 && !filtered ? (
-        <section className="rounded-xl border border-dashed border-input bg-surface p-6 text-center sm:p-10">
+        <section className="rounded-xl border border-input bg-surface p-6 text-center sm:p-10">
           <div aria-hidden className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-accent text-accent-foreground">
             <FileText className="size-6" />
           </div>
@@ -132,7 +132,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
       ) : null}
 
       {!problem && result && shown.length === 0 && (counts.total > 0 || filtered) ? (
-        <section className="rounded-xl border border-dashed border-input bg-surface p-8 text-center">
+        <section className="rounded-xl border border-input bg-surface p-8 text-center">
           <h2 className="text-lg font-semibold">{q ? 'No matches' : 'Nothing with this status'}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {q ? 'Search looks at titles, descriptions, tags and text, and matches word stems (run finds running). Try fewer or different words.' : 'Pick another tab above.'}
@@ -153,9 +153,9 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
               const hit = hitById.get(article.id);
               const minutes = approxReadingMinutes(article.bodyChars);
               return (
-                <li key={article.id} className="flex flex-col gap-2 p-4 transition-colors duration-[120ms] hover:bg-muted/50 sm:flex-row sm:items-start sm:gap-4">
+                <li key={article.id} className="flex flex-col gap-3 px-5 py-5 transition-colors duration-[120ms] hover:bg-accent sm:flex-row sm:items-start sm:gap-4 sm:px-6">
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-base leading-6 font-semibold">
+                    <h2 className="font-serif text-xl leading-7 font-normal tracking-normal">
                       <Link href={`/articles/${article.id}`} className="rounded-sm hover:underline">
                         {hit ? <MarkedText text={hit.titleMarked} /> : article.title || 'Untitled article'}
                       </Link>
@@ -174,23 +174,23 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
                       {article.tags.length > 0 ? (
                         <ul aria-label="Tags" className="flex flex-wrap gap-1">
                           {article.tags.slice(0, 3).map((tag) => (
-                            <li key={tag} className="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem]">
+                            <li key={tag} className="rounded-md bg-muted px-2 py-0.5 text-xs">
                               {tag}
                             </li>
                           ))}
-                          {article.tags.length > 3 ? <li className="px-1 py-0.5 text-[0.6875rem]">+{article.tags.length - 3}</li> : null}
+                          {article.tags.length > 3 ? <li className="px-1 py-0.5 text-xs">+{article.tags.length - 3}</li> : null}
                         </ul>
                       ) : null}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <Link href={`/articles/${article.id}/publish`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                      Share
-                    </Link>
-                    <Link href={`/articles/${article.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                    <Link href={`/articles/${article.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
                       Edit
                     </Link>
-                    <Link href={`/articles/${article.id}/read`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                    <Link href={`/publishing?article=${article.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                      Publish
+                    </Link>
+                    <Link href={`/articles/${article.id}/read`} className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'text-muted-foreground' })}>
                       <BookOpen aria-hidden />
                       Read
                     </Link>

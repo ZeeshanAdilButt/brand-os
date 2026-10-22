@@ -250,7 +250,7 @@ export function GuidedWizard({ api, articleId, article, facts, ai, recommendatio
           </div>
 
           {ordered.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">Nothing is prepared. Go back and choose destinations.</p>
+            <p className="rounded-xl border p-6 text-sm text-muted-foreground">Nothing is prepared. Go back and choose destinations.</p>
           ) : (
             <>
               <div role="tablist" aria-label="Destinations" className="flex gap-1.5 overflow-x-auto pb-1">
@@ -284,7 +284,7 @@ export function GuidedWizard({ api, articleId, article, facts, ai, recommendatio
                 focusDestination.draft ? (
                   <DestinationEditor key={focusDestination.platform} destination={focusDestination} api={api} article={article} ai={ai} onApplied={() => void api.reload()} />
                 ) : (
-                  <div className="grid gap-3 rounded-xl border border-dashed p-4">
+                  <div className="grid gap-3 rounded-xl border p-4">
                     <NoticeBar notice={api.notices[focusDestination.platform]} />
                     <p className="text-sm">{focusDestination.info.name} is not prepared yet.</p>
                     <div>
@@ -404,7 +404,7 @@ export function GuidedWizard({ api, articleId, article, facts, ai, recommendatio
               </div>
             </div>
           ) : (
-            <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">Everything prepared is already out. See the results.</p>
+            <p className="rounded-xl border p-6 text-sm text-muted-foreground">Everything prepared is already out. See the results.</p>
           )}
 
           <div className="flex flex-wrap items-center gap-3 border-t pt-4">

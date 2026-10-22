@@ -265,7 +265,7 @@ export function ProvidersManager({ initial, mode }: { initial: ProviderDTO[]; mo
                 onClick={() => setAdding(adding === kind ? null : kind)}
                 className={cn(
                   'flex items-start gap-3 rounded-xl border p-3 text-left transition-colors',
-                  disabled ? 'cursor-not-allowed border-dashed bg-card/60 opacity-70' : 'bg-card hover:bg-accent',
+                  disabled ? 'cursor-not-allowed bg-card/60 opacity-70' : 'bg-card hover:bg-accent',
                   adding === kind && 'border-primary/70 ring-1 ring-primary/40',
                 )}
               >

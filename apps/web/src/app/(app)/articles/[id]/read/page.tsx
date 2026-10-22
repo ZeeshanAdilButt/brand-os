@@ -88,7 +88,7 @@ export default async function ReadArticlePage({ params }: { params: Promise<{ id
           <RenderNotices notices={rendered.notices} className="mb-8" />
 
           {article.bodyMarkdown.trim() === '' ? (
-            <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+            <p className="rounded-lg border p-6 text-center text-muted-foreground">
               This article has no text yet.{' '}
               <Link href={`/articles/${article.id}`} className="text-link underline underline-offset-2">
                 Open the editor

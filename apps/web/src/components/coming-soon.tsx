@@ -16,7 +16,7 @@ export function ComingSoon({ day, icon: Icon, heading, lead, items, today }: Com
   return (
     <section
       aria-labelledby="coming-soon-heading"
-      className="rounded-xl border border-dashed border-input bg-card/60 p-5 sm:p-8"
+      className="rounded-xl border border-input bg-card/60 p-5 sm:p-8"
     >
       <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
         <div

@@ -69,7 +69,7 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
             type="button"
             onClick={() => setPaletteOpen(true)}
             aria-label="Open command palette"
-            className="ml-auto flex h-10 items-center gap-2 rounded-lg border border-input bg-surface px-3 text-sm text-muted-foreground transition-colors duration-[120ms] hover:bg-muted hover:text-foreground sm:ml-0 sm:w-72 lg:w-96"
+            className="ml-auto flex h-9 items-center gap-2 rounded-lg border border-input bg-surface px-3 text-sm text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground sm:ml-0 sm:w-72 lg:w-[22.5rem]"
           >
             <Search aria-hidden className="size-4 shrink-0" />
             <span className="hidden flex-1 truncate text-left sm:inline">Search articles, platforms, settings</span>
@@ -87,7 +87,7 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
         <main
           id="main"
           tabIndex={-1}
-          className={cn('mx-auto w-full outline-none', wide ? 'max-w-none px-2 py-2 sm:px-4 sm:py-3' : 'max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8')}
+          className={cn('mx-auto w-full outline-none', wide ? 'max-w-none px-2 py-2 sm:px-4 sm:py-3' : 'max-w-[1120px] px-5 py-6 sm:px-8 lg:px-10 lg:pt-8')}
         >
           {children}
         </main>

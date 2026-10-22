@@ -186,7 +186,7 @@ export function ArticleSkin({ platform, payload, account, device, appearance, vi
   const rendered = useRenderedMarkdown(payload.bodyMarkdown);
   const info = PLATFORMS[platform];
   const name = account && !account.startsWith('@') && !account.includes('/') ? account : 'Your name';
-  const accent: Partial<Record<PlatformId, string>> = { devto: '#3b49df', hashnode: '#2962ff', medium: '#1a8917', substack: '#ff6719', site: '#4338ca' };
+  const accent: Partial<Record<PlatformId, string>> = { devto: '#3b49df', hashnode: '#2962ff', medium: '#1a8917', substack: '#ff6719', site: '#285347' };
   const canonicalHost = hostOf(payload.canonicalUrl);
   const minutes = readingMinutes(payload.bodyMarkdown);
 

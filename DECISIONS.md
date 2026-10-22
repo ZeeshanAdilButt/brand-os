@@ -277,3 +277,13 @@ The app never calls Anthropic without a key the person saved, never accepts a Cl
 ## 38. Where publishing is shown
 
 **Decision.** Connections moved to Settings > Connections (the old address redirects). The article studio has a Publish panel with one card per destination. The Publishing page lists every draft and what needs the owner (unknown results, waiting approvals). The composer, per-destination editing and approved batches are Day 6.
+
+## 39. Design system v2: Warm Editorial
+
+**Decision.** The interface uses warm gray for the workspace (`#f4f2ee`), a nearly white working surface (`#fffefc`), white for overlays, and a deep forest green (`#285347`) for actions, links, focus and selection. Serif type (Iowan Old Style, Palatino, Georgia) is used only for article titles and reading text; the interface itself is sans (Segoe UI and system stacks). Category colours (blogs, social, communities, video, conferences, editorial, launches, aggregators) appear only on small icons and labels. Status colours are semantic pairs (text on its own subtle background) and every status chip carries an icon and text, never colour alone. Dark mode is a warm dark gray with a light sage action colour.
+
+**Why.** A first v2 used a cool gray canvas and indigo actions. The owner found it generic and cold, and said it looked worse than the original. A design review compared both and kept the first version's task order while recovering the original's warmth: paper, ink, and one deep colour for the things you press. The same review asked for fewer competing containers and control styles: one tab system (underline tabs for pages and status filters), selects instead of a wall of category pills, divided rows instead of a card per article, one progress strip inside the Home card, and solid borders for empty states (dashed is for real drop zones only).
+
+**Checks.** `test/design-tokens.test.ts` computes WCAG contrast from the token values in both themes: 4.5:1 for text pairs (including every category colour on background, surface and raised), 3:1 for the boundary of a form control and for the focus ring. Fonts are local stacks only. Legacy names (`cream`, `rust`, `ink`, `*-subtle`) remain only as aliases.
+
+**Deviations from the review.** None of its rules conflicts with the approval model. Where the review suggested "Layout preview" as the label of an approximate preview, the app keeps "Approximate preview", because that wording is part of the approval design: a preview never claims to be the platform.

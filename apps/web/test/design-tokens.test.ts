@@ -41,6 +41,10 @@ const PAIRS: [string, string, number][] = [
   ['card-foreground', 'card', 4.5],
   ['popover-foreground', 'popover', 4.5],
   ['muted-foreground', 'background', 4.5],
+  ['muted-foreground', 'raised', 4.5],
+  ['foreground', 'raised', 4.5],
+  ['foreground', 'code-background', 4.5],
+  ['accent-foreground', 'accent', 4.5],
   ['muted-foreground', 'surface', 4.5],
   ['muted-foreground', 'muted', 4.5],
   ['muted-foreground', 'sidebar', 4.5],
@@ -60,19 +64,41 @@ const PAIRS: [string, string, number][] = [
   ['danger', 'surface', 4.5],
   ['danger-foreground', 'danger', 4.5],
   ['selection-foreground', 'selection', 4.5],
+  ['category-blogs', 'background', 4.5],
   ['category-blogs', 'surface', 4.5],
+  ['category-blogs', 'raised', 4.5],
+  ['category-social', 'background', 4.5],
   ['category-social', 'surface', 4.5],
+  ['category-social', 'raised', 4.5],
+  ['category-communities', 'background', 4.5],
   ['category-communities', 'surface', 4.5],
+  ['category-communities', 'raised', 4.5],
+  ['category-video', 'background', 4.5],
   ['category-video', 'surface', 4.5],
+  ['category-video', 'raised', 4.5],
+  ['category-conferences', 'background', 4.5],
   ['category-conferences', 'surface', 4.5],
+  ['category-conferences', 'raised', 4.5],
+  ['category-editorial', 'background', 4.5],
   ['category-editorial', 'surface', 4.5],
+  ['category-editorial', 'raised', 4.5],
+  ['category-launches', 'background', 4.5],
   ['category-launches', 'surface', 4.5],
+  ['category-launches', 'raised', 4.5],
+  ['category-aggregators', 'background', 4.5],
   ['category-aggregators', 'surface', 4.5],
+  ['category-aggregators', 'raised', 4.5],
   ['ring', 'background', 3],
   ['ring', 'surface', 3],
   // A form control must be findable: its boundary is at least 3:1 against the page and against a surface.
   ['input', 'background', 3],
   ['input', 'surface', 3],
+  ['input', 'raised', 3],
+  ['input-border', 'surface', 3],
+  ['ring', 'raised', 3],
+  ['info', 'surface', 4.5],
+  ['primary', 'surface', 4.5],
+  ['primary', 'background', 4.5],
 ];
 
 describe.each([
@@ -94,9 +120,9 @@ describe('design system v2', () => {
   const dark = block('.dark,\n[data-theme="dark"]');
 
   it('defines every status, category and surface token in both themes', () => {
-    for (const name of ['surface', 'surface-raised', 'primary-hover', 'primary-active', 'neutral', 'neutral-subtle', 'success', 'success-subtle', 'warning', 'warning-subtle', 'danger', 'danger-subtle', 'info', 'info-subtle', 'code-background']) {
+    for (const name of ['surface', 'surface-raised', 'raised', 'input-border', 'primary-hover', 'primary-active', 'neutral', 'neutral-subtle', 'success', 'success-subtle', 'warning', 'warning-subtle', 'danger', 'danger-subtle', 'info', 'info-subtle', 'code-background']) {
       expect(light[name], `light ${name}`).toBeTruthy();
-      expect(dark[name], `dark ${name}`).toBeTruthy();
+      expect({ ...light, ...dark }[name], `dark ${name}`).toBeTruthy();
     }
     for (const area of ['blogs', 'social', 'communities', 'video', 'conferences', 'editorial', 'launches', 'aggregators']) {
       expect(light[`category-${area}`], area).toMatch(/^#/);
@@ -104,21 +130,27 @@ describe('design system v2', () => {
     }
   });
 
-  it('uses a cool neutral canvas with white working surfaces and an indigo action colour', () => {
-    expect(light.background).toBe('#f6f8fc');
-    expect(light.surface).toBe('#ffffff');
-    expect(light.primary).toBe('#4338ca');
+  it('uses a warm gray canvas, near white working surfaces, white overlays and a deep forest action colour', () => {
+    expect(light.background).toBe('#f4f2ee');
+    expect(light.surface).toBe('#fffefc');
+    expect(light.raised).toBe('#ffffff');
+    expect(light.primary).toBe('#285347');
+    // The action colour is green, not blue: its green channel leads its blue one.
+    const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt((light.primary as string).slice(i, i + 2), 16)) as [number, number, number];
+    expect(g).toBeGreaterThan(b);
+    expect(g).toBeGreaterThan(r);
     // Page and surface are distinguishable by more than a hair, and the dark canvas is darker than its surface.
     expect(luminance(dark.surface as string)).toBeGreaterThan(luminance(dark.background as string));
   });
 
   it('keeps the old brand names only as aliases of the new tokens, if at all', () => {
-    for (const legacy of ['cream', 'rust', 'sand', 'ink']) expect(light[legacy] === undefined || light[legacy]?.startsWith('var(')).toBe(true);
+    for (const legacy of ['cream', 'rust', 'sand', 'ink', 'success-subtle', 'danger-subtle', 'neutral-subtle']) expect(light[legacy] === undefined || light[legacy]?.startsWith('var(')).toBe(true);
   });
 
   it('uses the sans stack for the application and reserves serif for reading', () => {
     expect(css).toMatch(/--font-sans:\s*"Segoe UI"/);
-    expect(css).toMatch(/h1,\s*\n\s*h2,\s*\n\s*h3 \{\s*\n\s*@apply font-sans/);
+    expect(css).toMatch(/--font-serif:\s*"Iowan Old Style"/);
+    expect(css).toMatch(/h1,\s*\n\s*h2,\s*\n\s*h3,\s*\n\s*h4 \{\s*\n\s*@apply font-sans/);
   });
 
   it('uses local font stacks only (no network fonts)', () => {

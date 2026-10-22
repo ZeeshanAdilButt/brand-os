@@ -20,7 +20,7 @@ export function DisabledOption({
   day: number;
 }) {
   return (
-    <li className="flex flex-col gap-3 rounded-xl border border-dashed border-input bg-card/60 p-4">
+    <li className="flex flex-col gap-3 rounded-xl border border-input bg-card/60 p-4">
       <div className="flex items-start gap-3">
         <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
           <Icon className="size-[1.125rem]" />

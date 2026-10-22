@@ -105,7 +105,7 @@ export function DestinationPicker({
           <PickerCard key={entry.id} entry={entry} destination={entry.composer ? dest.get(entry.composer) : undefined} checked={entry.composer ? selected.has(entry.composer) : false} onToggle={onToggle} />
         ))}
       </ul>
-      {visible.length === 0 ? <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Nothing matches that search.</p> : null}
+      {visible.length === 0 ? <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">Nothing matches that search.</p> : null}
     </div>
   );
 }
@@ -120,7 +120,7 @@ function PickerCard({ entry, destination, checked, onToggle }: { entry: Director
   const prepared = destination?.draft ?? null;
 
   return (
-    <li className={cn('relative flex flex-col rounded-xl border bg-surface p-3.5 transition-colors duration-[120ms]', checked && 'border-primary bg-accent/40', !selectable && 'border-dashed')}>
+    <li className={cn('relative flex flex-col rounded-xl border bg-surface p-3.5 transition-colors duration-[120ms]', checked && 'border-primary bg-accent/40', !selectable && '')}>
       <div className="flex items-start gap-3">
         <span aria-hidden className={cn('mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-muted', style.text)}>
           <Icon className="size-4" />

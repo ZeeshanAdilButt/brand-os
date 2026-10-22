@@ -6,7 +6,7 @@ export function Brand({ onNavigate }: { onNavigate?: () => void }) {
     <Link href="/" onClick={onNavigate} className="group flex items-center gap-2.5 rounded-md" aria-label="Brand OS home">
       <span
         aria-hidden
-        className="grid size-8 place-items-center rounded-lg bg-primary text-base font-bold leading-none text-primary-foreground"
+        className="grid size-8 place-items-center rounded-lg bg-primary font-serif text-lg leading-none font-semibold text-primary-foreground"
       >
         B
       </span>

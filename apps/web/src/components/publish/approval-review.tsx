@@ -140,8 +140,8 @@ export function ManualHandoff({ destination, api, facts }: { destination: Destin
   return (
     <section aria-label={`Post on ${info.name} by hand`} className="grid gap-3 rounded-xl border bg-surface p-4">
       <div>
-        <h4 className="text-base font-semibold">Post it yourself on {info.name}</h4>
-        <p className="mt-0.5 text-sm leading-6 text-muted-foreground">Copy what {info.name} asks for, post it there, then record the link here. The app never claims it published this.</p>
+        <h4 className="text-base font-semibold">Post it yourself: {info.name}</h4>
+        <p className="mt-0.5 text-sm leading-6 text-muted-foreground">Copy the parts below and post them yourself. Then record the link here. This app never claims it published the post.</p>
       </div>
       <ol className="grid gap-1 pl-5 text-sm leading-6">
         {kit.steps.map((step) => (
@@ -256,7 +256,7 @@ export function ApprovalReview({
 
   if (!draft) {
     return (
-      <div className="grid gap-3 rounded-xl border border-dashed p-4">
+      <div className="grid gap-3 rounded-xl border p-4">
         <p className="text-sm">This destination has not been prepared yet. Preparing builds the post from your article and sends nothing.</p>
         <div>
           <Button type="button" onClick={() => void api.prepare(platform)} disabled={busyAny}>

@@ -102,7 +102,7 @@ export function TaskCard({ task, actions }: { task: TaskDTO; actions: TaskAction
       ) : null}
 
       {waitingForAgent ? (
-        <div className="mt-3 grid gap-2 rounded-lg border border-dashed bg-muted/40 p-3 text-sm">
+        <div className="mt-3 grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
           <p className="leading-relaxed text-muted-foreground">
             This task is waiting in your inbox. Nothing runs in this app. Ask your own Claude Code (with the Brand OS server connected) to pick it up; the result comes back here for your review.
           </p>

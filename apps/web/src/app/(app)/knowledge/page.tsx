@@ -161,7 +161,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
       {problem ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{problem}</p> : null}
 
       {!problem && counts.total === 0 && !filtered ? (
-        <section className="rounded-xl border border-dashed border-input bg-card/60 p-6 text-center sm:p-10">
+        <section className="rounded-xl border border-input bg-card/60 p-6 text-center sm:p-10">
           <div aria-hidden className="mx-auto mb-4 grid size-12 place-items-center rounded-xl border bg-background text-link shadow-soft">
             <BookOpen className="size-6" />
           </div>
@@ -183,7 +183,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
       ) : null}
 
       {!problem && items && shown.length === 0 && (counts.total > 0 || filtered) ? (
-        <section className="rounded-xl border border-dashed border-input bg-card/60 p-8 text-center">
+        <section className="rounded-xl border border-input bg-card/60 p-8 text-center">
           <h2 className=" text-xl font-semibold">{q ? 'No matches' : 'No items match these filters'}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {q

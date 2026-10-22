@@ -41,7 +41,7 @@ export function PreviewComparison({ items, initial }: { items: PreviewInput[]; i
   const diffs = differences(a.payload, b.payload);
 
   if (items.length < 2) {
-    return <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Choose at least two destinations to compare them.</p>;
+    return <p className="rounded-lg border p-4 text-sm text-muted-foreground">Choose at least two destinations to compare them.</p>;
   }
   return (
     <div className="grid gap-4">

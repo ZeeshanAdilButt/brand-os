@@ -138,7 +138,7 @@ export function AiAssist({ articleId, draft, ai, onApplied }: { articleId: strin
 
   if (!ai.available) {
     return (
-      <section aria-label="AI suggestions" className="grid gap-2 rounded-xl border border-dashed p-3 text-sm leading-6">
+      <section aria-label="AI suggestions" className="grid gap-2 rounded-xl border p-3 text-sm leading-6">
         <p className="flex items-center gap-2 font-semibold">
           <Sparkles aria-hidden className="size-4 text-muted-foreground" />
           AI suggestions are off

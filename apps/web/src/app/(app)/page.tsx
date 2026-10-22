@@ -26,10 +26,12 @@ export default async function HomePage() {
 
       <NextStepCard
         kicker={home.kicker}
+        subject={home.kicker === 'continue' ? home.focus?.title : undefined}
         headline={home.headline}
         why={home.why}
         href={home.href}
-        actionLabel={home.kicker === 'start' ? 'Import an article' : home.kicker === 'attention' ? home.headline : 'Continue'}
+        actionLabel={home.kicker === 'start' ? 'Import an article' : home.kicker === 'attention' ? home.headline : (home.journey?.next.label ?? 'Continue')}
+        footer={home.journey ? <JourneySteps steps={home.journey.steps} /> : null}
         secondary={
           home.alternative ? (
             home.alternative.newArticle ? (
@@ -43,16 +45,9 @@ export default async function HomePage() {
         }
       />
 
-      {home.journey ? (
-        <section aria-labelledby="progress-heading" className="mt-6 rounded-xl border bg-surface p-5">
-          <h2 id="progress-heading" className="mb-4 text-base font-semibold">
-            {home.focus ? `Progress for “${home.focus.title}”` : 'Your progress'}
-          </h2>
-          <JourneySteps steps={home.journey.steps} />
-        </section>
-      ) : (
-        <section aria-labelledby="progress-heading" className="mt-6 rounded-xl border bg-surface p-5">
-          <h2 id="progress-heading" className="mb-1 text-base font-semibold">
+      {home.journey ? null : (
+        <section aria-labelledby="progress-heading" className="mt-6 rounded-xl border bg-surface p-6">
+          <h2 id="progress-heading" className="mb-1 text-lg font-semibold">
             How it works
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">
@@ -63,7 +58,7 @@ export default async function HomePage() {
       )}
 
       {home.articleCount > 0 ? (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
           <section aria-labelledby="recent-articles" className="rounded-xl border bg-surface">
             <div className="flex items-center justify-between border-b px-5 py-3">
               <h2 id="recent-articles" className="text-base font-semibold">

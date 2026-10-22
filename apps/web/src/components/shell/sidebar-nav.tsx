@@ -16,7 +16,7 @@ function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean;
       aria-current={active ? 'page' : undefined}
       className={cn(
         'relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-[120ms]',
-        active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        active ? 'bg-accent font-semibold text-accent-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
       )}
     >
       {active ? <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary" /> : null}

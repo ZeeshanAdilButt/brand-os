@@ -115,7 +115,7 @@ export function SuggestionsPane({
             ))}
           </>
         ) : (
-          <div className="grid gap-2 rounded-xl border border-dashed p-3 text-sm leading-6">
+          <div className="grid gap-2 rounded-xl border p-3 text-sm leading-6">
             <p className="font-medium">AI suggestions are off</p>
             <p className="text-muted-foreground">Set up a local model, your own key or your own Claude Code to get an editor’s review, title ideas and adapted versions. The checks below need no AI.</p>
             <Link href="/settings/ai" className="w-fit font-medium text-link underline underline-offset-2">

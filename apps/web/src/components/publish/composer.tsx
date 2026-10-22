@@ -187,7 +187,7 @@ export function Composer({
           <div className="grid gap-3">
             <h2 className="text-sm font-semibold">Destinations</h2>
             {added.length === 0 ? (
-              <p className="rounded-xl border border-dashed p-4 text-sm leading-6 text-muted-foreground">
+              <p className="rounded-xl border p-4 text-sm leading-6 text-muted-foreground">
                 Nothing chosen yet. Add a destination below, or use the{' '}
                 <Link href={publishHref(articleId)} className="font-medium text-link underline underline-offset-2">
                   guided steps
@@ -262,7 +262,7 @@ function DestinationCard({ destination: d, api, onRun, onEdit }: { destination: 
   const id = `card-${d.platform}`;
 
   return (
-    <li className={cn('rounded-xl border bg-surface p-3.5', d.added ? '' : 'border-dashed')} aria-labelledby={id}>
+    <li className={cn('rounded-xl border bg-surface p-3.5', d.added ? '' : '')} aria-labelledby={id}>
       <div className="flex items-start gap-3">
         {Icon ? (
           <span aria-hidden className={cn('mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-muted', style?.text)}>

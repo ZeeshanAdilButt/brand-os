@@ -130,7 +130,7 @@ function CoverPicker({ coverAssetId, onChange, onUpload }: { coverAssetId: strin
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/api/assets/${coverAssetId}`} alt="Current cover" className="aspect-[16/9] w-full rounded-md border object-cover" />
       ) : (
-        <p className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">No cover image</p>
+        <p className="rounded-md border px-3 py-6 text-center text-sm text-muted-foreground">No cover image</p>
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => input.current?.click()} disabled={busy}>

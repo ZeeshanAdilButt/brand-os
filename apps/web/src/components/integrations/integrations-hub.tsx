@@ -168,7 +168,7 @@ export function IntegrationsHub({ connections, saved, site, appUrl }: HubProps) 
           </section>
         );
       })}
-      {visible.length === 0 ? <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No platform matches that search.</p> : null}
+      {visible.length === 0 ? <p className="rounded-xl border p-8 text-center text-sm text-muted-foreground">No platform matches that search.</p> : null}
     </div>
   );
 }

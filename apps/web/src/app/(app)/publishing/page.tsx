@@ -86,7 +86,7 @@ export default async function PublishingPage() {
       </PageHeader>
 
       {drafts.length === 0 ? (
-        <section className="rounded-xl border border-dashed border-input bg-surface p-6 sm:p-8">
+        <section className="rounded-xl border border-input bg-surface p-6 sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
             <div aria-hidden className="grid size-12 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
               <Send className="size-6" />

@@ -28,7 +28,7 @@ export function PublishResults({ destinations, articleId, onOpen }: { destinatio
     }
   }
 
-  if (rows.length === 0) return <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">No destinations yet. Go back and choose where this article should go.</p>;
+  if (rows.length === 0) return <p className="rounded-xl border p-6 text-sm text-muted-foreground">No destinations yet. Go back and choose where this article should go.</p>;
 
   return (
     <div className="grid gap-5">

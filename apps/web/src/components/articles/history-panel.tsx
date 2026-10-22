@@ -77,7 +77,7 @@ export function HistoryPanel({ articleId, refreshKey, current, restoreDisabled, 
       ) : null}
       {versions === null && !error ? <p className="text-sm text-muted-foreground">Loading history...</p> : null}
       {versions && versions.length === 0 ? (
-        <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm leading-relaxed text-muted-foreground">
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm leading-relaxed text-muted-foreground">
           <History aria-hidden className="mb-2 size-5" />
           No versions yet. The first one appears after your first save.
         </div>

@@ -141,7 +141,7 @@ export function CredentialsManager({ initial }: { initial: CredentialDTO[] }) {
           Your credentials
         </h2>
         {active.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-dashed bg-card/60 p-5 text-sm text-muted-foreground">
+          <p className="mt-3 rounded-xl border bg-card/60 p-5 text-sm text-muted-foreground">
             You have not created one yet. Nothing outside this app can reach your account until you do.
           </p>
         ) : (
@@ -188,7 +188,7 @@ export function CredentialsManager({ initial }: { initial: CredentialDTO[] }) {
             <summary className="cursor-pointer text-sm text-muted-foreground">Revoked ({revoked.length})</summary>
             <ul className="mt-3 grid gap-2">
               {revoked.map((c) => (
-                <li key={c.id} className="rounded-lg border border-dashed bg-card/60 p-3 text-sm text-muted-foreground">
+                <li key={c.id} className="rounded-lg border bg-card/60 p-3 text-sm text-muted-foreground">
                   <span className="font-medium text-foreground">{c.name}</span> <span className="font-mono text-xs">{c.prefix}&hellip;</span> &middot; revoked{' '}
                   {formatWhen(c.revokedAt)}
                 </li>

@@ -94,7 +94,7 @@ export function DestinationDrawer({
               draft ? (
                 <DestinationEditor key={`${destination.platform}-${draft.id}`} destination={destination} api={api} article={article} ai={ai} onApplied={onApplied} heading={false} />
               ) : (
-                <div className="grid gap-3 rounded-xl border border-dashed p-4">
+                <div className="grid gap-3 rounded-xl border p-4">
                   <p className="text-sm">{destination.info.name} is not prepared yet. Preparing builds the post from your article and sends nothing.</p>
                   <div>
                     <Button type="button" disabled={api.anyBusy} onClick={() => void api.prepare(destination.platform)}>

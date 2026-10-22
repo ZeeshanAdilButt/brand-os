@@ -100,7 +100,7 @@ export function AiPanel({ providers, tasks, loaded, stream, selection, onAsk, ac
           </div>
         </form>
       ) : (
-        <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm leading-relaxed">
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm leading-relaxed">
           <p className="font-medium">AI is off</p>
           <p className="mt-1 text-muted-foreground">
             Everything in the studio works without it. To get help with a selection, add a provider: a model on your machine, your own API key, or your own Claude Code.
@@ -120,7 +120,7 @@ export function AiPanel({ providers, tasks, loaded, stream, selection, onAsk, ac
         </div>
         {!loaded ? <p className="text-sm text-muted-foreground">Loading.</p> : null}
         {loaded && tasks.length === 0 ? (
-          <p className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm leading-relaxed text-muted-foreground">
+          <p className="rounded-lg border bg-muted/30 p-4 text-sm leading-relaxed text-muted-foreground">
             {available ? 'No tasks yet. Select some text and choose Improve, Tighten or Check accuracy, or ask something above.' : 'No tasks yet.'}
           </p>
         ) : null}
