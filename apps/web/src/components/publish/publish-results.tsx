@@ -101,7 +101,7 @@ export function PublishResults({ destinations, articleId, onOpen }: { destinatio
             Back to the article
           </Link>
           <Link href="/publishing" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-            Publishing overview
+            Publishing
           </Link>
         </div>
       </section>

@@ -114,7 +114,7 @@ export function ApprovalCard({
 }
 
 /** Posting by hand: copy what the platform asks for, open its page, then record the link with an approval. Never claims the app published it. */
-export function ManualHandoff({ destination, api, facts }: { destination: DestinationDTO; api: PublishApi; facts: SiteFacts }) {
+export function ManualHandoff({ destination, api, facts, onRecorded }: { destination: DestinationDTO; api: PublishApi; facts: SiteFacts; onRecorded?: () => void }) {
   const draft = destination.draft!;
   const info = PLATFORMS[destination.platform];
   const [url, setUrl] = useState('');
@@ -197,7 +197,7 @@ export function ManualHandoff({ destination, api, facts }: { destination: Destin
             ))}
           </fieldset>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={!all || !verdict?.ok || busy || expired} onClick={() => void api.record(destination.platform, approval.id, { checked: approval.checklist.filter((b) => ticked[b]), url })}>
+            <Button type="button" disabled={!all || !verdict?.ok || busy || expired} onClick={() => void api.record(destination.platform, approval.id, { checked: approval.checklist.filter((b) => ticked[b]), url }).then((result) => result.ok && onRecorded?.())}>
               {busy ? 'Recording' : 'I posted it: record the link'}
             </Button>
             <Button type="button" variant="ghost" disabled={busy} onClick={() => void api.decline(destination.platform, approval.id)}>
@@ -246,13 +246,15 @@ export function ApprovalReview({
 
   // Arriving at a staged post creates its approval request, so there is no separate "request approval" step for the owner.
   useEffect(() => {
-    if (!draft || !publishable || draft.status !== 'staged') return;
-    if (asked.current === draft.payloadSha256) return;
-    asked.current = draft.payloadSha256;
+    if (!draft || !publishable || !connected || draft.status !== 'staged') return;
+    // One request per staged copy: staging again (after a refusal, say) is a new copy and needs a new request.
+    const episode = `${draft.payloadSha256}|${draft.stagedAt ?? ''}`;
+    if (asked.current === episode) return;
+    asked.current = episode;
     void api.ask(platform, draft.id, 'publish');
     // The hash identifies the post; asking again for the same post would only void the request just made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft?.id, draft?.status, draft?.payloadSha256, publishable]);
+  }, [draft?.id, draft?.status, draft?.payloadSha256, draft?.stagedAt, publishable, connected]);
 
   if (!draft) {
     return (
@@ -273,8 +275,9 @@ export function ApprovalReview({
 
   return (
     <div className="grid gap-4">
-      <NoticeBar notice={api.notices[platform]} />
-      <StatusHint draft={draft} />
+      {/* The result is explained once: a published, refused or unknown post has its own block below, so the note and the hint stay out of its way. */}
+      {draft.status === 'published' || draft.status === 'failed' ? null : <NoticeBar notice={api.notices[platform]} />}
+      {draft.status === 'published' || draft.status === 'failed' || draft.status === 'unknown' ? null : <StatusHint draft={draft} />}
       <LiveLink draft={draft} name={info.name} />
 
       {draft.failureMessage && (draft.status === 'failed' || draft.status === 'unknown') ? (
@@ -382,7 +385,7 @@ export function ApprovalReview({
         </p>
       ) : null}
 
-      {draft.status !== 'publishing' ? <ManualHandoff destination={destination} api={api} facts={facts} /> : null}
+      {draft.status !== 'publishing' && draft.status !== 'published' ? <ManualHandoff destination={destination} api={api} facts={facts} {...(onSettled ? { onRecorded: () => onSettled('published') } : {})} /> : null}
 
       <details className="rounded-lg border bg-surface">
         <summary className="cursor-pointer px-3 py-2 text-sm font-medium">History ({draft.attempts.length})</summary>

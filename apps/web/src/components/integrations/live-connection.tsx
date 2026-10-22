@@ -41,7 +41,8 @@ export function LiveConnection({ view, onChange }: { view: ConnectionView; onCha
       setSecret('');
       setReplacing(false);
       onChange(result.data);
-      setNotice({ tone: 'success', text: `Connected${result.data.who ? ` as ${result.data.who}` : ''}.` });
+      // The status line above already says who it is connected as.
+      setNotice(null);
     } else {
       setFieldError(result.fields.secret ?? null);
       setNotice({ tone: 'error', text: result.network ? 'Could not reach the app server.' : result.error });
@@ -56,7 +57,7 @@ export function LiveConnection({ view, onChange }: { view: ConnectionView; onCha
     setBusy(null);
     if (result.ok) {
       onChange(result.data.connection);
-      setNotice({ tone: result.data.ok ? 'success' : 'error', text: result.data.message });
+      setNotice(result.data.ok ? null : { tone: 'error', text: result.data.message });
     } else setNotice({ tone: 'error', text: result.network ? 'Could not reach the app server.' : result.error });
   }
 

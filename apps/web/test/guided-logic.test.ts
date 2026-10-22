@@ -315,7 +315,7 @@ describe('one status language', () => {
   it('shows planned platforms as dashed and disabled with their phase', () => {
     expect(directoryChip('planned', 'Phase 2')).toEqual({ label: 'Planned: Phase 2', tone: 'planned', icon: 'calendar' });
     expect(directoryChip('available_now', null)).toMatchObject({ tone: 'success' });
-    expect(directoryChip('needs_connection', null)).toMatchObject({ tone: 'warning' });
+    expect(directoryChip('needs_connection', null)).toMatchObject({ tone: 'neutral' });
     expect(TONE_CLASS.planned).toContain('border-dashed');
   });
 });

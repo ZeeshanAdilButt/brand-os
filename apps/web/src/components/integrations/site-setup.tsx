@@ -94,7 +94,7 @@ export function SiteSetup({ initial, view, onConnection }: { initial: SiteSettin
     if (result.ok) {
       setSettings(result.data);
       setSaved(true);
-      setNotice({ tone: 'success', text: 'Saved. Drafts you already built keep their old layout until you rebuild them.' });
+      setNotice({ tone: 'success', text: 'Settings saved. Drafts you already built keep their old layout until you rebuild them.' });
     } else {
       setErrors(result.fields);
       setNotice({ tone: 'error', text: result.network ? 'Could not reach the app server.' : result.error });

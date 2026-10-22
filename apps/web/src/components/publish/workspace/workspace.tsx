@@ -30,7 +30,7 @@ const LAST_ARTICLE_KEY = 'brand-os.last-article';
 
 function Area({ n, title, note, children, className }: { n: number; title: string; note?: string; children: ReactNode; className?: string }) {
   return (
-    <section aria-labelledby={`area-${n}`} className={cn('rounded-xl border bg-surface p-4 sm:p-5', className)}>
+    <section aria-labelledby={`area-${n}`} className={cn('min-w-0 rounded-xl border bg-surface p-4 sm:p-5', className)}>
       <h2 id={`area-${n}`} className="flex items-center gap-2.5 text-lg font-semibold">
         <span aria-hidden className="grid size-6 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
           {n}
@@ -93,7 +93,7 @@ export function PublishWorkspace({
       {loaded && loaded.article.id === articleId ? (
         <WorkspaceBody key={loaded.article.id} articles={articles} article={loaded.article} destinations={loaded.destinations} initialPlatform={loaded.article.id === initial.article?.id ? initial.platform : null} onChooseArticle={choose} loading={loading} />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
           <Area n={1} title="Article" note="Choose the article to publish.">
             <ArticlePicker articles={articles} selectedId={articleId} onSelect={choose} />
             {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading…</p> : null}
@@ -187,8 +187,8 @@ function WorkspaceBody({
       {!hasText ? <p className="rounded-lg border border-info/25 bg-info-bg px-3 py-2 text-sm">This article has no text yet, so there is nothing to preview. Add some in the studio first.</p> : null}
       {api.loadError ? <FormNotice tone="error">{api.loadError}</FormNotice> : null}
 
-      <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]', loading && 'opacity-60')} aria-busy={loading}>
-        <div className="grid content-start gap-4">
+      <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]', loading && 'opacity-60')} aria-busy={loading}>
+        <div className="grid min-w-0 content-start gap-4">
           <Area n={1} title="Article" note="The article every preview is built from.">
             <ArticlePicker articles={articles} selectedId={article.id} onSelect={onChooseArticle} />
           </Area>

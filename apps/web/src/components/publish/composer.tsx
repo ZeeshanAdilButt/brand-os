@@ -178,7 +178,7 @@ export function Composer({
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className={cn('rounded-xl border bg-surface xl:max-h-[calc(100dvh-14rem)] xl:overflow-y-auto', mobileTab !== 'original' && 'hidden md:block')}>
           <OriginalPane articleId={articleId} title={article.title} html={html} jump={jump} />
         </div>

@@ -67,7 +67,7 @@ export function PublishScreen({
   const hasText = article.body.trim().length > 0;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <NextStepBarWrap articleId={articleId} title={article.title} hasText={hasText} destinations={api.destinations} />
         <Segmented

@@ -91,7 +91,9 @@ function serve(answers: Record<string, unknown> = {}) {
     vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url, method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : undefined });
       const hit = Object.entries(answers).find(([suffix]) => url.endsWith(suffix));
-      return new Response(JSON.stringify(hit ? hit[1] : {}), { status: 200 });
+      // An array answers one call after another, repeating the last.
+      const answer = hit ? (Array.isArray(hit[1]) ? (hit[1].length > 1 ? hit[1].shift() : hit[1][0]) : hit[1]) : {};
+      return new Response(JSON.stringify(answer), { status: 200 });
     }),
   );
   return calls;
@@ -143,6 +145,33 @@ describe('reviewing one destination', () => {
     await waitFor(() => expect(screen.getByRole('region', { name: /approve this exact post/i })).toBeTruthy());
     expect(calls.filter((c) => c.url.endsWith('/request-approval'))).toHaveLength(1);
     expect(calls.some((c) => c.url.endsWith('/approve'))).toBe(false);
+  });
+
+  it('a staged post whose account is no longer connected asks for nothing on load: no request, no conflict', async () => {
+    const calls = serve();
+    render(<Harness data={[destination('devto', { connection: null, draft: draft({ status: 'staged' }) })]} />);
+    expect(screen.getByText('DEV.to is not connected')).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(calls).toHaveLength(0);
+  });
+
+  it('staging again after a refusal is a new private copy and gets its own approval request', async () => {
+    const calls = serve({
+      '/stage': [
+        { ok: true, message: 'Private draft created.', draft: draft({ status: 'staged', stagedAt: '2026-10-21T10:06:00.000Z' }) },
+        { ok: true, message: 'Private draft updated.', draft: draft({ status: 'staged', stagedAt: '2026-10-21T10:09:00.000Z' }) },
+      ],
+      '/request-approval': [
+        { link: '/x', draft: draft({ status: 'failed', failureMessage: 'DEV.to refused the request.', failureKind: 'validation' }) },
+        { link: '/x', draft: draft({ status: 'pending_approval', approval: approval() }) },
+      ],
+    });
+    render(<Harness data={[destination('devto', { draft: draft({ status: 'draft' }) })]} />);
+    fireEvent.click(screen.getByRole('button', { name: /create private draft on dev.to/i }));
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/request-approval'))).toHaveLength(1));
+    fireEvent.click(await screen.findByRole('button', { name: /create private draft on dev.to/i }));
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/request-approval'))).toHaveLength(2));
+    await screen.findByRole('region', { name: /approve this exact post/i });
   });
 
   it('shows the approval card with the exact payload and a checklist that gates the one button', async () => {
