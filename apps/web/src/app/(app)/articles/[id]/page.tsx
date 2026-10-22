@@ -14,7 +14,7 @@ export default async function ArticleStudioPage({ params, searchParams }: { para
   const { id } = await params;
   const { panel } = await searchParams;
   // The old side panel moved to its own screen; an old link still lands in the right place.
-  if (panel === 'publish') redirect(`/articles/${id}/publish`);
+  if (panel === 'publish') redirect(`/publishing?article=${id}`);
   const user = await requireSessionUser();
   const owner = sessionToOwner(user, user.ctx);
   let article;

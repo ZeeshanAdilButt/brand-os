@@ -29,7 +29,7 @@ export function buildCommands(options: { articles: { id: string; title: string }
     { id: 'go-home', label: 'Home: your next step', group: 'Go to', href: '/', keywords: 'overview start progress' },
     { id: 'go-articles', label: 'Articles', group: 'Go to', href: '/articles' },
     { id: 'go-platforms', label: 'Platforms: every place you can share', group: 'Go to', href: '/platforms', keywords: 'directory destinations' },
-    { id: 'go-publishing', label: 'Publishing overview', group: 'Go to', href: '/publishing', keywords: 'drafts waiting status' },
+    { id: 'go-publishing', label: 'Publishing: article, platforms and previews', group: 'Go to', href: '/publishing', keywords: 'drafts waiting status share' },
     { id: 'go-knowledge', label: 'Knowledge', group: 'Go to', href: '/knowledge' },
     { id: 'new-article', label: 'New article', hint: 'A blank article in the studio', group: 'Create', action: 'new-article' },
     { id: 'import-article', label: 'Import an article', hint: 'From a file, a page or a folder', group: 'Create', href: '/articles/import' },
@@ -43,8 +43,8 @@ export function buildCommands(options: { articles: { id: string; title: string }
   if (options.currentArticleId) {
     const id = options.currentArticleId;
     commands.unshift(
-      { id: 'article-wizard', label: 'Open the guided sharing steps for this article', hint: 'Choose destinations, preview, then review one by one', group: 'Articles', href: `/articles/${id}/publish?view=guided` },
-      { id: 'article-composer', label: 'Open the composer for this article', hint: 'All destinations side by side', group: 'Articles', href: `/articles/${id}/publish?view=expert` },
+      { id: 'article-wizard', label: 'Choose platforms and preview this article', hint: 'Pick where it goes and see a preview of each', group: 'Articles', href: `/publishing?article=${id}` },
+      { id: 'article-composer', label: 'Open the composer for this article', hint: 'All destinations side by side', group: 'Articles', href: `/articles/${id}/publish?view=composer` },
       { id: 'article-studio', label: 'Edit this article', group: 'Articles', href: `/articles/${id}` },
     );
   }

@@ -483,8 +483,8 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
               {waitingForReview > 0 ? <span aria-hidden className="absolute right-1 top-1 size-2 rounded-full bg-primary" /> : null}
             </Button>
             <Link
-              href={`/articles/${initial.id}/publish`}
-              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+              href={`/publishing?article=${initial.id}`}
+              className={buttonVariants({ variant: 'default', size: 'sm' })}
               aria-label="Publish"
               title="Publish: choose destinations, preview, approve"
             >

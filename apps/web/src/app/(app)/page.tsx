@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ExternalLink, FileText } from 'lucide-react';
+import { ExternalLink, FileText, Send } from 'lucide-react';
 import { JourneySteps } from '@/components/guided/journey-steps';
 import { NextStepCard } from '@/components/guided/next-step-card';
 import { NewArticleButton } from '@/components/articles/new-article-button';
@@ -22,7 +22,12 @@ export default async function HomePage() {
 
   return (
     <>
-      <PageHeader title="Home" description="One article, a few destinations, and you approve each post yourself." />
+      <PageHeader title="Home" description="One article, a few destinations, and you approve each post yourself.">
+        <Link href={home.focus ? `/publishing?article=${home.focus.id}` : "/publishing"} className={buttonVariants({ variant: "outline" })}>
+          <Send aria-hidden />
+          Publish
+        </Link>
+      </PageHeader>
 
       <NextStepCard
         kicker={home.kicker}

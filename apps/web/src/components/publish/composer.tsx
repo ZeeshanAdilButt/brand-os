@@ -8,7 +8,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { draftChip } from '@/lib/chips';
 import { DIRECTORY } from '@/lib/directory';
-import { computeJourney, publishHref, toJourneyDestinations } from '@/lib/next-step';
+import { computeJourney, toJourneyDestinations, workspaceHref } from '@/lib/next-step';
 import { RECOMMENDED_ORDER, type DestinationDTO, type PlatformId } from '@/lib/publishing';
 import { cn } from '@/lib/utils';
 import type { AiState } from './ai-assist';
@@ -189,8 +189,8 @@ export function Composer({
             {added.length === 0 ? (
               <p className="rounded-xl border p-4 text-sm leading-6 text-muted-foreground">
                 Nothing chosen yet. Add a destination below, or use the{' '}
-                <Link href={publishHref(articleId)} className="font-medium text-link underline underline-offset-2">
-                  guided steps
+                <Link href={workspaceHref(articleId)} className="font-medium text-link underline underline-offset-2">
+                  Publishing screen
                 </Link>
                 .
               </p>

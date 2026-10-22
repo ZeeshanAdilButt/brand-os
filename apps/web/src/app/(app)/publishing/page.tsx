@@ -1,13 +1,19 @@
 import type { Metadata } from 'next';
-import { ArrowUpRight, FileText, Send } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
+import { PublishWorkspace } from '@/components/publish/workspace/workspace';
 import { buttonVariants } from '@/components/ui/button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { draftChip } from '@/lib/chips';
 import { formatWhen } from '@/lib/format';
 import { PLATFORMS, type PlatformDraftDTO } from '@/lib/publishing';
 import { publishHref } from '@/lib/next-step';
+import { isPlatformId } from '@/lib/catalog';
+import { pickInitialArticle, wordsFromChars, type ArticleOption } from '@/lib/publish-workspace';
+import { listArticles } from '@/server/actions/articles';
+import { listDestinations } from '@/server/actions/publishing';
+import { getArticle } from '@/server/actions/articles';
 import { sessionToOwner } from '@/server/actions/owner';
 import { listDrafts } from '@/server/actions/publishing';
 import { requireSessionUser } from '@/server/auth/session';
@@ -58,10 +64,22 @@ function Group({ title, note, drafts, id }: { title: string; note?: string; draf
   );
 }
 
-export default async function PublishingPage() {
+export default async function PublishingPage({ searchParams }: { searchParams: Promise<{ article?: string; platform?: string }> }) {
+  const query = await searchParams;
   const user = await requireSessionUser();
   const owner = sessionToOwner(user, user.ctx);
-  const drafts = await listDrafts(owner, {}, { limit: 100 });
+  const [drafts, list] = await Promise.all([listDrafts(owner, {}, { limit: 100 }), listArticles(owner, { status: 'all', limit: 200 })]);
+  const options: ArticleOption[] = list.articles.map((a) => ({ id: a.id, title: a.title, status: a.status as ArticleOption['status'], words: wordsFromChars(a.bodyChars), updatedAt: a.updatedAt.toISOString() }));
+  const startId = pickInitialArticle(options, query.article);
+  let initial: { article: { id: string; title: string; description: string; tags: string[]; canonicalUrl: string | null; bodyMarkdown: string } | null; destinations: Awaited<ReturnType<typeof listDestinations>>; platform: ReturnType<typeof asPlatform> } = { article: null, destinations: [], platform: null };
+  if (startId) {
+    const a = await getArticle(owner, startId);
+    initial = {
+      article: { id: a.id, title: a.title, description: a.description, tags: a.tags, canonicalUrl: a.canonicalUrl, bodyMarkdown: a.bodyMarkdown },
+      destinations: await listDestinations(owner, {}, a.id),
+      platform: asPlatform(query.platform),
+    };
+  }
   const unknown = drafts.filter((d) => d.status === 'unknown');
   const waiting = drafts.filter((d) => d.status === 'pending_approval');
   const failed = drafts.filter((d) => d.status === 'failed' || d.status === 'source_changed');
@@ -72,49 +90,31 @@ export default async function PublishingPage() {
 
   return (
     <>
-      <PageHeader title="Publishing" description="Every post prepared for a destination, where it stands, and what needs you.">
+      <PageHeader title="Publishing" description="Choose an article, choose where it goes, and see a preview of each. You approve every post yourself.">
         {first ? (
-          <Link href={publishHref(first.articleId, { step: '3', d: first.platform })} className={buttonVariants()}>
+          <Link href={publishHref(first.articleId, { step: '3', d: first.platform })} className={buttonVariants({ variant: 'outline' })}>
             {unknown.length > 0 ? 'Check post status' : waiting.length > 0 ? 'Review next post' : 'Fix next post'}
           </Link>
-        ) : (
-          <Link href="/articles" className={buttonVariants()}>
-            <FileText aria-hidden />
-            Prepare posts
-          </Link>
-        )}
+        ) : null}
       </PageHeader>
 
-      {drafts.length === 0 ? (
-        <section className="rounded-xl border border-input bg-surface p-6 sm:p-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
-            <div aria-hidden className="grid size-12 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
-              <Send className="size-6" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-xl font-semibold">Nothing prepared yet</h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Open an article and choose where it should go. You will see a preview of each destination and approve each post yourself.</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Link href="/articles" className={buttonVariants({ size: 'sm' })}>
-                  Open an article
-                </Link>
-                <Link href="/platforms" className={buttonVariants({ size: 'sm', variant: 'outline' })}>
-                  See the platforms
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <>
+      <PublishWorkspace articles={options} initial={initial} />
+
+      {drafts.length > 0 ? (
+        <div className="mt-10">
+          <h2 className="mb-4 text-xl font-semibold">Activity</h2>
           <Group id="g-unknown" title="Result not known" note="It may or may not have gone out. Checking only reads, and nothing is sent again on its own." drafts={unknown} />
           <Group id="g-waiting" title="Waiting for your approval" note="Nothing goes public until you approve that exact post." drafts={waiting} />
           <Group id="g-failed" title="Needs a fix" note="The platform refused it, or the article changed after the post was prepared." drafts={failed} />
           <Group id="g-progress" title="In progress" drafts={inProgress} />
           <Group id="g-prepared" title="Prepared" note="Drafts you can still edit and preview." drafts={prepared} />
           <Group id="g-done" title="Published" drafts={done} />
-        </>
-      )}
+        </div>
+      ) : null}
     </>
   );
+}
+
+function asPlatform(value: string | undefined) {
+  return value && isPlatformId(value) ? value : null;
 }

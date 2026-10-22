@@ -416,7 +416,7 @@ describe('asking for approval', () => {
     expect(approval).toMatchObject({ status: 'pending', requestedBy: 'owner', payloadSha256: requested.draft.payloadSha256 });
     expect(approval.tag).toBe(`#${requested.draft.payloadSha256.slice(0, 8).toUpperCase()}`);
     expect(Date.parse(approval.expiresAt) - START.getTime()).toBe(30 * 60_000);
-    expect(requested.link).toBe(`${env.config.appUrl}/articles/${requested.draft.articleId}/publish`);
+    expect(requested.link).toBe(`${env.config.appUrl}/articles/${requested.draft.articleId}/publish?view=guided&step=3&d=${requested.draft.platform}`);
     expect((await getDraft(owner, env, draftId)).approval?.id).toBe(approval.id);
   });
 

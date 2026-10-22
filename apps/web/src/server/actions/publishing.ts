@@ -695,7 +695,7 @@ export async function requestApproval(owner: OwnerContext, env: PublishEnv, id: 
   });
   if (!approval) throw new ActionError('conflict', 'The draft changed. Review it and ask again.', {}, { code: 'STATUS' });
   await owner.data.audit.record({ actor: owner.actor, action: 'approval.requested', entityType: 'approval', entityId: approval.id, metadata: { platform: draft.platform, draftId: draft.id, tag: approval.tag, mode } });
-  return { draft: await draftView(owner, await loadDraft(owner, draft.id)), link: `${env.config.appUrl}/articles/${draft.articleId}/publish` };
+  return { draft: await draftView(owner, await loadDraft(owner, draft.id)), link: `${env.config.appUrl}/articles/${draft.articleId}/publish?view=guided&step=3&d=${draft.platform}` };
 }
 
 /** Say no to a pending request. Only the signed-in owner. The draft goes back to where it was. */

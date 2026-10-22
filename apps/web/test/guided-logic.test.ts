@@ -28,13 +28,13 @@ describe('the next step is computed from what is really true', () => {
   it('asks for text when the article is empty, and for destinations when it has text', () => {
     expect(computeJourney(input({ article: { id: ID, title: 'Empty', hasText: false } })).next).toMatchObject({ label: expect.stringContaining('Add text'), href: `/articles/${ID}` });
     const picked = computeJourney(input());
-    expect(picked.next).toMatchObject({ label: 'Pick destinations', href: `/articles/${ID}/publish` });
+    expect(picked.next).toMatchObject({ label: 'Pick destinations', href: `/publishing?article=${ID}` });
     expect(picked.steps.map((s) => s.state)).toEqual(['done', 'current', 'todo', 'todo', 'todo']);
   });
 
   it('previews every destination before the first approval, one at a time', () => {
     const j = computeJourney(input({ destinations: [dest('site', { draft: draft('draft') }), dest('devto'), dest('linkedin')] }));
-    expect(j.next).toMatchObject({ label: 'Preview DEV.to', href: `/articles/${ID}/publish?step=2&d=devto` });
+    expect(j.next).toMatchObject({ label: 'Preview DEV.to', href: `/publishing?article=${ID}&platform=devto` });
     expect(j.steps.find((s) => s.id === 'preview')?.state).toBe('current');
     expect(j.steps.find((s) => s.id === 'preview')?.detail).toBe('1 of 3 prepared.');
   });
@@ -45,14 +45,14 @@ describe('the next step is computed from what is really true', () => {
   });
 
   it.each([
-    ['a blocking problem', dest('devto', { draft: draft('draft', { lintErrors: 2 }) }), 'Fix 2 problems in DEV.to', 'step=2'],
-    ['one problem', dest('devto', { draft: draft('draft', { lintErrors: 1 }) }), 'Fix 1 problem in DEV.to', 'step=2'],
+    ['a blocking problem', dest('devto', { draft: draft('draft', { lintErrors: 2 }) }), 'Fix 2 problems in DEV.to', 'platform=devto'],
+    ['one problem', dest('devto', { draft: draft('draft', { lintErrors: 1 }) }), 'Fix 1 problem in DEV.to', 'platform=devto'],
     ['a connector that needs an account', dest('devto', { connected: false, draft: draft('draft') }), 'Connect DEV.to', '/platforms/integrations#devto'],
     ['a draft ready to review', dest('devto', { draft: draft('staged') }), 'Review and approve DEV.to', 'step=3'],
     ['a waiting approval', dest('devto', { draft: draft('pending_approval') }), 'Review and approve DEV.to', 'step=3'],
     ['a refused publish', dest('devto', { draft: draft('failed') }), 'Fix and try DEV.to again', 'step=3'],
     ['an unknown result', dest('devto', { draft: draft('unknown') }), 'Check DEV.to on the platform', 'step=3'],
-    ['a changed article', dest('devto', { draft: draft('source_changed') }), 'Rebuild DEV.to from the changed article', 'step=2'],
+    ['a changed article', dest('devto', { draft: draft('source_changed') }), 'Rebuild DEV.to from the changed article', 'step=3'],
     ['a platform with no connector', dest('linkedin', { draft: draft('draft') }), 'Post LinkedIn by hand and record the link', 'step=3'],
   ])('with %s the next step is "%s"', (_label, d, label, hrefPart) => {
     const j = computeJourney(input({ destinations: [d] }));
@@ -263,7 +263,7 @@ describe('the command palette', () => {
       expect(Boolean(c.href) !== Boolean(c.action), `${c.id} is a link or a local action`).toBe(true);
       if (c.action) expect(['new-article', 'toggle-theme']).toContain(c.action);
     }
-    expect(commands.filter((c) => c.href?.startsWith('/articles/') && c.href.includes('/publish')).map((c) => c.href)).toEqual([`/articles/${ID}/publish?view=guided`, `/articles/${ID}/publish?view=expert`]);
+    expect(commands.filter((c) => c.href?.includes('/publish') && c.href.includes(ID)).map((c) => c.href)).toEqual([`/publishing?article=${ID}`, `/articles/${ID}/publish?view=composer`]);
   });
 
   it('finds things by any word in the label, hint or keywords', () => {

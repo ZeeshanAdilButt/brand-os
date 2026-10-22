@@ -23,21 +23,19 @@ export function StatusChip({ endpoint = '/api/health' }: { endpoint?: string }) 
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
     async function refresh() {
       try {
-        const res = await fetch(endpoint, { cache: 'no-store', signal: controller.signal });
+        const res = await fetch(endpoint, { cache: 'no-store' });
         const health = (await res.json()) as Health;
         if (!cancelled) setState({ kind: 'loaded', health });
       } catch {
-        if (!cancelled && !controller.signal.aborted) setState({ kind: 'unreachable' });
+        if (!cancelled) setState({ kind: 'unreachable' });
       }
     }
     void refresh();
     const timer = window.setInterval(refresh, REFRESH_MS);
     return () => {
       cancelled = true;
-      controller.abort();
       window.clearInterval(timer);
     };
   }, [endpoint]);
