@@ -21,8 +21,8 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
   const [navOpen, setNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const apple = useSyncExternalStore(noopSubscribe, isApplePlatform, () => false);
-  // The article studio (editor and preview side by side) needs the full width; every other page keeps the reading column.
-  const wide = /^\/articles\/[0-9a-f-]{36}\/?$/i.test(usePathname() ?? '');
+  // The article studio (editor and preview side by side) and the publishing screens (three columns) need the full width; every other page keeps a readable column.
+  const wide = /^\/articles\/[0-9a-f-]{36}(\/publish)?\/?$/i.test(usePathname() ?? '');
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -50,7 +50,7 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
       </aside>
 
       <div className="lg:pl-60">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-surface px-3 sm:px-6">
           <Button
             type="button"
             variant="ghost"
@@ -69,11 +69,11 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
             type="button"
             onClick={() => setPaletteOpen(true)}
             aria-label="Open command palette"
-            className="ml-auto flex h-9 items-center gap-2 rounded-md border bg-card px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:ml-0 sm:w-72 lg:w-80"
+            className="ml-auto flex h-10 items-center gap-2 rounded-lg border border-input bg-surface px-3 text-sm text-muted-foreground transition-colors duration-[120ms] hover:bg-muted hover:text-foreground sm:ml-0 sm:w-72 lg:w-96"
           >
             <Search aria-hidden className="size-4 shrink-0" />
-            <span className="hidden flex-1 truncate text-left sm:inline">Search or jump to</span>
-            <kbd className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[0.6875rem] sm:inline">
+            <span className="hidden flex-1 truncate text-left sm:inline">Search articles, platforms, settings</span>
+            <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] sm:inline">
               {apple ? '⌘K' : 'Ctrl K'}
             </kbd>
           </button>
@@ -87,7 +87,7 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
         <main
           id="main"
           tabIndex={-1}
-          className={cn('mx-auto w-full outline-none', wide ? 'max-w-none px-2 py-2 sm:px-4 sm:py-3' : 'max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10')}
+          className={cn('mx-auto w-full outline-none', wide ? 'max-w-none px-2 py-2 sm:px-4 sm:py-3' : 'max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8')}
         >
           {children}
         </main>

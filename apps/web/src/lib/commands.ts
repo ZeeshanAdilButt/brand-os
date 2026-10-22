@@ -34,7 +34,7 @@ export function buildCommands(options: { articles: { id: string; title: string }
     { id: 'new-article', label: 'New article', hint: 'A blank article in the studio', group: 'Create', action: 'new-article' },
     { id: 'import-article', label: 'Import an article', hint: 'From a file, a page or a folder', group: 'Create', href: '/articles/import' },
     { id: 'settings', label: 'Settings', group: 'Settings', href: '/settings' },
-    { id: 'settings-integrations', label: 'Integrations: connect your accounts', group: 'Settings', href: '/settings/integrations', keywords: 'connections keys oauth' },
+    { id: 'settings-integrations', label: 'Integrations: connect your accounts', group: 'Settings', href: '/platforms/integrations', keywords: 'connections keys oauth' },
     { id: 'settings-ai', label: 'AI providers', group: 'Settings', href: '/settings/ai' },
     { id: 'settings-agent', label: 'Agent access', group: 'Settings', href: '/settings/agent-access', keywords: 'claude mcp' },
     { id: 'settings-profile', label: 'Profile', group: 'Settings', href: '/settings/profile' },
@@ -54,7 +54,7 @@ export function buildCommands(options: { articles: { id: string; title: string }
   for (const id of PLATFORM_IDS) {
     const info = PLATFORMS[id];
     commands.push({ id: `platform-${id}`, label: `${info.name}: what it can do`, group: 'Platforms', href: `/platforms#${id}`, keywords: info.kind.replace('_', ' ') });
-    commands.push({ id: `setup-${id}`, label: `Set up ${info.name}`, group: 'Platforms', href: `/settings/integrations#${id}`, keywords: 'connect key account' });
+    commands.push({ id: `setup-${id}`, label: `Set up ${info.name}`, group: 'Platforms', href: `/platforms/integrations#${id}`, keywords: 'connect key account' });
   }
   for (const area of AREAS) {
     commands.push({ id: `area-${area}`, label: `Platforms: ${AREA_LABELS[area]}`, group: 'Platforms', href: `/platforms?area=${area}` });

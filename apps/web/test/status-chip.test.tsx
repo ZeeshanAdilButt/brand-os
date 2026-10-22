@@ -20,14 +20,16 @@ function stubHealth(health: Health | Error) {
 }
 
 describe('StatusChip', () => {
-  it('shows mode, driver and latency from /api/health, and links to settings', async () => {
+  it('shows only the mode in the bar, keeps the engine and latency in the tooltip, and links to settings', async () => {
     stubHealth({ status: 'ok', mode: 'local', db: { ok: true, driver: 'pglite', latencyMs: 1.4, schema: 'ready' } });
     render(<StatusChip />);
     const link = await screen.findByRole('link', { name: /System status/ });
     await waitFor(() => expect(link.getAttribute('data-state')).toBe('ok'));
     expect(link.textContent).toContain('Local');
-    expect(link.textContent).toContain('PGlite');
-    expect(link.textContent).toContain('1.4 ms');
+    expect(link.textContent).not.toContain('PGlite');
+    expect(link.textContent).not.toContain('ms');
+    expect(link.getAttribute('aria-label')).toContain('PGlite');
+    expect(link.getAttribute('aria-label')).toContain('1.4 ms');
     expect(link.getAttribute('href')).toBe('/settings');
   });
 

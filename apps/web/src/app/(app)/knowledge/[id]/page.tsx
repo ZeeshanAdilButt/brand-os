@@ -62,7 +62,7 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             Marking an item reviewed confirms the claim is accurate and records today as the review date. It does not allow public use; that stays a
-            separate choice above. Deleting removes only this item. Deleting your whole account arrives on Day 27.
+            separate choice above. Deleting removes only this item. Deleting your whole account is not built yet. You can export all your data from Settings at any time.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {item.verificationStatus !== 'verified' ? <ReviewButton id={item.id} /> : null}

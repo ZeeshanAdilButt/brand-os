@@ -1,0 +1,222 @@
+/*
+ * The simulated platform surfaces. These colours are the preview's own, independent of the app theme, so a light
+ * destination can be inspected inside a dark workspace. They are an approximation of the typography and spacing,
+ * never a copy of a platform's interface, and every preview wears the "Approximate preview" label outside them.
+ */
+.sim {
+  --sim-bg: #ffffff;
+  --sim-fg: #1f2328;
+  --sim-muted: #59636e;
+  --sim-border: #d1d9e0;
+  --sim-link: #0a66c2;
+  --sim-card: #f6f8fa;
+  --sim-accent: #0a66c2;
+  --sim-accent-fg: #ffffff;
+  background: var(--sim-bg);
+  color: var(--sim-fg);
+  border: 1px solid var(--sim-border);
+  border-radius: 12px;
+  font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.sim[data-appearance="dark"] {
+  --sim-bg: #1b1f23;
+  --sim-fg: #e6edf3;
+  --sim-muted: #9198a1;
+  --sim-border: #3d444d;
+  --sim-link: #6cb6ff;
+  --sim-card: #22272e;
+}
+
+.sim a,
+.sim .sim-link {
+  color: var(--sim-link);
+  text-decoration: none;
+}
+
+.sim-muted {
+  color: var(--sim-muted);
+}
+
+.sim-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--sim-card);
+  border: 1px solid var(--sim-border);
+  color: var(--sim-muted);
+  font-weight: 600;
+}
+
+.sim-card {
+  border: 1px solid var(--sim-border);
+  background: var(--sim-card);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.sim-placeholder {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 12px;
+  color: var(--sim-muted);
+  font-size: 12px;
+  line-height: 16px;
+  background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--sim-border) 45%, transparent) 10px 11px);
+}
+
+/* Mock interface chrome: drawn flat and inert, so it cannot be mistaken for a real control. */
+.sim-mock {
+  pointer-events: none;
+  user-select: none;
+  color: var(--sim-muted);
+  font-size: 12px;
+  display: flex;
+  gap: 18px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sim-border);
+}
+
+.sim-post-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sim-tag {
+  color: var(--sim-link);
+}
+
+/* An article page: typography for the rendered Markdown, set per platform through the data attribute. */
+.sim-article {
+  padding: 20px 24px 28px;
+}
+
+.sim-article .sim-prose {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.sim-article .sim-prose > * + * {
+  margin-top: 1em;
+}
+
+.sim-article .sim-prose h1,
+.sim-article .sim-prose h2,
+.sim-article .sim-prose h3 {
+  line-height: 1.25;
+  font-weight: 700;
+  margin-top: 1.6em;
+  letter-spacing: -0.01em;
+}
+
+.sim-article .sim-prose h1 {
+  font-size: 1.7em;
+}
+
+.sim-article .sim-prose h2 {
+  font-size: 1.35em;
+}
+
+.sim-article .sim-prose h3 {
+  font-size: 1.15em;
+}
+
+.sim-article .sim-prose pre {
+  background: var(--sim-card);
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font: 13px/20px "Cascadia Code", ui-monospace, Consolas, Menlo, monospace;
+}
+
+.sim-article .sim-prose code {
+  font-family: "Cascadia Code", ui-monospace, Consolas, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--sim-card);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+
+.sim-article .sim-prose pre code {
+  background: none;
+  padding: 0;
+}
+
+.sim-article .sim-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+  display: block;
+  overflow-x: auto;
+}
+
+.sim-article .sim-prose th,
+.sim-article .sim-prose td {
+  border: 1px solid var(--sim-border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.sim-article .sim-prose th {
+  background: var(--sim-card);
+}
+
+.sim-article .sim-prose blockquote {
+  border-left: 3px solid var(--sim-border);
+  padding-left: 14px;
+  color: var(--sim-muted);
+}
+
+.sim-article .sim-prose ul,
+.sim-article .sim-prose ol {
+  padding-left: 1.4em;
+}
+
+.sim-article .sim-prose ul {
+  list-style: disc;
+}
+
+.sim-article .sim-prose ol {
+  list-style: decimal;
+}
+
+.sim-article .sim-prose img {
+  max-width: 100%;
+  height: auto;
+}
+
+.sim-article .sim-prose a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Serif for the platforms that read as magazines. */
+.sim[data-skin="medium"] .sim-prose,
+.sim[data-skin="site"] .sim-prose,
+.sim[data-skin="substack"] .sim-prose {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  line-height: 30px;
+}
+
+.sim[data-skin="medium"] .sim-title,
+.sim[data-skin="substack"] .sim-title {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.sim[data-device="mobile"] .sim-article {
+  padding: 16px 16px 22px;
+}
+
+.sim[data-device="mobile"] .sim-article .sim-prose {
+  font-size: 15px;
+  line-height: 24px;
+}

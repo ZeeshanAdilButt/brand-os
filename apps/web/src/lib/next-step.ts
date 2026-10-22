@@ -76,7 +76,7 @@ function nextForDestination(articleId: string, d: JourneyDestination): NextActio
     return { label: `Fix ${draft.lintErrors} ${draft.lintErrors === 1 ? 'problem' : 'problems'} in ${d.name}`, href: publishHref(articleId, { step: '2', d: d.platform }), why: 'A problem blocks approval until it is fixed.' };
   }
   if (!d.publishable) return { label: `Post ${d.name} by hand and record the link`, href: publishHref(articleId, { step: '3', d: d.platform }), why: `${d.name} cannot be published from here yet. You copy it and post it, then record the link.` };
-  if (!d.connected) return { label: `Connect ${d.name}`, href: `/settings/integrations#${d.platform}`, why: `${d.name} needs your account before it can be staged and published.` };
+  if (!d.connected) return { label: `Connect ${d.name}`, href: `/platforms/integrations#${d.platform}`, why: `${d.name} needs your account before it can be staged and published.` };
   return { label: `Review and approve ${d.name}`, href: publishHref(articleId, { step: '3', d: d.platform }), why: 'Nothing goes out until you approve the exact post.' };
 }
 
@@ -148,4 +148,24 @@ function stepDetail(id: StepId, input: JourneyInput, added: JourneyDestination[]
     case 'share':
       return added.length > 0 && added.every((d) => d.draft?.status === 'published') ? 'Copy the links and tell people.' : 'Available once everything is out.';
   }
+}
+
+/** The destinations of an article as the journey needs them, from what the server returned. */
+export function toJourneyDestinations(
+  destinations: {
+    platform: PlatformId;
+    added: boolean;
+    info: { name: string; state: string };
+    connection: { status: string } | null;
+    draft: { status: DraftStatus; publishedVia: PublishedVia | null; lint: { severity: string }[] } | null;
+  }[],
+): JourneyDestination[] {
+  return destinations.map((d) => ({
+    platform: d.platform,
+    name: d.info.name,
+    added: d.added,
+    publishable: d.info.state === 'adapter',
+    connected: d.connection?.status === 'connected',
+    draft: d.draft ? { status: d.draft.status, publishedVia: d.draft.publishedVia, lintErrors: d.draft.lint.filter((i) => i.severity === 'error').length } : null,
+  }));
 }

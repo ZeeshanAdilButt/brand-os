@@ -8,7 +8,6 @@ const TABS = [
   { href: '/settings', label: 'General' },
   { href: '/settings/profile', label: 'Profile' },
   { href: '/settings/ai', label: 'AI' },
-  { href: '/settings/connections', label: 'Connections' },
   { href: '/settings/agent-access', label: 'Agent access' },
 ] as const;
 

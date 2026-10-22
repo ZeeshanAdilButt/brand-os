@@ -466,6 +466,22 @@ const METHOD_OF: Record<PlatformId, ContentMethod> = {
   youtube: 'oauth',
 };
 
+const WHAT_IT_IS: Record<PlatformId, string> = {
+  devto: 'Developer community and publishing platform, built on Forem.',
+  hashnode: 'Blogging platform for developers, with custom domains.',
+  site: 'Your own site, kept in a Git repository.',
+  medium: 'General-purpose publishing platform and reading network.',
+  substack: 'Newsletter and publishing platform.',
+  linkedin: 'Professional network: short posts that point to your article.',
+  x: 'Short posts and threads.',
+  bluesky: 'Open social network for short posts.',
+  threads: 'Meta’s network for short text posts.',
+  mastodon: 'Federated social network run by independent servers.',
+  reddit: 'Communities that discuss links and posts, each with its own rules.',
+  hackernews: 'Link-sharing and discussion site run by Y Combinator.',
+  youtube: 'Video platform for long videos and Shorts.',
+};
+
 function fromCatalog(id: PlatformId): DirectoryEntry {
   const info = PLATFORMS[id];
   const adapter = info.state === 'adapter';
@@ -473,7 +489,7 @@ function fromCatalog(id: PlatformId): DirectoryEntry {
     id,
     name: info.name,
     area: AREA_OF[id],
-    summary: info.reason,
+    summary: WHAT_IT_IS[id],
     url: URL_OF[id],
     method: METHOD_OF[id],
     plan: adapter ? 'Built: private drafts, an exact-payload approval and publishing.' : info.state === 'manual_only' ? 'Preview, edit and copy for manual posting, with a pre-filled link where the platform has one.' : `Preview and manual posting now; publishing through the platform when it arrives.`,

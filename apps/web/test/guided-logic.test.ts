@@ -47,7 +47,7 @@ describe('the next step is computed from what is really true', () => {
   it.each([
     ['a blocking problem', dest('devto', { draft: draft('draft', { lintErrors: 2 }) }), 'Fix 2 problems in DEV.to', 'step=2'],
     ['one problem', dest('devto', { draft: draft('draft', { lintErrors: 1 }) }), 'Fix 1 problem in DEV.to', 'step=2'],
-    ['a connector that needs an account', dest('devto', { connected: false, draft: draft('draft') }), 'Connect DEV.to', '/settings/integrations#devto'],
+    ['a connector that needs an account', dest('devto', { connected: false, draft: draft('draft') }), 'Connect DEV.to', '/platforms/integrations#devto'],
     ['a draft ready to review', dest('devto', { draft: draft('staged') }), 'Review and approve DEV.to', 'step=3'],
     ['a waiting approval', dest('devto', { draft: draft('pending_approval') }), 'Review and approve DEV.to', 'step=3'],
     ['a refused publish', dest('devto', { draft: draft('failed') }), 'Fix and try DEV.to again', 'step=3'],
@@ -279,24 +279,43 @@ describe('the command palette', () => {
   });
 });
 
-describe('one colour language', () => {
-  it('maps every draft status to a chip with words and a tone', () => {
+describe('one status language', () => {
+  const statuses = ['draft', 'staged', 'pending_approval', 'approved', 'publishing', 'published', 'failed', 'unknown', 'source_changed'] as const;
+
+  it('gives every draft status words, a tone and an icon, so colour never carries the meaning alone', () => {
     const labels = new Set<string>();
-    for (const status of ['draft', 'staged', 'pending_approval', 'approved', 'publishing', 'published', 'failed', 'unknown', 'source_changed'] as const) {
+    for (const status of statuses) {
       const chip = draftChip('devto', { status, publishedVia: null });
       expect(chip.label.length).toBeGreaterThan(2);
       expect(Object.keys(TONE_CLASS)).toContain(chip.tone);
+      expect(chip.icon).toBeTruthy();
       labels.add(chip.label);
     }
-    expect(draftChip('devto', null)).toEqual({ label: 'Not prepared', tone: 'muted' });
+    expect(labels.size).toBe(statuses.length);
+    expect(draftChip('devto', null)).toEqual({ label: 'Not prepared', tone: 'neutral', icon: 'dashed-circle' });
     expect(draftChip('devto', { status: 'source_changed', publishedVia: null }).label).toBe('Stale');
-    expect(draftChip('linkedin', { status: 'published', publishedVia: 'manual' })).toEqual({ label: 'Posted by hand', tone: 'ok' });
+    expect(draftChip('devto', { status: 'staged', publishedVia: null }).label).toBe('Private draft');
+    expect(draftChip('linkedin', { status: 'published', publishedVia: 'manual' })).toMatchObject({ label: 'Posted by hand', tone: 'success' });
     expect(draftChip('site', { status: 'published', publishedVia: 'app' }).label).toBe('Pull request opened');
   });
 
+  it('separates attention, progress, success and uncertainty', () => {
+    const tone = (status: (typeof statuses)[number]) => draftChip('devto', { status, publishedVia: null });
+    expect(tone('pending_approval')).toMatchObject({ tone: 'warning', icon: 'review' }); // needs you
+    expect(tone('approved')).toMatchObject({ tone: 'info', icon: 'shield-check' }); // recorded, not proof of publication
+    expect(tone('publishing')).toMatchObject({ tone: 'info', icon: 'spinner' }); // in progress
+    expect(tone('published')).toMatchObject({ tone: 'success', icon: 'check-circle' });
+    expect(tone('failed')).toMatchObject({ tone: 'danger' });
+    expect(tone('unknown')).toMatchObject({ tone: 'warning', icon: 'help-circle' }); // uncertain
+    // Waiting for you, being published and live must not look alike.
+    const looks = ['pending_approval', 'approved', 'publishing', 'published'].map((s) => `${tone(s as (typeof statuses)[number]).tone}/${tone(s as (typeof statuses)[number]).icon}`);
+    expect(new Set(looks).size).toBe(4);
+  });
+
   it('shows planned platforms as dashed and disabled with their phase', () => {
-    expect(directoryChip('planned', 'Phase 2, Day 9')).toEqual({ label: 'Planned: Phase 2', tone: 'off' });
-    expect(directoryChip('available_now', null).tone).toBe('ok');
-    expect(directoryChip('needs_connection', null).tone).toBe('wait');
+    expect(directoryChip('planned', 'Phase 2, Day 9')).toEqual({ label: 'Planned: Phase 2', tone: 'planned', icon: 'calendar' });
+    expect(directoryChip('available_now', null)).toMatchObject({ tone: 'success' });
+    expect(directoryChip('needs_connection', null)).toMatchObject({ tone: 'warning' });
+    expect(TONE_CLASS.planned).toContain('border-dashed');
   });
 });

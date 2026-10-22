@@ -7,6 +7,10 @@ import { SettingsTabs } from '@/components/settings-tabs';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { driverLabel, formatLatency, modeLabel } from '@/lib/status';
+import Link from 'next/link';
+import { listProviders } from '@/server/actions/ai-providers';
+import { sessionToOwner } from '@/server/actions/owner';
+import { requireSessionUser } from '@/server/auth/session';
 import { getHealth } from '@/server/actions/system';
 import { ConfigError, loadConfig } from '@/server/config';
 
@@ -35,7 +39,10 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export default async function SettingsPage() {
-  const health = await getHealth();
+  const user = await requireSessionUser();
+  const [health, providers] = await Promise.all([getHealth(), listProviders(sessionToOwner(user, user.ctx))]);
+  const ready = providers.filter((p) => p.ready);
+  const fallback = providers.find((p) => p.isDefault) ?? providers[0];
   let dataDir: string | null = null;
   try {
     const config = loadConfig();
@@ -55,7 +62,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Settings" title="Settings" description="Appearance, your data and the state of this installation." />
+      <PageHeader title="Settings" description="Appearance, AI, your data and the state of this installation." />
       <SettingsTabs />
 
       <Section title="Appearance" description="Saved in this browser only.">
@@ -88,6 +95,13 @@ export default async function SettingsPage() {
         </Section>
       ) : null}
 
+      <Section title="Accounts for publishing" description="Keys and sign-ins for DEV.to, Hashnode, your site and more.">
+        <p className="text-sm leading-relaxed">Accounts now live under Platforms, with a setup card for every platform and a guided connect for the ones that work today.</p>
+        <Link href="/platforms/integrations" className={buttonVariants({ variant: 'outline', className: 'mt-4' })}>
+          Open Integrations
+        </Link>
+      </Section>
+
       <Section title="Export and deletion" description="Your data is yours to take with you.">
         <p className="text-sm leading-relaxed">
           Download everything you hold in one JSON file: your profile, brand preferences, sources and knowledge items. It contains only your own data.
@@ -96,16 +110,27 @@ export default async function SettingsPage() {
           Download my data
         </a>
         <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
-          You can delete a single knowledge item from its edit page today. Deleting your whole account and everything in it arrives on Day 27; until then
-          there is no account-wide delete button, and none is shown.
+          You can delete a single knowledge item from its edit page. Deleting your whole account and everything in it is not built yet, so there is no
+          account-wide delete button. Export is always available.
         </p>
       </Section>
 
       <Section title="AI" description="Optional. Every feature works without it.">
-        <p className="text-sm leading-relaxed">
-          No AI provider is configured and none is needed. Provider settings (a local Ollama model or your own API key)
-          and the Claude Code connection arrive on Day 4.
-        </p>
+        {providers.length === 0 ? (
+          <p className="text-sm leading-relaxed">
+            No AI provider is set up, and none is needed. You can add a local model, your own API key, or hand tasks to your own Claude Code.
+          </p>
+        ) : (
+          <p className="text-sm leading-relaxed">
+            {ready.length === 0
+              ? `${providers.length} provider${providers.length === 1 ? ' is' : 's are'} saved, but none is ready to use yet.`
+              : `${ready.length} of ${providers.length} provider${providers.length === 1 ? ' is' : 's are'} ready.`}
+            {fallback ? ` Default: ${fallback.name}${fallback.trust === 'external' ? ' (sends text to an outside service when you ask for help)' : ' (stays on your machine or network)'}.` : ''}
+          </p>
+        )}
+        <Link href="/settings/ai" className={buttonVariants({ variant: 'outline', className: 'mt-4' })}>
+          Manage AI providers
+        </Link>
       </Section>
     </>
   );

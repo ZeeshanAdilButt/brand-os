@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { ImportFile, ImportFolder, ImportUrl } from '@/components/articles/import-panels';
+import { ImportTabs } from '@/components/articles/import-tabs';
 import { PageHeader } from '@/components/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { getFolderStatus } from '@/server/actions/import';
@@ -18,23 +18,13 @@ export default async function ImportArticlePage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Articles"
-        title="Import an article"
-        description="Bring in writing you already have. Each import creates a draft with its own history entry, keeps code blocks, tables, links and diagrams, and tells you about anything it could not carry across."
-      >
-        <div>
-          <Link href="/articles" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-            <ArrowLeft aria-hidden />
-            All articles
-          </Link>
-        </div>
+      <PageHeader title="Import an article" description="Each import makes a draft, keeps code blocks, tables, links and diagrams, and tells you about anything it could not carry across.">
+        <Link href="/articles" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+          <ArrowLeft aria-hidden />
+          All articles
+        </Link>
       </PageHeader>
-      <div className="grid max-w-3xl gap-5">
-        <ImportFile />
-        <ImportUrl />
-        <ImportFolder initial={folder} />
-      </div>
+      <ImportTabs folder={folder} />
     </>
   );
 }

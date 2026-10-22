@@ -18,19 +18,19 @@ interface ImportResultDTO {
 
 function Card({ icon, title, intro, children, id }: { icon: ReactNode; title: string; intro: string; children: ReactNode; id: string }) {
   return (
-    <section aria-labelledby={id} className="rounded-xl border bg-card p-4 shadow-xs sm:p-5">
+    <section aria-labelledby={id} className="grid gap-4">
       <div className="flex items-start gap-3">
-        <div aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg border bg-background text-link">
+        <div aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
           {icon}
         </div>
         <div className="min-w-0">
-          <h2 id={id} className=" text-lg font-semibold">
+          <h2 id={id} className="text-base font-semibold">
             {title}
           </h2>
-          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{intro}</p>
+          <p className="mt-0.5 text-sm leading-6 text-muted-foreground">{intro}</p>
         </div>
       </div>
-      <div className="mt-4 grid gap-3">{children}</div>
+      <div className="grid gap-3">{children}</div>
     </section>
   );
 }
@@ -118,8 +118,9 @@ export function ImportFile() {
             ref={input}
             type="file"
             accept=".md,.mdx,.markdown,.txt,text/markdown,text/plain"
-            onChange={() => void submit()}
-            className="h-auto cursor-pointer py-2 file:mr-3 file:cursor-pointer"
+            onChange={() => setError(null)}
+            aria-invalid={error ? true : undefined}
+            className="h-auto cursor-pointer border-dashed py-3 file:mr-3 file:cursor-pointer"
           />
         </Field>
         {error ? <FormNotice tone="error">{error}</FormNotice> : null}
@@ -143,6 +144,10 @@ export function ImportUrl() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (url.trim() === '') {
+      setError('Enter a web address first.');
+      return;
+    }
     setBusy(true);
     setError(null);
     setResult(null);
@@ -182,7 +187,7 @@ export function ImportUrl() {
         </Field>
         {error ? <FormNotice tone="error">{error}</FormNotice> : null}
         <div>
-          <Button type="submit" disabled={busy || url.trim() === ''}>
+          <Button type="submit" disabled={busy}>
             {busy ? 'Fetching' : 'Import page'}
           </Button>
         </div>
@@ -228,6 +233,10 @@ export function ImportFolder({ initial }: { initial: FolderStatusDTO }) {
 
   async function saveFolder(event: React.FormEvent) {
     event.preventDefault();
+    if (path.trim() === '') {
+      setError('Enter a folder path first.');
+      return;
+    }
     setBusy('folder');
     setError(null);
     const response = await api<FolderStatusDTO>('/api/articles/import/folder', { method: 'PUT', json: { path } });

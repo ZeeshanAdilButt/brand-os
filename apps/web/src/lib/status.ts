@@ -23,7 +23,8 @@ export function formatLatency(ms: number | null): string {
 export function chipText(health: Health): string {
   if (health.status === 'error') return 'Database offline';
   if (health.status === 'degraded') return 'Migration pending';
-  return `${modeLabel(health.mode)} · ${driverLabel(health.db.driver)} · ${formatLatency(health.db.latencyMs)}`;
+  // The engine and the latency live in Settings. The bar only speaks up when something is wrong.
+  return modeLabel(health.mode);
 }
 
 /** Full sentence for assistive tech and tooltips. */

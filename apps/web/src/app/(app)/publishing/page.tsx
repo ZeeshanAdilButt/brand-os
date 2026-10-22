@@ -2,116 +2,119 @@ import type { Metadata } from 'next';
 import { ArrowUpRight, FileText, Send } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
-import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import { StatusChip } from '@/components/ui/status-chip';
+import { draftChip } from '@/lib/chips';
 import { formatWhen } from '@/lib/format';
-import { DRAFT_STATUS_LABELS, PLATFORMS, type DraftStatus } from '@/lib/publishing';
-import { cn } from '@/lib/utils';
+import { PLATFORMS, type PlatformDraftDTO } from '@/lib/publishing';
+import { publishHref } from '@/lib/next-step';
 import { sessionToOwner } from '@/server/actions/owner';
-import { listConnections, listDrafts } from '@/server/actions/publishing';
+import { listDrafts } from '@/server/actions/publishing';
 import { requireSessionUser } from '@/server/auth/session';
 
 export const metadata: Metadata = { title: 'Publishing' };
 export const dynamic = 'force-dynamic';
 
-const TONE: Record<DraftStatus, string> = {
-  draft: 'border-input text-muted-foreground',
-  staged: 'border-teal-text/50 text-teal-text',
-  pending_approval: 'border-warning/60 text-warning',
-  approved: 'border-warning/60 text-warning',
-  publishing: 'border-warning/60 text-warning',
-  published: 'border-success/60 bg-success/10 text-success',
-  failed: 'border-destructive/50 text-destructive',
-  unknown: 'border-destructive/60 bg-destructive/10 text-destructive',
-  source_changed: 'border-warning/60 text-warning',
-};
+function Row({ d }: { d: PlatformDraftDTO }) {
+  return (
+    <li className="rounded-xl border bg-surface p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link href={publishHref(d.articleId, { step: '3', d: d.platform })} className="text-base font-semibold underline-offset-2 hover:underline">
+            {d.payload.title || 'Untitled article'}
+          </Link>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {PLATFORMS[d.platform].name}
+            {d.account ? ` · ${d.account}` : ''} · updated {formatWhen(d.updatedAt)}
+          </p>
+        </div>
+        <StatusChip chip={draftChip(d.platform, d)} />
+      </div>
+      {d.remoteUrl && d.status === 'published' ? (
+        <a href={d.remoteUrl} target="_blank" rel="noreferrer noopener" className="mt-2 inline-flex items-center gap-1 break-all text-sm font-medium text-link underline underline-offset-2">
+          {d.remoteUrl}
+          <ArrowUpRight aria-hidden className="size-3.5 shrink-0" />
+        </a>
+      ) : null}
+      {d.failureMessage && (d.status === 'failed' || d.status === 'unknown') ? <p className="mt-2 text-sm text-muted-foreground">{d.failureMessage}</p> : null}
+    </li>
+  );
+}
+
+function Group({ title, note, drafts, id }: { title: string; note?: string; drafts: PlatformDraftDTO[]; id: string }) {
+  if (drafts.length === 0) return null;
+  return (
+    <section aria-labelledby={id} className="mb-8">
+      <h2 id={id} className="text-base font-semibold">
+        {title} <span className="font-normal text-muted-foreground">({drafts.length})</span>
+      </h2>
+      {note ? <p className="mt-0.5 mb-3 text-sm text-muted-foreground">{note}</p> : <div className="mb-3" />}
+      <ul className="grid gap-3">
+        {drafts.map((d) => (
+          <Row key={d.id} d={d} />
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 export default async function PublishingPage() {
   const user = await requireSessionUser();
   const owner = sessionToOwner(user, user.ctx);
-  const [drafts, connections] = await Promise.all([listDrafts(owner, {}, { limit: 100 }), listConnections(owner)]);
-  const connected = connections.filter((c) => c.connection?.status === 'connected');
-  const waiting = drafts.filter((d) => d.status === 'pending_approval').length;
-  const unknown = drafts.filter((d) => d.status === 'unknown').length;
+  const drafts = await listDrafts(owner, {}, { limit: 100 });
+  const unknown = drafts.filter((d) => d.status === 'unknown');
+  const waiting = drafts.filter((d) => d.status === 'pending_approval');
+  const failed = drafts.filter((d) => d.status === 'failed' || d.status === 'source_changed');
+  const inProgress = drafts.filter((d) => d.status === 'publishing' || d.status === 'approved');
+  const prepared = drafts.filter((d) => d.status === 'draft' || d.status === 'staged');
+  const done = drafts.filter((d) => d.status === 'published');
+  const first = unknown[0] ?? waiting[0] ?? failed[0];
 
   return (
     <>
-      <PageHeader eyebrow="Publishing" title="Drafts and posts" description="Every post prepared for a platform, where it stands, and what needs you. Nothing goes out without your explicit approval of that exact post." />
-
-      {unknown > 0 ? (
-        <p role="alert" className="mb-6 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm">
-          {unknown} post{unknown === 1 ? ' has' : 's have'} an unknown result. Open it and use “Check on platform”. It will not be sent again on its own.
-        </p>
-      ) : null}
-      {waiting > 0 ? <p className="mb-6 rounded-lg border border-warning/50 bg-warning/10 px-4 py-3 text-sm">{waiting} post{waiting === 1 ? ' is' : 's are'} waiting for your approval.</p> : null}
+      <PageHeader title="Publishing" description="Every post prepared for a destination, where it stands, and what needs you.">
+        {first ? (
+          <Link href={publishHref(first.articleId, { step: '3', d: first.platform })} className={buttonVariants()}>
+            {unknown.length > 0 ? 'Check post status' : waiting.length > 0 ? 'Review next post' : 'Fix next post'}
+          </Link>
+        ) : (
+          <Link href="/articles" className={buttonVariants()}>
+            <FileText aria-hidden />
+            Prepare posts
+          </Link>
+        )}
+      </PageHeader>
 
       {drafts.length === 0 ? (
-        <section className="rounded-xl border border-dashed bg-card/60 p-6 sm:p-8">
+        <section className="rounded-xl border border-dashed border-input bg-surface p-6 sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
-            <div aria-hidden className="grid size-12 shrink-0 place-items-center rounded-xl border bg-background text-link shadow-soft">
+            <div aria-hidden className="grid size-12 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
               <Send className="size-6" />
             </div>
             <div className="min-w-0">
-              <h2 className=" text-2xl font-semibold">Nothing prepared yet</h2>
-              <p className="mt-2 max-w-2xl leading-relaxed text-muted-foreground">
-                Open an article and choose Publish. You pick a destination, build the post, look at a private copy on the platform, and approve it yourself.
-              </p>
-              <ol className="mt-4 grid max-w-xl gap-2 text-sm">
-                <li>
-                  <span className="font-medium">1.</span> {connected.length > 0 ? `${connected.map((c) => c.info.name).join(' and ')} ${connected.length === 1 ? 'is' : 'are'} connected.` : 'Connect a platform in Settings.'}
-                </li>
-                <li>
-                  <span className="font-medium">2.</span> Open an article, then Publish, then Prepare draft.
-                </li>
-                <li>
-                  <span className="font-medium">3.</span> Stage the private draft, check it on the platform, request approval, then approve.
-                </li>
-              </ol>
-              <div className="mt-5 flex flex-wrap gap-2">
+              <h2 className="text-xl font-semibold">Nothing prepared yet</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Open an article and choose where it should go. You will see a preview of each destination and approve each post yourself.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Link href="/articles" className={buttonVariants({ size: 'sm' })}>
-                  <FileText aria-hidden />
                   Open an article
                 </Link>
-                <Link href="/settings/connections" className={buttonVariants({ size: 'sm', variant: 'outline' })}>
-                  Connections
+                <Link href="/platforms" className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+                  See the platforms
                 </Link>
               </div>
             </div>
           </div>
         </section>
       ) : (
-        <ul className="grid gap-3">
-          {drafts.map((d) => (
-            <li key={d.id} className="rounded-xl border bg-card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <Link href={`/articles/${d.articleId}?panel=publish`} className=" text-lg font-semibold underline-offset-2 hover:underline">
-                    {d.payload.title || 'Untitled article'}
-                  </Link>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    {PLATFORMS[d.platform].name}
-                    {d.account ? ` · ${d.account}` : ''} · updated {formatWhen(d.updatedAt)}
-                  </p>
-                </div>
-                <Badge variant="outline" className={cn(TONE[d.status])}>
-                  {DRAFT_STATUS_LABELS[d.status]}
-                </Badge>
-              </div>
-              {d.remoteUrl && d.status === 'published' ? (
-                <a href={d.remoteUrl} target="_blank" rel="noreferrer noopener" className="mt-2 inline-flex items-center gap-1 break-all text-sm font-medium text-link underline underline-offset-2">
-                  {d.remoteUrl}
-                  <ArrowUpRight aria-hidden className="size-3.5 shrink-0" />
-                </a>
-              ) : null}
-              {d.failureMessage && (d.status === 'failed' || d.status === 'unknown') ? <p className="mt-2 text-sm text-muted-foreground">{d.failureMessage}</p> : null}
-            </li>
-          ))}
-        </ul>
+        <>
+          <Group id="g-unknown" title="Result not known" note="It may or may not have gone out. Checking only reads, and nothing is sent again on its own." drafts={unknown} />
+          <Group id="g-waiting" title="Waiting for your approval" note="Nothing goes public until you approve that exact post." drafts={waiting} />
+          <Group id="g-failed" title="Needs a fix" note="The platform refused it, or the article changed after the post was prepared." drafts={failed} />
+          <Group id="g-progress" title="In progress" drafts={inProgress} />
+          <Group id="g-prepared" title="Prepared" note="Drafts you can still edit and preview." drafts={prepared} />
+          <Group id="g-done" title="Published" drafts={done} />
+        </>
       )}
-
-      <p className="mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        The side-by-side composer, per-destination editing and approved batches arrive on Day 6. Today each destination is prepared, staged and approved on its own, from the article studio.
-      </p>
     </>
   );
 }

@@ -63,7 +63,7 @@ export function StatusChip({ endpoint = '/api/health' }: { endpoint?: string }) 
       title={description}
       aria-label={`System status: ${description} Open settings.`}
       data-state={chip}
-      className="inline-flex h-8 max-w-full items-center gap-2 rounded-full border bg-card px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+      className="inline-flex h-8 max-w-full items-center gap-2 rounded-full border bg-surface px-2.5 text-xs font-medium text-foreground transition-colors duration-[120ms] hover:bg-muted"
     >
       <span aria-hidden className={cn('size-2 shrink-0 rounded-full', DOT[chip])} />
       <span className="hidden truncate sm:inline">{text}</span>

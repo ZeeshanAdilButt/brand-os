@@ -2,12 +2,31 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { activeNavHref, NAV_ITEMS } from '@/lib/nav';
+import { activeNavHref, NAV_FOOTER, NAV_ITEMS, type NavItem } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 import { AccountBlock, type AccountInfo } from './account-block';
 import { Brand } from './brand';
 
-/** Brand, primary navigation and footer note. Shared by the desktop rail and the mobile drawer. */
+function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate: (() => void) | undefined }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-[120ms]',
+        active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
+    >
+      {active ? <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary" /> : null}
+      <Icon aria-hidden className="size-[1.125rem] shrink-0" />
+      {item.label}
+    </Link>
+  );
+}
+
+/** Brand, primary navigation, Settings near the bottom and one honest line about approval. Shared by the desktop rail and the mobile drawer. */
 export function SidebarNav({ onNavigate, account }: { onNavigate?: () => void; account?: AccountInfo }) {
   const pathname = usePathname();
   const current = activeNavHref(pathname);
@@ -16,42 +35,24 @@ export function SidebarNav({ onNavigate, account }: { onNavigate?: () => void; a
       <div className="flex h-14 shrink-0 items-center px-4">
         <Brand {...(onNavigate ? { onNavigate } : {})} />
       </div>
-      <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Primary" className="flex flex-1 flex-col overflow-y-auto px-3 py-3">
         <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = current === href;
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  onClick={onNavigate}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'group relative flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
-                  )}
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary transition-opacity',
-                      active ? 'opacity-100' : 'opacity-0',
-                    )}
-                  />
-                  <Icon aria-hidden className={cn('size-[1.125rem] shrink-0', active && 'text-link')} />
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
+          {NAV_ITEMS.map((item) => (
+            <li key={item.href}>
+              <NavLink item={item} active={current === item.href} onNavigate={onNavigate} />
+            </li>
+          ))}
+        </ul>
+        <ul className="mt-auto flex flex-col gap-1 pt-4">
+          {NAV_FOOTER.map((item) => (
+            <li key={item.href}>
+              <NavLink item={item} active={current === item.href} onNavigate={onNavigate} />
+            </li>
+          ))}
         </ul>
       </nav>
       {account ? <AccountBlock account={account} /> : null}
-      <p className="shrink-0 border-t border-sidebar-border px-5 py-4 text-xs leading-relaxed text-muted-foreground">
-        Nothing is published without your explicit approval.
-      </p>
+      <p className="shrink-0 border-t border-sidebar-border px-5 py-3.5 text-xs leading-5 text-muted-foreground">Nothing goes public until you approve that exact post.</p>
     </div>
   );
 }
