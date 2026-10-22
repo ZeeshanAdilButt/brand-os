@@ -274,7 +274,7 @@ The app never calls Anthropic without a key the person saved, never accepts a Cl
 
 **Trade-off.** An article that was already published is not rebuilt (editing a live post is not built), and a second article with identical text cannot be published to the same account.
 
-## 38. Where publishing is shown
+## 38. Where publishing is shown (superseded by 40 and 47)
 
 **Decision.** Connections moved to Settings > Connections (the old address redirects). The article studio has a Publish panel with one card per destination. The Publishing page lists every draft and what needs the owner (unknown results, waiting approvals). The composer, per-destination editing and approved batches are Day 6.
 

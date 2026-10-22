@@ -4,8 +4,8 @@ Working name for the product that content-powerhouse grows into. Days are implem
 
 ## Current Position
 Phase: 1
-Day: 5
-Status: Built and tested against fake servers (Day 4 complete). Waiting on the owner's live DEV.to check, the one acceptance step only the owner can do
+Day: 7
+Status: Day 6 is built and tested against local fake servers (DEV.to, Hashnode, GitHub). Waiting on the owner's live checks, the one acceptance step only the owner can do (DEV.to, Hashnode, a GitHub pull request); nothing in Days 5 or 6 called a real platform
 
 ## Phase 1: Technical Article Publishing
 
@@ -85,6 +85,10 @@ Not validated, on purpose or for lack of access: no real DEV.to or Hashnode requ
 - [ ] **Pending the owner's live checks:** DEV.to, Hashnode and a GitHub pull request on a real repository (nothing in this day called a real platform)
 
 Acceptance: several destinations from one source, each independently controlled. Met against local fake servers.
+
+Day 6 results: `pnpm test` (94 files, 2,180 tests), `pnpm typecheck`, `pnpm build` and `pnpm web:lint` are green. New tests cover the destination catalog and previews (sanitized, labelled "Approximate preview"), per-destination independence, edits voiding approvals, the manual handoff and its separate approval kind, the canonical check (SSRF refusals, the extra box), the GitHub adapter (branch, one file, no base writes, no overwrite without a matching blob sha, unknown on a timed-out pull request), the approve route taking exactly one approval id, tenant isolation and session-only access for every new route and the agent additions, saved integration values never echoed, the Publishing screen (selection, live previews, recommended chips, remembered choice, unbuildable entries that cannot be ticked, choose all), hydration of the shared components, and the design tokens' contrast in both themes. Real flow: the built app on a spare port with a temporary data folder and local fakes for DEV.to, Hashnode and GitHub (loopback only, behind the explicit test flag): connected all three, chose three platforms on the Publishing screen, saw each preview, edited one title and watched the preview follow, approved one post at a time (the button stayed off until every box was ticked, DEV.to needed the extra canonical box), saw a refused DEV.to publish stop the queue without touching the others, retried it, saw the GitHub calls (read, new branch, one file, one pull request, never the base branch), recorded a Medium post made by hand, and read the results. A walk over every page at 1280px and 400px in light and dark found no console error or warning, no failed request, no hydration warning and no horizontal overflow after the fixes listed in the commit messages.
+
+Not validated, on purpose or for lack of access: no real platform was called; DEV.to and Hashnode live checks and a real GitHub pull request are pending the owner; OAuth connections for the other platforms are the next task.
 
 ### Day 7: Phase 1 hardening
 - [ ] End-to-end publishing tests; authorization and tenant isolation; failed and retried publishes; no duplicates; canonical attribution

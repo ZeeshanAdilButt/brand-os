@@ -238,9 +238,9 @@ export function Composer({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-20 -mx-4 flex items-center gap-3 border-t bg-background/95 px-4 py-3 md:hidden">
-        <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{journey.next.why}</p>
-        <Link href={journey.next.href} className={buttonVariants({ size: 'default' })}>
+      <div className="sticky bottom-0 z-20 -mx-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-t bg-background px-5 py-3 md:hidden">
+        <p className="min-w-0 basis-full text-sm text-muted-foreground">{journey.next.why}</p>
+        <Link href={journey.next.href} className={buttonVariants({ size: 'default', className: 'max-w-full whitespace-normal' })}>
           {journey.next.label}
           <ArrowRight aria-hidden />
         </Link>
