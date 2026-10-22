@@ -287,3 +287,47 @@ The app never calls Anthropic without a key the person saved, never accepts a Cl
 **Checks.** `test/design-tokens.test.ts` computes WCAG contrast from the token values in both themes: 4.5:1 for text pairs (including every category colour on background, surface and raised), 3:1 for the boundary of a form control and for the focus ring. Fonts are local stacks only. Legacy names (`cream`, `rust`, `ink`, `*-subtle`) remain only as aliases.
 
 **Deviations from the review.** None of its rules conflicts with the approval model. Where the review suggested "Layout preview" as the label of an approximate preview, the app keeps "Approximate preview", because that wording is part of the approval design: a preview never claims to be the platform.
+
+## 40. One publishing screen: article, platforms, previews
+
+**Decision.** `/publishing` is the one place to publish from. Three numbered areas work together on one page: (1) pick the article (searchable, newest first, with status and size), (2) tick platforms from the whole directory (category tabs, search, "Recommended for this article" chips), (3) see a live, approximate preview of that article on each ticked platform, with the device toggle, a quick edit of title, description and tags, and a side by side comparison. Ticking a platform adds the destination and prepares its draft, which sends nothing; unticking removes it (a post that went out cannot be removed). The choice is saved with the article on the server, and the last choice is remembered in the browser as a starting suggestion for the next article. A sticky bar says "N platforms selected" and has one button, "Review and approve", which continues to the approval queue.
+
+**What cannot be ticked.** Only entries with a composer destination (13 today) can be ticked. Directory entries without one stay visible with the reason and are never selectable, so they cannot reach a preview, a queue or an approval. Of the ticked ones only DEV.to, Hashnode and the personal site publish through the app; the others get a preview and a manual handoff.
+
+**Why.** The earlier guided path spread "choose" and "preview" over two screens and the composer over a third. Putting them on one page makes previews two clicks from Home. The old separate steps are folded in: `/articles/<id>/publish` now serves the approval queue, the results and the expert composer, and redirects a request for the old choose or preview steps to the Publishing screen.
+
+## 41. Approving several posts: a review queue, never a bulk approval
+
+**Decision.** There is no bulk approve. "Batch" means a review queue: the owner reviews one destination, approves it with its own button ("Approve and next"), and the queue moves on. The approve route accepts exactly one approval id and a body of only the ticked boxes (`.strict()`); the queue is a pure client reducer with no function that approves more than one post; it stops on a failure or an unknown result and never retries a publish by itself. No keyboard shortcut, command palette entry or MCP tool approves or publishes.
+
+**Trade-off.** Approving five posts is five deliberate acts. That is the product: every public action needs the owner's own per-action approval.
+
+## 42. Destinations, drafts and independence
+
+**Decision.** Each destination of an article has its own platform draft: its own payload, hash, status, lint, approval and attempts. `article_destinations` records which destinations the owner added and in what order. Editing one never changes another, a failure on one leaves the others untouched, and an approval is bound to one payload hash, so an edit after the request voids it and the draft goes back to staging. A draft keeps what the adapter generated (`generated_payload`) next to what the owner edited, so "reset to generated" and the divergence view are exact. `platform_drafts` also gain `extras` (hashed with the payload: the site file path, a subreddit, a Mastodon instance), `remote_info`, `published_via` (app or manual), `edited_at` and `edit_count`.
+
+**Preparing needs no account.** Preparing builds the post from the article and sends nothing, so it works without a connection (the owner can still preview and post by hand). The connected account is attached when staging, which changes the hash before any approval exists. Staging, approving and publishing still need the connection.
+
+## 43. Platform catalog: 13 composer destinations, 45 directory entries
+
+**Decision.** The catalog (`lib/catalog.ts`) holds 13 destinations with capability data (formats, limits, what the API allows, restrictions, cost, manual hosts): DEV.to, Hashnode, the personal site, Medium, Substack, LinkedIn, X, Bluesky, Threads, Mastodon, Reddit, Hacker News and YouTube. Three have adapters (DEV.to, Hashnode, GitHub for the site). The others use a content adapter that adapts and lints but whose every network method refuses with a clean "not sent" error. `isPublishable` and `requirePublishable` gate stage, approve, publish, check and connect. The directory (`lib/directory.ts`) adds the rest of the roadmap (blogs, social, communities, video, conferences, editorial, launches, aggregators) as directory-only entries: visible with their method, plan and cost, never selectable.
+
+**Connection method per platform** is recorded in the directory: `api_key` (DEV.to, Hashnode, and a GitHub access key for the site), `oauth` (LinkedIn, X, Threads, Mastodon, Reddit, YouTube), `browser_assisted` (platforms with no usable API, where the owner's own Claude can set up access in their browser) and `manual_only` (Medium, Substack, Hacker News). OAuth connections are the next task: the Connect button stays off with the reason until then.
+
+## 44. The personal site through GitHub, with safeguards
+
+**Decision.** The personal site destination is Markdown export (generic, Hugo, Jekyll or MDX presets, with a path template and a front matter mapping) and, optionally, a pull request through the GitHub REST API. The adapter does only this, in order: read the base branch sha, read the target file on the base branch, create a new branch `brand-os/<slug>-<first 8 hex of the payload hash>` at that sha, commit one file to it, open a pull request. It never writes to the base branch, never merges, and refuses to replace an existing file unless the draft says "update existing" and the file's blob sha is the one the owner saw. A leftover branch is reused only if its tip is the base sha. Everything before the pull request call is a clean "not sent" failure (the worst case is a stray branch); the pull request call can be ambiguous (a timeout is `unknown`) and "Check on platform" looks for a pull request from that branch. Staging the site is read-only. The access key needs Contents and Pull requests (read and write) for that one repository.
+
+## 45. Canonical page check
+
+**Decision.** Before a syndication copy is approved, the app looks at the article's canonical page: a read-only fetch with the same SSRF-safe fetcher as URL import (public https only, private and loopback addresses and DNS that points inward are refused, one hop of redirect re-checked, size and time capped), plus a check that the page is on the host the owner set for their site. The result is kept per article and address. When the page is not live (404, unreachable, blocked), the approval needs one more box, "I know the canonical page is not live yet". Publishing is never blocked by the check, only made deliberate.
+
+**Deviation from the design review.** The review asked for one combined acknowledgement. The approval keeps the four separate boxes the server computes (read the payload, it goes public, canonical, not undone by the app) plus the canonical box when needed. Fewer boxes would weaken the per-action approval, so the rule wins.
+
+## 46. Saved values for platforms that are not built yet
+
+**Decision.** The owner can save what a not-yet-built platform will need (an API key, or an OAuth client id and client secret). They are encrypted with the same AES-256-GCM scheme as connection keys, bound to the owner and the row, shown as "Saved. Not used yet." with only the last four characters, never returned, logged or echoed, never exposed through the agent API or MCP, wiped by Remove, and tenant isolated. For platforms with no usable API, a copyable prompt lets the owner's own Claude set up access in their browser; the secret never passes through chat.
+
+## 47. Where things live in the app
+
+**Decision.** Home (one next step, computed from real state), Articles, Publishing, Platforms (Directory and Integrations tabs, with the old Connections addresses redirecting), Knowledge, and Settings at the bottom. A global command palette (Ctrl K) lists pages, articles and platforms and never lists an action that approves, declines or publishes. Status language is shared: one set of chips with an icon and text, in one tone vocabulary (neutral, info, success, warning, danger, planned).

@@ -71,10 +71,20 @@ Day 5 results: `pnpm test`, `pnpm typecheck`, `pnpm build` and `pnpm web:lint` a
 Not validated, on purpose or for lack of access: no real DEV.to or Hashnode request was made, and the owner's live check is pending; Hashnode is built from the official schema only (INTEGRATIONS.md open risks 19 and 20); no real Postgres server run of the hosted driver (as on earlier days); the approval has no per-action presence check in the web app (DECISIONS.md 33).
 
 ### Day 6: Publishing preview and workflow
-- [ ] Composer: original (left), destination cards (middle), AI suggestions (right); per-destination preview, edit, diff, metadata
-- [ ] Individual and approved batch publishing; retries; result links; personal-site adapter (Markdown or reviewable GitHub change, never silent)
+- [x] Composer: original, destination cards for all 13 destinations, suggestions; per-destination drawer with edit, approximate preview, diff against generated and against the article, reset, divergence
+- [x] One Publishing screen: article picker, platform selector (category tabs, search, recommended chips), live previews per platform, quick edit, side by side comparison, one "Review and approve" button
+- [x] Approval as a one-at-a-time queue ("Approve and next"); no bulk approval anywhere (route, queue reducer, keyboard, command palette, MCP)
+- [x] Retries, history and result links per destination; unknown results resolved by a read-only check or by hand
+- [x] Personal-site destination: Markdown export presets, GitHub pull request adapter with safeguards (own branch, one file, never the base branch, never a merge, no overwrite without a matching blob sha)
+- [x] Canonical page check (SSRF-safe, read-only) with a required extra box when the page is not live
+- [x] Manual handoff for every platform, with link validation and a manual approval that cannot be spent as a publish
+- [x] Platform directory (every roadmap platform), Integrations, saved values for platforms not built yet (encrypted, never read back)
+- [x] AI: adapt for a platform, editor's review, title suggestions; validated, shown as a diff, never applied on their own
+- [x] Agent API and MCP: list destinations, update a draft, read a preview; still no approve or publish
+- [x] Design system v2 (Warm Editorial), Home with one next step, command palette
+- [ ] **Pending the owner's live checks:** DEV.to, Hashnode and a GitHub pull request on a real repository (nothing in this day called a real platform)
 
-Acceptance: several destinations from one source, each independently controlled.
+Acceptance: several destinations from one source, each independently controlled. Met against local fake servers.
 
 ### Day 7: Phase 1 hardening
 - [ ] End-to-end publishing tests; authorization and tenant isolation; failed and retried publishes; no duplicates; canonical attribution

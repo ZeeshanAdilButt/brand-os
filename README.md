@@ -19,7 +19,8 @@ Brand OS is a local-first, self-hostable studio for technical writers and engine
 | Article studio: Markdown editor, autosave, version history, import, assets, reading view | Built |
 | AI assistance in the studio (local model, your own API key, or Claude Code hand-off), AI task inbox with diffs to accept or reject, agent API with per-user keys, and the `brand-os` MCP server for Claude Code | Built and tested |
 | Technical publishing in the web app: connections, DEV.to and Hashnode adapters, private drafts, hash-bound single-use approval, the approved publish, recovery for an unknown result, and agent and MCP tools that can prepare and ask but never approve | Built and tested against local fake servers. **DEV.to live check pending the owner**; Hashnode is built from the official schema and is live-unverified |
-| Per-destination composer, previews and batches, more destinations | Planned (see [roadmap](#roadmap)) |
+| One Publishing screen (article, platforms, live previews), a one-at-a-time approval queue, an expert composer, 13 destinations with previews and manual posting, the personal site as a Markdown export or a GitHub pull request, a canonical page check, a directory of every planned platform, and saved integration values for platforms that are not built yet | Built and tested against local fake servers. DEV.to, Hashnode and GitHub are the only destinations that publish through the app; live checks pending the owner |
+| More destinations that publish through the app (OAuth connections come next) | Planned (see [roadmap](#roadmap)) |
 | Hosted cloud service, team workspaces | Planned |
 
 Nothing here is a mock-up: unfinished features are hidden or shown as clearly disabled.
@@ -155,19 +156,29 @@ Details, scopes and troubleshooting: [docs/brand-os-mcp.md](docs/brand-os-mcp.md
 
 ### Publish to DEV.to
 
-The web app publishes through Settings > Connections. This is the one step that only you can do, because it needs your own DEV.to key and your own approval. Nothing here has been run against the real DEV.to yet.
+The web app publishes through Platforms > Integrations. This is the one step that only you can do, because it needs your own DEV.to key and your own approval. Nothing here has been run against the real DEV.to yet.
 
 1. In DEV.to open Settings, then Extensions, and create a "DEV Community API Key".
-2. In Brand OS open **Settings > Connections**, paste the key into the DEV.to card (a password field) and choose **Connect DEV.to**. The key is checked with a read-only request and stored encrypted. It is never shown again.
-3. Open an article, choose **Publish** in the studio toolbar, then **Prepare draft**. Read the checks: an image that only exists in the app, or more than four tags, must be fixed first.
+2. In Brand OS open **Platforms > Integrations**, paste the key into the DEV.to card (a password field) and choose **Connect DEV.to**. The key is checked with a read-only request and stored encrypted. It is never shown again.
+3. Open **Publishing**, choose the article, tick **DEV.to** (this prepares the post). Read the checks: an image that only exists in the app, or more than four tags, must be fixed first.
 4. Choose **Stage private draft**, then **Open the private draft on DEV.to** and look at it in your DEV.to dashboard. It is a draft, not public.
 5. Only if you want it live: choose **Request approval**, read the exact post, tick all four boxes and choose **Approve and publish**. It goes out once. If the result is unknown, use **Check on platform**; it is never retried for you.
 
 Hashnode works the same way (it needs a Pro plan on the publication) and is marked live-unverified until you have tried it.
 
+### Publish from the composer
+
+Open **Publishing** (or choose **Publish** on Home or in the studio). One page, three areas:
+
+1. **Article.** The article is already chosen when you arrive from Home or the studio; search to change it.
+2. **Platforms.** Tick as many as you like. Recommended ones are marked with the reason. Ticking prepares a preview at once and sends nothing. Platforms that are not built yet are listed but cannot be ticked.
+3. **Previews.** Each ticked platform shows an approximate preview of your article, with a desktop and phone toggle, a few fields to fix, and a side by side comparison.
+
+Then choose **Review and approve**. Each post is shown on its own, with its exact content, and needs its own approval ("Approve and next"). There is no approve all. For platforms the app cannot publish to, copy the post, publish it yourself, and record the link. For the personal site you can download the Markdown file or let the app open a pull request on your repository (Platforms > Integrations has the repository setting); the app never merges it.
+
 ### Connect your systems
 
-0. The web app: open **Settings > Connections** to connect DEV.to or Hashnode (see "Publish to DEV.to" above).
+0. The web app: open **Platforms > Integrations** to connect DEV.to, Hashnode or your site repository (see "Publish to DEV.to" above).
 1. The Phase 0 command-line tool: open the dashboard (`cph dashboard`) and go to **Connections**.
 2. **DEV.to:** create an API key in your DEV.to settings and paste it into the dashboard card. Never paste keys into chat.
 3. **Buffer (optional, for LinkedIn, X and YouTube):** create a free account, connect the channels, create one API key and paste it into the dashboard card.

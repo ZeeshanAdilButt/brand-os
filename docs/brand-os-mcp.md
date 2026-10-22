@@ -23,6 +23,9 @@ Verified against Claude Code's MCP documentation on 2026-10-21 (see `INTEGRATION
 | `stage_remote_draft` | `platform_drafts` | Create or update a PRIVATE draft on the platform. Never public; refused while lint errors exist |
 | `request_publish_approval` | `platform_drafts` | Open a pending, single-use request (30 minutes) and return the link where the owner decides. Publishes nothing |
 | `get_publication_status` | `read` | Where a draft stands, the link once published, any failure |
+| `list_destinations` | `read` | The destinations of an article: which exist, which the app can publish to, and where each draft stands |
+| `update_platform_draft` | `platform_drafts` | Change one destination's title, description, tags, cover, canonical URL or text. It is a new payload hash and voids any open approval; nothing is sent. Needs the hash you read |
+| `get_publication_preview` | `read` | The exact payload, the checks and an approximate preview as text |
 
 There are **no tools to approve, decline, publish, check on a platform, mark a result, connect an account, change credentials or provider settings, or reach other accounts**, and no route behind them: only the signed-in owner can approve, in the app. A test fails if a tool or an agent route with such a name or purpose appears.
 
@@ -91,7 +94,7 @@ A result is checked by the same rules as an answer from any model: one to five o
 
 With the `platform_drafts` scope Claude can take an article as far as a request for your approval, and no further.
 
-1. In **Settings > Connections** you connect DEV.to (and Hashnode, live-unverified). Claude never sees or sets a key.
+1. In **Platforms > Integrations** you connect DEV.to (and Hashnode, live-unverified). Claude never sees or sets a key.
 2. Claude calls `create_platform_draft` for an article, reads the lint with `get_platform_draft` and tells you what must be fixed (an image that only exists in the app, too many tags). Lint errors block staging and approval.
 3. `stage_remote_draft` makes a private copy on the platform, which you can open there.
 4. `request_publish_approval` returns a link to the article's Publish panel. Opening it approves nothing. You read the exact payload, tick four boxes and click **Approve and publish**. The request expires after 30 minutes, can be used once, and is void if the article changes.

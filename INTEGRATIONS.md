@@ -424,6 +424,37 @@ Wording rule for the UI: never say "Connect your Claude account". Say "Add an An
 
 ---
 
+## 8. GitHub REST API (the personal site)
+
+The personal site destination can open a pull request that adds one Markdown file to the owner's own repository. Sources (read 2026-10-22): docs.github.com REST reference for repositories, Git references, repository contents and pull requests; the "Rate limits for the REST API" and "Permissions required for fine-grained personal access tokens" pages.
+
+### Auth and headers
+
+- `Authorization: Bearer <access key>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and a `User-Agent` (GitHub rejects requests without one).
+- A fine-grained personal access key limited to the one repository, with Contents (read and write) and Pull requests (read and write). Metadata read is implied. No other scope is needed.
+
+### The calls, in order (all under `/repos/{owner}/{repo}`)
+
+1. `GET /repos/{owner}/{repo}`: the connection check. Reads the default branch, whether the repository is archived and whether the key can push.
+2. `GET /git/ref/heads/{base}`: the sha of the base branch.
+3. `GET /contents/{path}?ref={base}`: is the target file already there, and its blob sha. A 404 means the path is free.
+4. `POST /git/refs` with `ref: refs/heads/brand-os/<slug>-<hash8>` and the base sha: a new branch. A branch that already exists is reused only when its tip is still the base sha.
+5. `PUT /contents/{path}` with `branch`, the base64 content and, only when replacing a file the owner has seen, that file's blob `sha`: one commit on the new branch.
+6. `POST /pulls` with `head` (the new branch) and `base`: the pull request. `maintainer_can_modify` is false.
+7. `GET /pulls?head={owner}:{branch}&state=all`: "Check on platform" looks for a pull request from the branch.
+
+The adapter never writes to the base branch, never merges and never deletes a branch. Steps 1 to 5 are not visible on the site, so a failure there is a clean refusal; step 6 is the only one that can be ambiguous (a timeout is `unknown`).
+
+### Limits and errors
+
+Authenticated requests are limited to 5,000 an hour for a personal key (the response headers `x-ratelimit-remaining` and `x-ratelimit-reset` say where you stand); a 403 or 429 with `retry-after` or `x-ratelimit-remaining: 0` is a rate limit. A 403 "Resource not accessible by personal access token" means the key lacks Contents or Pull requests on that repository. A 422 on `POST /pulls` usually means there is nothing to compare or a pull request already exists for the branch. A 409 on `PUT /contents` means the sha did not match.
+
+### Gotchas
+
+- The branch name must be a valid ref; the app only builds it from a safe slug and a hash.
+- A file path is validated (no `..`, no leading slash, no `.git` segment) and encoded segment by segment.
+- Large files go through the Contents API only up to 1 MB with the default media type; an article is far smaller.
+
 ## Open risks and UNVERIFIED items
 
 1. **Hashnode host and Pro scope are moving.** `gql.hashnode.com` now redirects; `gql-beta.hashnode.com` is the official skill's target. The announcement says all API requests need Pro; the skill README says public reads are free. Keep host, and "needs Pro" detection (`FORBIDDEN` message), configurable. Re-introspect the schema on connect.
@@ -446,3 +477,6 @@ Wording rule for the UI: never say "Connect your Claude account". Say "Add an An
 18. **Not re-checked this run** (carried from `docs/research/01-longform-platforms.md`, dated 2026-10-19): Substack (no post API, no canonical field), DEV.to AI disclosure wording, Medium AI-content and Partner Program rules, Hashnode CLI details beyond the flags quoted above.
 19. **Day 5, DEV.to.** The tag rules (characters, length), the title limit, the fields of `/api/users/me` and rate limits are not in the official reference. The adapter cleans and warns; it has only met a fake server. The first live check is the owner's (README, "Publish to DEV.to").
 20. **Day 5, Hashnode.** Everything in the Day 5 adapter check above marked UNVERIFIED, and the Pro requirement for the first draft. Treat the adapter as a draft until a real token has been tried once.
+
+21. **Day 6, GitHub.** Every call in section 8 is written from the documentation and exercised only against a local fake. No real repository was touched. UNVERIFIED against GitHub itself: the exact message of a 403 for a missing permission (the adapter matches on wording and on the status), the 422 body for "no commits between branches", and `maintainer_can_modify: false` on a repository the key owns.
+22. **Day 6, platform facts for the preview and manual handoff.** Limits quoted in the catalog (character counts for X, Bluesky, Threads, Mastodon and LinkedIn, tag limits, title limits for Hacker News and Reddit, the 150 requests a day for LinkedIn) come from each platform's public documentation as of 2026-10-22 and are shown as approximations. Reddit's self-promotion rules, Hacker News's submission guidelines and Substack's lack of a canonical field are rules of the platforms that can change. Previews are approximate and say so; none claims to be a pixel copy.
