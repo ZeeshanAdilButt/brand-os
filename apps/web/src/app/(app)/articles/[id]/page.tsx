@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { StudioLoader } from '@/components/articles/studio-loader';
 import type { ArticleDTO } from '@/lib/articles';
 import { aiAvailability } from '@/server/actions/ai-providers';
@@ -13,6 +13,8 @@ export const dynamic = 'force-dynamic';
 export default async function ArticleStudioPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ panel?: string }> }) {
   const { id } = await params;
   const { panel } = await searchParams;
+  // The old side panel moved to its own screen; an old link still lands in the right place.
+  if (panel === 'publish') redirect(`/articles/${id}/publish`);
   const user = await requireSessionUser();
   const owner = sessionToOwner(user, user.ctx);
   let article;
@@ -42,5 +44,5 @@ export default async function ArticleStudioPage({ params, searchParams }: { para
     publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
   };
   const { providers } = await aiAvailability(owner);
-  return <StudioLoader initial={initial} providers={providers} initialPanel={panel === 'publish' ? 'publish' : undefined} />;
+  return <StudioLoader initial={initial} providers={providers} />;
 }
