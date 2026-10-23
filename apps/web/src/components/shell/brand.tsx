@@ -1,16 +1,11 @@
 import Link from 'next/link';
+import { BrandLockup } from '@/components/brand/brand-mark';
 
-/** Product mark and wordmark. Links home. */
-export function Brand({ onNavigate }: { onNavigate?: () => void }) {
+/** Product mark and wordmark. Links home. `onForest` is for the forest sidebar. */
+export function Brand({ onNavigate, onForest = false, size = 32 }: { onNavigate?: () => void; onForest?: boolean; size?: number }) {
   return (
-    <Link href="/" onClick={onNavigate} className="group flex items-center gap-2.5 rounded-md" aria-label="Brand OS home">
-      <span
-        aria-hidden
-        className="grid size-8 place-items-center rounded-lg bg-primary font-serif text-lg leading-none font-semibold text-primary-foreground"
-      >
-        B
-      </span>
-      <span className="text-[1.0625rem] leading-tight font-semibold tracking-tight">Brand OS</span>
+    <Link href="/" onClick={onNavigate} className="group inline-flex rounded-lg" aria-label="Brand OS home">
+      <BrandLockup onForest={onForest} size={size} />
     </Link>
   );
 }
