@@ -5,6 +5,7 @@ import { statusLabel, type DraftStatus, type PlatformId, type PublishedVia } fro
  * One status language for Home, Platforms, Integrations, the studio and the composer. Attention, progress, success
  * and uncertainty each have their own colour AND their own icon and words, so nothing is told apart by colour alone:
  *
+ *   attention needs setting up (a connection): the warm accent, the only place it marks state
  *   warning  needs you (pending approval) or is uncertain (unknown result, stale draft, needs connection)
  *   info     progress or a recorded step (private draft, approved, publishing, preview only)
  *   success  done and live
@@ -12,7 +13,7 @@ import { statusLabel, type DraftStatus, type PlatformId, type PublishedVia } fro
  *   neutral  idle or informational (not prepared, draft, manual only)
  *   planned  not available yet: dashed outline
  */
-export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'planned';
+export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'planned' | 'attention';
 
 export type ChipIcon =
   | 'dashed-circle'
@@ -38,6 +39,7 @@ export const TONE_CLASS: Record<Tone, string> = {
   warning: 'border-warning/30 bg-warning-subtle text-warning',
   danger: 'border-danger/30 bg-danger-subtle text-danger',
   planned: 'border-dashed border-input bg-transparent text-neutral',
+  attention: 'border-accent-warm/30 bg-accent-warm-soft text-accent-warm-ink',
 };
 
 export interface Chip {
@@ -69,7 +71,7 @@ export function directoryChip(status: DirectoryStatus, roadmap: string | null): 
     case 'available_now':
       return { label: 'Available now', tone: 'success', icon: 'plug-check' };
     case 'needs_connection':
-      return { label: 'Needs connection', tone: 'neutral', icon: 'plug' };
+      return { label: 'Needs connection', tone: 'attention', icon: 'plug' };
     case 'preview_only':
       return { label: 'Preview only', tone: 'neutral', icon: 'eye' };
     case 'manual_only':

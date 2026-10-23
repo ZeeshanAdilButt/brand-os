@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors duration-[120ms] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-[0.9375rem] font-medium whitespace-nowrap transition-colors duration-[120ms] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -12,21 +12,21 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive font-semibold text-destructive-foreground hover:opacity-90",
         outline:
-          "border border-input bg-surface text-foreground hover:bg-accent hover:text-accent-foreground",
+          "border-[1.5px] border-border-strong bg-surface text-foreground hover:bg-accent hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground",
         ghost:
           "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-link underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 has-[>svg]:px-3.5",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-        lg: "h-11 rounded-md px-6 has-[>svg]:px-5",
+        xs: "h-7 gap-1 rounded-lg px-2.5 text-xs has-[>svg]:px-2 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-9 gap-1.5 rounded-lg px-3 text-sm has-[>svg]:px-2.5",
+        lg: "h-11 rounded-xl px-6 text-base has-[>svg]:px-5",
         icon: "size-10",
-        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
+        "icon-xs": "size-7 rounded-lg [&_svg:not([class*='size-'])]:size-3.5",
+        "icon-sm": "size-9 rounded-lg",
         "icon-lg": "size-11",
       },
     },

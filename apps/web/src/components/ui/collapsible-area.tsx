@@ -33,6 +33,7 @@ const BAR = {
  */
 export function CollapsibleArea({
   title,
+  heading,
   summary,
   collapsed,
   onCollapsedChange,
@@ -47,7 +48,10 @@ export function CollapsibleArea({
   className,
   collapsedClassName,
 }: {
+  /** The short name: it labels the fold control and the folded bar. */
   title: string;
+  /** The heading shown while the area is open, when it should say more than the name (a question, for example). */
+  heading?: string;
   /** One line shown in the folded bar, for example the chosen article or "2 platforms selected". */
   summary: string;
   collapsed: boolean;
@@ -101,10 +105,10 @@ export function CollapsibleArea({
           </button>
         </h2>
       ) : (
-        <div className={cn('flex gap-2.5', flush ? 'items-center border-b px-4 py-2' : 'mb-1 items-start')}>
-          <h2 id={headingId} className="flex min-w-0 flex-1 items-center gap-2.5 text-lg font-semibold">
+        <div className={cn('flex gap-2.5', flush ? 'items-center border-b px-4 py-2' : 'mb-1 items-center')}>
+          <h2 id={headingId} className="flex min-w-0 flex-1 items-center gap-2.5 text-xl leading-7 font-semibold">
             {badge}
-            <span className="min-w-0">{title}</span>
+            <span className="min-w-0">{heading ?? title}</span>
           </h2>
           {actions}
           {canCollapse ? (
@@ -115,7 +119,7 @@ export function CollapsibleArea({
               aria-label={`Fold ${title}`}
               title={`Fold ${title} away`}
               onClick={() => onCollapsedChange(true)}
-              className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+              className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
             >
               <CloseIcon aria-hidden className={cn('size-4', b.open)} />
               <ChevronUp aria-hidden className={cn('size-4', b.chevron)} />
@@ -123,8 +127,8 @@ export function CollapsibleArea({
           ) : null}
         </div>
       )}
-      {!collapsed && !flush && note ? <p className="mb-3 text-sm text-muted-foreground">{note}</p> : null}
-      {!collapsed && !flush && !note ? <div className="mb-3" /> : null}
+      {!collapsed && !flush && note ? <p className="mb-4 text-sm leading-5 text-muted-foreground">{note}</p> : null}
+      {!collapsed && !flush && !note ? <div className="mb-4" /> : null}
       <div id={bodyId} hidden={collapsed} className={flush ? 'min-h-0 flex-1' : undefined}>
         {children}
       </div>

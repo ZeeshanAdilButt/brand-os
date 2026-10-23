@@ -27,7 +27,7 @@ export function StatusChip({ chip, className, title }: { chip: Chip; className?:
   return (
     <span
       title={title}
-      className={cn('inline-flex min-h-6 w-fit shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-xs font-semibold leading-4', TONE_CLASS[chip.tone], className)}
+      className={cn('mono-label inline-flex min-h-6 w-fit shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5', TONE_CLASS[chip.tone], className)}
     >
       <Icon aria-hidden className={cn('size-3.5 shrink-0', chip.icon === 'spinner' && 'motion-safe:animate-spin')} />
       {chip.label}
