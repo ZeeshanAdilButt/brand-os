@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { BookOpen, ChevronLeft, ChevronRight, FileDown, FileText, Search } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, FileDown, Search } from 'lucide-react';
+import { BranchArt } from '@/components/brand/branch-art';
 import { ArticleStatusBadge } from '@/components/articles/status-badge';
 import { NewArticleButton } from '@/components/articles/new-article-button';
 import { MarkedText } from '@/components/knowledge/marked-text';
@@ -63,7 +64,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Articles">
+      <PageHeader eyebrow="Library" title="Articles">
         <Link href="/articles/import" className={buttonVariants({ variant: 'outline' })}>
           <FileDown aria-hidden />
           Import
@@ -82,8 +83,8 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
                   href={href({ q, status: tab.key })}
                   aria-current={current ? 'page' : undefined}
                   className={cn(
-                    '-mb-px inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm transition-colors duration-[120ms]',
-                    current ? 'border-primary font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
+                    '-mb-px inline-flex h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 text-[0.9375rem] transition-colors duration-[120ms]',
+                    current ? 'border-accent-warm font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {tab.label}
@@ -113,10 +114,8 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
       {problem ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{problem}</p> : null}
 
       {!problem && counts.total === 0 && !filtered ? (
-        <section className="rounded-xl border border-input bg-surface p-6 text-center sm:p-10">
-          <div aria-hidden className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-accent text-accent-foreground">
-            <FileText className="size-6" />
-          </div>
+        <section className="rounded-xl border bg-surface p-6 text-center sm:p-10">
+          <BranchArt className="mx-auto mb-4 h-20 w-auto" />
           <h2 className="text-xl font-semibold">Bring in your first article</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
             Import a Markdown file, a page on your site or a folder of posts, or start with a blank page. Code blocks, tables and diagrams come across intact.
@@ -132,7 +131,8 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
       ) : null}
 
       {!problem && result && shown.length === 0 && (counts.total > 0 || filtered) ? (
-        <section className="rounded-xl border border-input bg-surface p-8 text-center">
+        <section className="rounded-xl border bg-surface p-8 text-center">
+          <BranchArt branches={2} className="mx-auto mb-3 h-14 w-auto" />
           <h2 className="text-lg font-semibold">{q ? 'No matches' : 'Nothing with this status'}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {q ? 'Search looks at titles, descriptions, tags and text, and matches word stems (run finds running). Try fewer or different words.' : 'Pick another tab above.'}
@@ -155,7 +155,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
               return (
                 <li key={article.id} className="flex flex-col gap-3 px-5 py-5 transition-colors duration-[120ms] hover:bg-accent sm:flex-row sm:items-start sm:gap-4 sm:px-6">
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-serif text-xl leading-7 font-normal tracking-normal">
+                    <h2 className="font-serif text-xl leading-7 font-semibold tracking-[-0.01em]">
                       <Link href={`/articles/${article.id}`} className="rounded-sm hover:underline">
                         {hit ? <MarkedText text={hit.titleMarked} /> : article.title || 'Untitled article'}
                       </Link>

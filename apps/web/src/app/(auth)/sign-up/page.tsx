@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Create account' };
 export default function SignUpPage() {
   return (
     <>
-      <h1 className="mb-1  text-2xl font-semibold">Create your account</h1>
+      <h1 className="mb-2 text-3xl font-bold">Create your account</h1>
       <p className="mb-6 text-sm text-muted-foreground">An email and a password. No third-party sign-in, no AI key needed.</p>
       <AuthForm mode="sign-up" />
     </>

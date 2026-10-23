@@ -3,6 +3,7 @@ import { ExternalLink, FileText, Send } from 'lucide-react';
 import { JourneySteps } from '@/components/guided/journey-steps';
 import { NextStepCard } from '@/components/guided/next-step-card';
 import { NewArticleButton } from '@/components/articles/new-article-button';
+import { BranchArt } from '@/components/brand/branch-art';
 import { PageHeader } from '@/components/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -22,8 +23,8 @@ export default async function HomePage() {
 
   return (
     <>
-      <PageHeader title="Home" description="One article, a few destinations, and you approve each post yourself.">
-        <Link href={home.focus ? `/publishing?article=${home.focus.id}` : "/publishing"} className={buttonVariants({ variant: "outline" })}>
+      <PageHeader eyebrow="Home" title="Your next step" description="One article, a few destinations, and you approve each post yourself.">
+        <Link href={home.focus ? `/publishing?article=${home.focus.id}` : "/publishing"} className={buttonVariants({ variant: "outline", size: "lg" })}>
           <Send aria-hidden />
           Publish
         </Link>
@@ -51,14 +52,17 @@ export default async function HomePage() {
       />
 
       {home.journey ? null : (
-        <section aria-labelledby="progress-heading" className="mt-6 rounded-xl border bg-surface p-6">
+        <section aria-labelledby="progress-heading" className="mt-6 flex flex-col items-center gap-4 rounded-xl border bg-surface p-6 text-center sm:flex-row sm:text-left">
+          <BranchArt className="h-16 w-auto shrink-0" />
+          <div>
           <h2 id="progress-heading" className="mb-1 text-lg font-semibold">
             How it works
           </h2>
-          <p className="text-sm leading-6 text-muted-foreground">
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Write or import an article, choose where it should go, look at a preview of each destination, approve each post yourself, then share the links. Nothing is sent
             until you approve it.
           </p>
+          </div>
         </section>
       )}
 
@@ -66,7 +70,7 @@ export default async function HomePage() {
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
           <section aria-labelledby="recent-articles" className="rounded-xl border bg-surface">
             <div className="flex items-center justify-between border-b px-5 py-3">
-              <h2 id="recent-articles" className="text-base font-semibold">
+              <h2 id="recent-articles" className="text-lg font-semibold">
                 Recent articles
               </h2>
               <Link href="/articles" className="text-sm font-medium text-link hover:underline">
@@ -90,7 +94,7 @@ export default async function HomePage() {
 
           <section aria-labelledby="recent-results" className="rounded-xl border bg-surface">
             <div className="flex items-center justify-between border-b px-5 py-3">
-              <h2 id="recent-results" className="text-base font-semibold">
+              <h2 id="recent-results" className="text-lg font-semibold">
                 Recent publishing results
               </h2>
               <Link href="/publishing" className="text-sm font-medium text-link hover:underline">
@@ -98,7 +102,10 @@ export default async function HomePage() {
               </Link>
             </div>
             {home.results.length === 0 ? (
-              <p className="px-5 py-6 text-sm leading-6 text-muted-foreground">Nothing has been published yet. When a post goes out, its link shows up here.</p>
+              <div className="flex flex-col items-center gap-2 px-5 py-6 text-center">
+                <BranchArt branches={2} className="h-12 w-auto" />
+                <p className="text-sm leading-6 text-muted-foreground">Nothing has been published yet. When a post goes out, its link shows up here.</p>
+              </div>
             ) : (
               <ul className="divide-y">
                 {home.results.map((r) => (

@@ -41,13 +41,13 @@ function Step({ step, index, last = false, compact = false }: { step: JourneySte
     <span
       aria-hidden
       className={cn(
-        'grid size-6 shrink-0 place-items-center rounded-full border text-xs font-semibold',
-        step.state === 'done' && 'border-success bg-success text-surface',
-        step.state === 'current' && 'border-primary bg-primary text-primary-foreground',
+        'grid size-7 shrink-0 place-items-center rounded-full border-[1.5px] text-[0.8125rem] font-semibold',
+        step.state === 'done' && 'border-solid bg-accent text-accent-foreground',
+        step.state === 'current' && 'border-solid bg-solid text-solid-accent',
         step.state === 'todo' && 'border-input bg-surface text-muted-foreground',
       )}
     >
-      {step.state === 'done' ? <Check className="size-3.5" /> : index + 1}
+      {step.state === 'done' ? <Check className="size-3.5" strokeWidth={3} /> : index + 1}
     </span>
   );
   const text = (
@@ -71,7 +71,7 @@ function Step({ step, index, last = false, compact = false }: { step: JourneySte
     <li aria-current={step.state === 'current' ? 'step' : undefined} className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         {marker}
-        <span aria-hidden className={cn('h-0.5 flex-1 rounded-full', last ? 'bg-transparent' : step.state === 'done' ? 'bg-success' : 'bg-border')} />
+        <span aria-hidden className={cn('h-0.5 flex-1 rounded-full', last ? 'bg-transparent' : step.state === 'done' ? 'bg-solid' : 'bg-border')} />
       </div>
       <div className="min-w-0 pr-2">{text}</div>
     </li>
