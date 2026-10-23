@@ -34,7 +34,7 @@ export function AccountBlock({ account, collapsed = false }: { account: AccountI
     return (
       <div className="shrink-0 border-t border-sidebar-border px-2 py-3">
         <Tip label={`Sign out ${account.name}`}>
-          <Button type="button" variant="outline" size="icon" className="w-full" onClick={signOut} disabled={pending} aria-label={`Sign out ${account.name}`}>
+          <Button type="button" variant="outline" size="icon" className="w-full border-sidebar-muted/50 bg-transparent text-sidebar-foreground hover:bg-sidebar-active hover:text-sidebar-foreground" onClick={signOut} disabled={pending} aria-label={`Sign out ${account.name}`}>
             <LogOut aria-hidden />
           </Button>
         </Tip>
@@ -44,9 +44,9 @@ export function AccountBlock({ account, collapsed = false }: { account: AccountI
 
   return (
     <div className="shrink-0 border-t border-sidebar-border px-4 py-3">
-      <p className="truncate text-sm font-medium">{account.name}</p>
-      {account.email ? <p className="truncate text-xs text-muted-foreground">{account.email}</p> : null}
-      <Button type="button" variant="outline" size="sm" className="mt-2.5 w-full" onClick={signOut} disabled={pending}>
+      <p className="truncate text-sm font-medium text-sidebar-foreground">{account.name}</p>
+      {account.email ? <p className="truncate text-xs text-sidebar-muted">{account.email}</p> : null}
+      <Button type="button" variant="outline" size="sm" className="mt-3 w-full border-sidebar-muted/50 bg-transparent text-sidebar-foreground hover:bg-sidebar-active hover:text-sidebar-foreground" onClick={signOut} disabled={pending}>
         <LogOut aria-hidden />
         {pending ? 'Signing out' : 'Sign out'}
       </Button>

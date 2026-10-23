@@ -29,3 +29,23 @@ export function useShellLayout(active: boolean, layout: Partial<ShellLayout>): v
     return () => set(NORMAL_LAYOUT);
   }, [active, hideSidebar, hideHeader, wide, set]);
 }
+
+/** One step of the rail the sidebar shows on a page that has a short journey (Publishing). */
+export interface ShellStep {
+  id: string;
+  label: string;
+  state: 'done' | 'current' | 'todo';
+}
+
+export const ShellStepsContext = createContext<(steps: ShellStep[] | null) => void>(() => undefined);
+
+/** Show these steps in the sidebar while the page is open. They go away when the page is left. */
+export function useShellSteps(steps: ShellStep[] | null): void {
+  const set = useContext(ShellStepsContext);
+  const key = steps ? JSON.stringify(steps) : '';
+  useEffect(() => {
+    if (!key) return;
+    set(JSON.parse(key) as ShellStep[]);
+    return () => set(null);
+  }, [key, set]);
+}

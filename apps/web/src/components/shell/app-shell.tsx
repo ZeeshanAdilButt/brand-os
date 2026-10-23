@@ -11,7 +11,7 @@ import type { AccountInfo } from './account-block';
 import { Brand } from './brand';
 import { CommandPalette } from './command-palette';
 import { MobileNav } from './mobile-nav';
-import { NORMAL_LAYOUT, ShellLayoutContext, type ShellLayout } from './shell-layout';
+import { NORMAL_LAYOUT, ShellLayoutContext, ShellStepsContext, type ShellLayout, type ShellStep } from './shell-layout';
 import { SIDEBAR_ID, SidebarNav } from './sidebar-nav';
 import { StatusChip } from './status-chip';
 import { ThemeToggle } from './theme-toggle';
@@ -26,6 +26,7 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
   const [navOpen, setNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [layout, setLayout] = useState<ShellLayout>(NORMAL_LAYOUT);
+  const [steps, setSteps] = useState<ShellStep[] | null>(null);
   const { prefs, update } = useViewPrefs();
   const collapsed = prefs.sidebarCollapsed;
   const apple = useSyncExternalStore(noopSubscribe, isApplePlatform, () => false);
@@ -54,6 +55,7 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
 
   return (
     <ShellLayoutContext.Provider value={setLayout}>
+      <ShellStepsContext.Provider value={setSteps}>
       <TooltipProvider delayDuration={250} skipDelayDuration={300}>
         <div className="min-h-dvh">
           <a
@@ -76,12 +78,13 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
               collapsed={collapsed}
               onToggleCollapsed={() => update({ sidebarCollapsed: !collapsed })}
               toggleHint={apple ? '⌘\\' : 'Ctrl+\\'}
+              steps={steps}
               {...(account ? { account } : {})}
             />
           </aside>
 
           <div className={cn('motion-safe:transition-[padding-left] motion-safe:duration-200', layout.hideSidebar ? '' : collapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-60')}>
-            <header className={cn('sticky top-0 z-20 h-14 items-center gap-2 border-b bg-surface px-3 sm:px-6', layout.hideHeader ? 'hidden' : 'flex')}>
+            <header className={cn('sticky top-0 z-20 h-16 items-center gap-2 border-b bg-surface px-3 sm:px-6', layout.hideHeader ? 'hidden' : 'flex')}>
               <Button
                 type="button"
                 variant="ghost"
@@ -100,11 +103,11 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
                 type="button"
                 onClick={() => setPaletteOpen(true)}
                 aria-label="Open command palette"
-                className="ml-auto flex h-9 items-center gap-2 rounded-lg border border-input bg-surface px-3 text-sm text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground sm:ml-0 sm:w-72 lg:w-[22.5rem]"
+                className="ml-auto flex h-10 items-center gap-2 rounded-xl border border-input bg-surface px-3 text-sm text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground sm:ml-0 sm:w-72 lg:w-[22.5rem]"
               >
                 <Search aria-hidden className="size-4 shrink-0" />
                 <span className="hidden flex-1 truncate text-left sm:inline">Search articles, platforms, settings</span>
-                <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] sm:inline">
+                <kbd className="hidden rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] sm:inline">
                   {apple ? '⌘K' : 'Ctrl K'}
                 </kbd>
               </button>
@@ -124,10 +127,11 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
             </main>
           </div>
 
-          <MobileNav open={navOpen} onOpenChange={setNavOpen} {...(account ? { account } : {})} />
+          <MobileNav open={navOpen} onOpenChange={setNavOpen} steps={steps} {...(account ? { account } : {})} />
           <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
         </div>
       </TooltipProvider>
+      </ShellStepsContext.Provider>
     </ShellLayoutContext.Provider>
   );
 }

@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import type { AccountInfo } from './account-block';
+import type { ShellStep } from './shell-layout';
 import { SidebarNav } from './sidebar-nav';
 
 /** Off-canvas navigation for screens below the lg breakpoint. Focus is trapped while open. */
@@ -10,10 +11,12 @@ export function MobileNav({
   open,
   onOpenChange,
   account,
+  steps,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   account?: AccountInfo;
+  steps?: ShellStep[] | null;
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -24,8 +27,8 @@ export function MobileNav({
         >
           <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">Primary navigation links</DialogPrimitive.Description>
-          <SidebarNav onNavigate={() => onOpenChange(false)} {...(account ? { account } : {})} />
-          <DialogPrimitive.Close className="absolute top-3 right-3 grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground">
+          <SidebarNav onNavigate={() => onOpenChange(false)} steps={steps} {...(account ? { account } : {})} />
+          <DialogPrimitive.Close className="absolute top-3 right-3 grid size-10 place-items-center rounded-xl text-sidebar-muted hover:bg-sidebar-active hover:text-sidebar-foreground">
             <X aria-hidden className="size-4" />
             <span className="sr-only">Close navigation</span>
           </DialogPrimitive.Close>
