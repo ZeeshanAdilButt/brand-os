@@ -1,6 +1,6 @@
 import type { ArticleStatus } from './articles';
 import { AREAS, DIRECTORY, directoryStatus, type Area, type DirectoryEntry, type DirectoryStatus } from './directory';
-import type { PlatformId } from './catalog';
+import { KIND_LABELS, PLATFORMS, type PlatformId } from './catalog';
 
 /** What the article picker needs about one article. The list never loads bodies, so words are an estimate. */
 export interface ArticleOption {
@@ -110,13 +110,20 @@ export function monogramOf(name: string): string {
   return first.charAt(0).toUpperCase() + first.charAt(1).toLowerCase();
 }
 
-/** The state of a row in a word or two, with whether it asks for the person's attention (set up, connect). */
+/**
+ * The state of a row in a word or two, with whether it asks for the person's attention (set up, connect). A platform that
+ * is ready says nothing: being ready is the normal state and needs no badge.
+ */
 export function rowState(row: SelectorRow): { label: string; attention: boolean } {
   switch (row.status) {
     case 'available_now':
-      return { label: 'Ready', attention: false };
-    case 'needs_connection':
-      return { label: row.composer === 'site' ? 'Set up' : 'Connect', attention: true };
+      return { label: '', attention: false };
+    case 'needs_connection': {
+      const auth = row.composer ? PLATFORMS[row.composer].authKind : 'none';
+      if (row.composer === 'site') return { label: 'Set up', attention: true };
+      const label = auth === 'api_key' ? 'Needs key' : auth === 'personal_access_token' ? 'Needs token' : auth === 'oauth' ? 'Needs sign-in' : auth === 'app_password' ? 'Needs password' : 'Set up';
+      return { label, attention: true };
+    }
     case 'preview_only':
       return { label: 'Preview', attention: false };
     case 'manual_only':
@@ -124,6 +131,27 @@ export function rowState(row: SelectorRow): { label: string; attention: boolean 
     case 'planned':
       return { label: 'Planned', attention: false };
   }
+}
+
+/** The part of a catalog format worth a line: "Markdown (with Liquid tags)" is "Markdown", "Rich text, pasted" is "Rich text". */
+const shortFormat = (format: string): string => (format.split('(')[0] ?? format).split(',')[0]!.trim();
+
+/**
+ * One real fact about a platform, from the catalog: the format it takes and the limit or feature that matters most.
+ * "Markdown, canonical link", "3,000 characters, threads". An entry that cannot be chosen says why instead.
+ */
+export function platformFact(row: SelectorRow): string {
+  if (row.blockedReason) return row.blockedReason;
+  const info = row.composer ? PLATFORMS[row.composer] : null;
+  if (!info) return row.entry.summary;
+  const format = info.capabilities.formats[0] ? shortFormat(info.capabilities.formats[0]) : KIND_LABELS[info.kind];
+  if (info.kind === 'short_form') {
+    const size = info.limits.body ? `${info.limits.body.toLocaleString('en')} characters` : format;
+    return `${size} · ${info.limits.thread ? 'threads' : 'single post'}`;
+  }
+  if (info.kind === 'long_form') return info.capabilities.canonicalUrl ? `${format} · canonical link` : format;
+  const title = info.limits.title ? ` · title up to ${info.limits.title}` : '';
+  return info.capabilities.formats[0] ? `${shortFormat(info.capabilities.formats[0])}${title}` : format;
 }
 
 export interface JourneyStep {
