@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArticlePicker } from '../src/components/publish/workspace/article-picker';
 import { PlatformSelector } from '../src/components/publish/workspace/platform-selector';
+import { ExpandedPreview, type ExpandEntry } from '../src/components/publish/workspace/preview-expand';
 import { PublishWorkspace } from '../src/components/publish/workspace/workspace';
+import { ViewPrefsProvider } from '../src/components/shell/view-prefs';
+import { NORMAL_LAYOUT, ShellLayoutContext, type ShellLayout } from '../src/components/shell/shell-layout';
+import { DEFAULT_VIEW_PREFS, type ViewPrefs } from '../src/lib/view-prefs';
 import { DIRECTORY } from '../src/lib/directory';
 import { PLATFORM_IDS, PLATFORMS, RECOMMENDED_ORDER, type DestinationDTO, type PlatformDraftDTO, type PlatformId } from '../src/lib/publishing';
 import { filterArticles, pickInitialArticle, rowsInArea, selectorRows, sortArticles, workspaceProgress, wordsFromChars, type ArticleOption } from '../src/lib/publish-workspace';
@@ -279,7 +283,7 @@ describe('the publishing workspace', () => {
     expect(tabs.map((t) => t.textContent)).toEqual(['DEV.to', 'Hashnode']);
     fireEvent.click(tabs[1]!);
     expect(screen.getByRole('heading', { name: 'Hashnode', level: 3 })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /compare side by side/i })).toBeTruthy();
+    expect(within(screen.getByRole('group', { name: 'Preview layout' })).getByRole('button', { name: /compare/i })).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox', { name: /^Hashnode/ }));
     await waitFor(() => expect(screen.getByText('1 platform selected')).toBeTruthy());
     expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/destinations/hashnode'))).toBe(true);
@@ -307,5 +311,189 @@ describe('the publishing workspace', () => {
     expect(calls.filter((c) => c.method === 'GET').map((c) => c.url.replace(A2, ':id'))).toEqual(expect.arrayContaining(['/api/articles/:id', '/api/articles/:id/destinations']));
     // The other article's choice is not carried over: this one has nothing chosen yet.
     await waitFor(() => expect(screen.getByText('0 platforms selected')).toBeTruthy());
+  });
+});
+
+// ---- folding, full view, layouts and the expanded preview ----------------------------------------------------------
+
+function inProvider(prefs: Partial<ViewPrefs> = {}) {
+  const writes: ViewPrefs[] = [];
+  const layouts: ShellLayout[] = [];
+  const wrap = (node: React.ReactNode) => (
+    <ViewPrefsProvider initial={{ ...DEFAULT_VIEW_PREFS, ...prefs }} write={(p) => writes.push(p)}>
+      <ShellLayoutContext.Provider value={(l) => layouts.push(l)}>{node}</ShellLayoutContext.Provider>
+    </ViewPrefsProvider>
+  );
+  return { writes, layouts, wrap };
+}
+
+/** The element that holds the Article and Platforms areas (the left group). */
+const leftGroup = () => screen.getByRole('heading', { name: 'Article', level: 2 }).closest('section')!.parentElement!;
+
+describe('folding the areas and the full view', () => {
+  it('folds an area to a bar that says what it holds, keeps it mounted, and opens it again on click', async () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    const { wrap, writes } = inProvider();
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
+    const fold = screen.getByRole('button', { name: 'Fold Platforms' });
+    expect(fold.getAttribute('aria-expanded')).toBe('true');
+    const bodyId = fold.getAttribute('aria-controls')!;
+    expect(document.getElementById(bodyId)!.hidden).toBe(false);
+    fireEvent.click(fold);
+    expect(writes.at(-1)!.collapsedAreas).toEqual(['platforms']);
+    // The folded bar is one button: its name holds the title and the one-line summary, and it controls the (still mounted) body.
+    const bar = screen.getByRole('button', { name: /Platforms.*1 platform selected/ });
+    expect(bar.getAttribute('aria-expanded')).toBe('false');
+    expect(bar.getAttribute('aria-controls')).toBe(bodyId);
+    expect(document.getElementById(bodyId)!.hidden).toBe(true);
+    expect(document.getElementById(bodyId)!.querySelectorAll('input[type=checkbox]').length).toBeGreaterThan(0);
+    fireEvent.click(bar);
+    expect(writes.at(-1)!.collapsedAreas).toEqual([]);
+    expect(document.getElementById(bodyId)!.hidden).toBe(false);
+  });
+
+  it('shows the chosen article title when the Article area is folded, and starts folded from the saved choice', () => {
+    serve({ added: new Set() });
+    const { wrap } = inProvider({ collapsedAreas: ['article', 'previews'] });
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(), platform: null }} />));
+    expect(screen.getByRole('button', { name: /Article.*Why the write path stalls/ }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: /Previews/ }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Fold Platforms' })).toBeTruthy();
+  });
+
+  it('full view hides the sidebar and the Article and Platforms areas, keeps the previews live, and Esc or the button brings everything back', async () => {
+    serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
+    const { wrap, layouts } = inProvider();
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />));
+    expect(leftGroup().className).not.toMatch(/\bhidden\b/);
+    const button = screen.getByRole('button', { name: 'Full view' });
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(button);
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(leftGroup().className).toMatch(/\bhidden\b/);
+    expect(layouts.at(-1)).toMatchObject({ hideSidebar: true, wide: true });
+    // The previews and the selection are still there and live.
+    expect(within(screen.getByRole('tablist', { name: 'Previews' })).getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getByText('2 platforms selected')).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    expect(leftGroup().className).not.toMatch(/\bhidden\b/);
+    expect(layouts.at(-1)).toEqual(NORMAL_LAYOUT);
+    // The same button also leaves it.
+    fireEvent.click(button);
+    expect(leftGroup().className).toMatch(/\bhidden\b/);
+    fireEvent.click(button);
+    expect(leftGroup().className).not.toMatch(/\bhidden\b/);
+  });
+
+  it('Esc does not leave full view while a dialog is open over it', () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    const { wrap } = inProvider();
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
+    fireEvent.click(screen.getByRole('button', { name: 'Full view' }));
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    document.body.append(dialog);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Full view' }).getAttribute('aria-pressed')).toBe('true');
+    dialog.remove();
+  });
+});
+
+describe('preview layouts and sizes', () => {
+  it('switches between one large preview, two or three columns and compare, and remembers the choice', () => {
+    serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
+    const { wrap, writes } = inProvider();
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />));
+    const layout = within(screen.getByRole('group', { name: 'Preview layout' }));
+    expect(layout.getByRole('button', { name: /One large/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getAllByRole('region', { name: /preview$/ })).toHaveLength(1);
+    fireEvent.click(layout.getByRole('button', { name: '2 columns' }));
+    expect(writes.at(-1)!.previewLayout).toBe('grid2');
+    // A grid shows every chosen platform at once and has no tabs.
+    expect(screen.getAllByRole('region', { name: /preview$/ })).toHaveLength(2);
+    expect(screen.queryByRole('tablist', { name: 'Previews' })).toBeNull();
+    fireEvent.click(layout.getByRole('button', { name: /Compare/ }));
+    expect(writes.at(-1)!.previewLayout).toBe('compare');
+    expect(screen.getByText('What differs')).toBeTruthy();
+  });
+
+  it('cannot compare with fewer than two prepared previews', () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    const { wrap } = inProvider({ previewLayout: 'compare' });
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
+    const compare = within(screen.getByRole('group', { name: 'Preview layout' })).getByRole('button', { name: /Compare/ }) as HTMLButtonElement;
+    expect(compare.disabled).toBe(true);
+    // The saved choice is compare, but with one preview the page shows the single view.
+    expect(screen.getByRole('tablist', { name: 'Previews' })).toBeTruthy();
+  });
+
+  it('the size control scales the preview surface and is remembered', () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    const { wrap, writes } = inProvider();
+    const { container } = render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
+    const sim = () => container.querySelector('.sim') as HTMLElement;
+    expect(sim().style.zoom).toBe('');
+    fireEvent.click(within(screen.getByRole('group', { name: 'Preview size' })).getByRole('button', { name: 'Large' }));
+    expect(writes.at(-1)!.previewSize).toBe('large');
+    expect(sim().style.zoom).toBe('1.25');
+    fireEvent.click(within(screen.getByRole('group', { name: 'Preview size' })).getByRole('button', { name: 'Compact' }));
+    expect(sim().style.zoom).toBe('0.85');
+  });
+});
+
+describe('expanding a preview', () => {
+  const entries: ExpandEntry[] = (['devto', 'hashnode', 'site'] as PlatformId[]).map((platform) => {
+    const d = draft(platform);
+    return { platform, name: PLATFORMS[platform].name, lint: [{ code: 'x', severity: 'warning', message: 'A heads up for this platform.' }] as ExpandEntry['lint'], input: { platform, payload: d.payload, extras: d.extras, account: null } };
+  });
+  const names = entries.map((e) => e.name);
+
+  it('is a labelled dialog with the larger preview, the checks and the device toggle, and Esc closes it', () => {
+    const onChange = vi.fn();
+    render(<ExpandedPreview entries={entries} current="devto" onChange={onChange} />);
+    const dialog = screen.getByRole('dialog', { name: `${names[0]} preview` });
+    expect(within(dialog).getByText('A heads up for this platform.')).toBeTruthy();
+    expect(within(dialog).getByRole('group', { name: 'Device' })).toBeTruthy();
+    expect(within(dialog).getByText(/Preview 1 of 3/)).toBeTruthy();
+    // No Expand control inside the overlay itself.
+    expect(within(dialog).queryByRole('button', { name: /^Expand/ })).toBeNull();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it('moves to the next and previous platform, and comes round at either end', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<ExpandedPreview entries={entries} current="site" onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: `Next platform: ${names[0]}` }));
+    expect(onChange).toHaveBeenLastCalledWith('devto');
+    rerender(<ExpandedPreview entries={entries} current="devto" onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: `Previous platform: ${names[2]}` }));
+    expect(onChange).toHaveBeenLastCalledWith('site');
+    // The arrow keys do the same, and wrap too.
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowLeft' });
+    expect(onChange).toHaveBeenLastCalledWith('site');
+    rerender(<ExpandedPreview entries={entries} current="site" onChange={onChange} />);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenLastCalledWith('devto');
+  });
+
+  it('offers no arrows for a single platform, and stays closed when nothing is chosen', () => {
+    const { rerender } = render(<ExpandedPreview entries={entries.slice(0, 1)} current="devto" onChange={() => undefined} />);
+    expect(screen.queryByRole('button', { name: /^Next platform/ })).toBeNull();
+    rerender(<ExpandedPreview entries={entries} current={null} onChange={() => undefined} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('every preview on the publishing screen has an Expand control that opens it', async () => {
+    serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
+    const { wrap } = inProvider();
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />));
+    const expand = screen.getByRole('button', { name: /^Expand .* preview$/ });
+    expect(expand.getAttribute('aria-haspopup')).toBe('dialog');
+    await act(async () => {
+      fireEvent.click(expand);
+    });
+    expect(screen.getByRole('dialog', { name: /preview$/ })).toBeTruthy();
   });
 });
