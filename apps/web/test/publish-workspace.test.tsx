@@ -620,6 +620,67 @@ describe('what is left out of the page', () => {
   });
 });
 
+describe('the floating preview window', () => {
+  const setup = () => {
+    serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
+    const { wrap, writes } = inProvider();
+    render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />));
+    return { writes };
+  };
+  const dockedColumn = () => screen.getByRole('heading', { name: 'How it will look', level: 2 }).closest('section')!;
+  const floatIt = async () => {
+    const view = await openView();
+    fireEvent.click(view.getByRole('button', { name: 'Float window' }));
+    // The panel closes by itself, because the control it hung from is going.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    return screen.getByRole('region', { name: 'Preview · DEV.to' });
+  };
+
+  it('is optional: the preview is in the page until Float window is chosen, and Dock puts it back', async () => {
+    setup();
+    expect(screen.queryByRole('region', { name: /^Preview · / })).toBeNull();
+    expect(dockedColumn().className).not.toMatch(/(^|\s)lg:hidden(\s|$)/);
+    const win = await floatIt();
+    expect(win).toBeTruthy();
+    // The column in the page steps aside on a wide screen, and the window carries the active platform's preview.
+    expect(dockedColumn().className).toMatch(/(^|\s)lg:hidden(\s|$)/);
+    expect(within(win).getByRole('tablist', { name: 'Previews' })).toBeTruthy();
+    fireEvent.click(within(win).getByRole('button', { name: /Close preview window/ }));
+    expect(screen.queryByRole('region', { name: /^Preview · / })).toBeNull();
+    expect(dockedColumn().className).not.toMatch(/(^|\s)lg:hidden(\s|$)/);
+  });
+
+  it('has a title bar with minimize, open large and close, and no Expand button of its own inside', async () => {
+    setup();
+    const win = within(await floatIt());
+    const minimize = win.getByRole('button', { name: 'Minimize preview window' });
+    expect(minimize.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(minimize);
+    expect(win.getByRole('button', { name: 'Restore preview window' }).getAttribute('aria-expanded')).toBe('false');
+    expect(win.getByRole('tablist', { name: 'Previews', hidden: true }).closest('[hidden]')).toBeTruthy();
+    fireEvent.click(win.getByRole('button', { name: 'Restore preview window' }));
+    // Open large is the existing expanded overlay.
+    expect(win.queryByRole('button', { name: /^Expand .* preview$/ })).toBeNull();
+    await act(async () => {
+      fireEvent.click(win.getByRole('button', { name: 'Open DEV.to preview large' }));
+    });
+    expect(screen.getByRole('dialog', { name: 'DEV.to preview' })).toBeTruthy();
+  });
+
+  it('moves with the arrow keys from its grip, and Escape inside it docks the preview', async () => {
+    setup();
+    const region = await floatIt();
+    const win = within(region);
+    expect(region.style.transform).toBe('translate(0px, 0px)');
+    const grip = win.getByRole('button', { name: /Move preview window/ });
+    fireEvent.keyDown(grip, { key: 'ArrowRight' });
+    fireEvent.keyDown(grip, { key: 'ArrowDown' });
+    expect(region.style.transform).not.toBe('translate(0px, 0px)');
+    fireEvent.keyDown(grip, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: /^Preview · / })).toBeNull();
+  });
+});
+
 describe('expanding a preview', () => {
   const entries: ExpandEntry[] = (['devto', 'hashnode', 'site'] as PlatformId[]).map((platform) => {
     const d = draft(platform);

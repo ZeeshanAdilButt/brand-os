@@ -32,6 +32,8 @@ export interface PreviewView {
   appearance: Appearance;
   onAppearance(appearance: Appearance): void;
   menu?: ReactNode;
+  /** The preview has no Expand of its own (the floating window carries one in its title bar). */
+  hideExpand?: boolean;
 }
 export const PreviewViewContext = createContext<PreviewView | null>(null);
 export const usePreviewView = () => useContext(PreviewViewContext);

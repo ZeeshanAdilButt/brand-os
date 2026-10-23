@@ -262,7 +262,7 @@ export function previewEntries(chosen: DestinationDTO[]): ExpandEntry[] {
 /** One tab per chosen platform, in one bordered group. The tab for a platform with something to fix carries the count. */
 export function PreviewTabs({ chosen, current, onActive }: { chosen: DestinationDTO[]; current: PlatformId | null; onActive(platform: PlatformId): void }) {
   return (
-    <div role="tablist" aria-label="Previews" className="flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-xl border-[1.5px] border-border-strong bg-surface p-1">
+    <div role="tablist" aria-label="Previews" className="flex w-fit min-w-0 max-w-full gap-1 overflow-x-auto rounded-xl border-[1.5px] border-border-strong bg-surface p-1">
       {chosen.map((d) => {
         const n = d.draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
         const selected = current === d.platform;
@@ -308,7 +308,7 @@ export function PreviewArea({
   onActive(platform: PlatformId): void;
   windowed?: boolean;
 }) {
-  const { prefs, update } = useViewPrefs();
+  const { prefs } = useViewPrefs();
   const current = chosen.find((d) => d.platform === active) ?? chosen[0] ?? null;
   const entries = useMemo(() => previewEntries(chosen), [chosen]);
   const layout = windowed ? 'single' : effectiveLayout(prefs.previewLayout, entries.length);

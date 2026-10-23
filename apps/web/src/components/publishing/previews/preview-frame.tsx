@@ -98,15 +98,15 @@ export function PreviewFrame({
   className?: string;
 }) {
   const expand = onExpand ? (
-    <Button type="button" variant="outline" aria-haspopup="dialog" aria-label={`Expand ${name} preview`} onClick={(e) => onExpand(e.currentTarget)}>
+    <Button type="button" variant="outline" aria-haspopup="dialog" aria-label={`Expand ${name} preview`} title="Open this preview large" onClick={(e) => onExpand(e.currentTarget)}>
       <Maximize2 aria-hidden />
-      Expand
+      <span className="sr-only @xl:not-sr-only">Expand</span>
     </Button>
   ) : null;
 
   if (compact) {
     return (
-      <section aria-label={`${name} preview`} className={cn('min-w-0 rounded-xl border bg-muted/50', className)}>
+      <section aria-label={`${name} preview`} className={cn('@container min-w-0 rounded-xl border bg-muted/50', className)}>
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 py-2">
           {leading}
           <span className="ml-auto text-sm text-muted-foreground" title={`Layout may differ on ${name}.`}>

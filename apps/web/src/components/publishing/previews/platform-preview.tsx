@@ -124,7 +124,7 @@ export function PlatformPreview({ input, defaultDevice = 'desktop', onDeviceChan
   }
 
   return (
-    <PreviewFrame name={info.name} device={device} onDevice={(next) => { setDevice(next); onDeviceChange?.(next); }} appearance={appearance} onAppearance={setAppearance} controls={controls} footer={footer} {...(view ? { compact: true, leading, below, menu: view.menu } : {})} {...(expand ? { onExpand: (button: HTMLButtonElement) => expand.open(platform, button) } : {})} {...(className ? { className } : {})}>
+    <PreviewFrame name={info.name} device={device} onDevice={(next) => { setDevice(next); onDeviceChange?.(next); }} appearance={appearance} onAppearance={setAppearance} controls={controls} footer={footer} {...(view ? { compact: true, leading, below, menu: view.menu } : {})} {...(expand && !view?.hideExpand ? { onExpand: (button: HTMLButtonElement) => expand.open(platform, button) } : {})} {...(className ? { className } : {})}>
       {body}
     </PreviewFrame>
   );

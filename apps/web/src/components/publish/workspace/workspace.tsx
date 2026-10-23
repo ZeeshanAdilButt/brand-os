@@ -9,6 +9,7 @@ import { ViewSection } from '@/components/publishing/previews/preview-frame';
 import { useViewPrefs } from '@/components/shell/view-prefs';
 import { useShellLayout, useShellSteps } from '@/components/shell/shell-layout';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { PopoverClose } from '@/components/ui/popover';
 import { CollapsibleArea } from '@/components/ui/collapsible-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormNotice } from '@/components/ui/field';
@@ -43,7 +44,7 @@ const LAST_ARTICLE_KEY = 'brand-os.last-article';
 function Header({ title, serif, children }: { title: string; serif: boolean; children?: ReactNode }) {
   return (
     <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-      <div className="flex min-w-0 flex-1 basis-64 flex-col sm:flex-row sm:items-baseline sm:gap-3">
+      <div className="flex min-w-[12rem] flex-1 basis-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
         <p className="mono-label shrink-0 text-muted-foreground">Publishing</p>
         <h1 title={title} data-testid={serif ? 'selected-article' : undefined} className={cn('min-w-0 truncate', serif ? 'font-serif text-2xl leading-9 font-semibold' : 'text-2xl leading-9 font-bold')}>
           {title}
@@ -169,16 +170,21 @@ function WorkspaceViewMenu({
     <>
       {windowed ? null : <LayoutAndSize ready={ready} />}
       <ViewSection title="Room">
+        {/* The panel closes when the preview moves, because the control it hangs from is about to go. */}
         {floating ? (
-          <Button type="button" variant="outline" className="hidden lg:inline-flex" onClick={() => onFloat(false)}>
-            <X aria-hidden />
-            Dock the preview
-          </Button>
+          <PopoverClose asChild>
+            <Button type="button" variant="outline" className="hidden lg:inline-flex" onClick={() => onFloat(false)}>
+              <X aria-hidden />
+              Dock the preview
+            </Button>
+          </PopoverClose>
         ) : (
-          <Button type="button" variant="outline" className="hidden lg:inline-flex" onClick={() => onFloat(true)} title="Show the preview in a floating window you can move">
-            <PictureInPicture2 aria-hidden />
-            Float window
-          </Button>
+          <PopoverClose asChild>
+            <Button type="button" variant="outline" className="hidden lg:inline-flex" onClick={() => onFloat(true)} title="Show the preview in a floating window you can move">
+              <PictureInPicture2 aria-hidden />
+              Float window
+            </Button>
+          </PopoverClose>
         )}
         <Button type="button" variant={fullView ? 'default' : 'outline'} aria-pressed={fullView} onClick={() => onFullView(!fullView)} title="Hide the sidebar and the platform list so the previews use the whole width. Esc leaves it.">
           <Maximize2 aria-hidden />
@@ -227,7 +233,7 @@ function FloatingPreview({
       expandLabel={`Open ${name} preview large`}
       className="hidden lg:flex"
     >
-      <PreviewViewContext.Provider value={view}>
+      <PreviewViewContext.Provider value={{ ...view, hideExpand: true }}>
         <PreviewArea api={api} articleId={articleId} chosen={chosen} active={active} onActive={onActive} windowed />
       </PreviewViewContext.Provider>
     </PreviewWindow>
@@ -358,8 +364,9 @@ function WorkspaceBody({
             Leave full view
           </Button>
         ) : null}
-        <Button type="button" variant="outline" size="lg" aria-haspopup="dialog" onClick={() => setChanging(true)}>
-          Change article
+        <Button type="button" variant="outline" size="lg" aria-haspopup="dialog" aria-label="Change article" onClick={() => setChanging(true)}>
+          <span className="sm:hidden">Change</span>
+          <span className="hidden sm:inline">Change article</span>
         </Button>
         {actions}
       </Header>
@@ -439,14 +446,14 @@ function WorkspaceBody({
           fullView ? '-mx-2 px-2 sm:-mx-4 sm:px-4' : '-mx-5 px-5 sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10',
         )}
       >
-        <p className="min-w-0 flex-1 text-sm text-muted-foreground">{chosen.length > 0 && blockedReason ? blockedReason : 'You approve each post on its own, with its exact text in front of you.'}</p>
+        <p className={cn('min-w-0 flex-1 text-sm text-muted-foreground', !(chosen.length > 0 && blockedReason) && 'hidden sm:block')}>{chosen.length > 0 && blockedReason ? blockedReason : 'You approve each post on its own, with its exact text in front of you.'}</p>
         {blockedReason ? (
-          <button type="button" disabled title={blockedReason} className={cn(buttonVariants({ size: 'lg' }))}>
+          <button type="button" disabled title={blockedReason} className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}>
             {reviewLabel}
             <ArrowRight aria-hidden />
           </button>
         ) : (
-          <Link href={reviewHref} className={cn(buttonVariants({ size: 'lg' }))}>
+          <Link href={reviewHref} className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}>
             {reviewLabel}
             <ArrowRight aria-hidden />
           </Link>

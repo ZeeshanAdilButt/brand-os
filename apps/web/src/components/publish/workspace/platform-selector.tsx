@@ -129,12 +129,12 @@ export function PlatformSelector({
         ))}
       </div>
 
-      <fieldset className="-mx-2">
+      <fieldset className="-mx-2 min-w-0">
         <legend className="sr-only">Platforms</legend>
         {pinned.length > 0 ? (
           <>
             <p className="mono-label px-3 pb-1 text-muted-foreground">Chosen</p>
-            <ul className="mb-3 grid gap-0.5">
+            <ul className="mb-3 grid grid-cols-[minmax(0,1fr)] gap-0.5">
               {pinned.map((row) => (
                 <SelectorItem key={row.entry.id} row={row} checked working={row.composer ? busy.has(row.composer) : false} onToggle={onToggle} />
               ))}
@@ -145,7 +145,7 @@ export function PlatformSelector({
         {visible.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">Nothing matches that filter.</p>
         ) : (
-          <ul className="grid gap-0.5">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
             {listed.map((row) => (
               <SelectorItem key={row.entry.id} row={row} checked={row.composer ? selected.has(row.composer) : false} working={row.composer ? busy.has(row.composer) : false} onToggle={onToggle} />
             ))}
@@ -161,7 +161,7 @@ function SelectorItem({ row, checked, working, onToggle }: { row: SelectorRow; c
   const id = `sel-${entry.id}`;
   const blocked = row.composer === null;
   const state = rowState(row);
-  const tile = row.composer ? PLATFORMS[row.composer].monogram : monogramOf(entry.name);
+  const tile = monogramOf(entry.name);
   return (
     <li>
       <label

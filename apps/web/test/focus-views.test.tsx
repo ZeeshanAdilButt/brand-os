@@ -55,6 +55,13 @@ describe('the saved layout choices', () => {
     expect(toggled(['a', 'b'], 'a', false)).toEqual(['b']);
   });
 
+  it('remember the device and appearance of the previews, and fall back when either is not a known value', () => {
+    expect(DEFAULT_VIEW_PREFS).toMatchObject({ previewDevice: 'desktop', previewAppearance: 'light' });
+    const kept: ViewPrefs = { ...DEFAULT_VIEW_PREFS, previewDevice: 'mobile', previewAppearance: 'dark' };
+    expect(parseViewPrefs(serializeViewPrefs(kept))).toEqual(kept);
+    expect(parseViewPrefs(encodeURIComponent(JSON.stringify({ previewDevice: 'watch', previewAppearance: 'sepia' })))).toEqual(DEFAULT_VIEW_PREFS);
+  });
+
   it('are kept in the cookie when changed, and the provider starts from what the server read', () => {
     function Probe() {
       const { prefs, update } = useViewPrefs();
