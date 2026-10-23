@@ -15,7 +15,7 @@ const TABS = [
 export function SettingsTabs() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Settings sections" className="-mt-4 mb-8 flex gap-2 overflow-x-auto border-b">
+    <nav aria-label="Settings sections" className="-mt-4 mb-8 flex gap-2 overflow-x-auto overflow-y-hidden border-b">
       {TABS.map((tab) => {
         const active = pathname === tab.href;
         return (

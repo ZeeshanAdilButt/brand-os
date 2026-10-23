@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { BookOpen, ChevronLeft, ChevronRight, Plus, Search, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, ShieldAlert } from 'lucide-react';
+import { BranchArt } from '@/components/brand/branch-art';
 import { ConfidentialityBadge, KindBadge, PublicUseBadge, VerificationBadge } from '@/components/knowledge/badges';
 import { ReviewButton } from '@/components/knowledge/item-actions';
 import { MarkedText } from '@/components/knowledge/marked-text';
@@ -161,11 +162,9 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
       {problem ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{problem}</p> : null}
 
       {!problem && counts.total === 0 && !filtered ? (
-        <section className="rounded-xl border border-input bg-card/60 p-6 text-center sm:p-10">
-          <div aria-hidden className="mx-auto mb-4 grid size-12 place-items-center rounded-xl border bg-background text-link shadow-soft">
-            <BookOpen className="size-6" />
-          </div>
-          <h2 className=" text-2xl font-semibold">Nothing here yet</h2>
+        <section className="rounded-xl border bg-surface p-6 text-center sm:p-10">
+          <BranchArt branches={4} className="mx-auto mb-4 h-20 w-auto" />
+          <h2 className="text-2xl font-semibold">Nothing here yet</h2>
           <p className="mx-auto mt-2 max-w-xl leading-relaxed text-muted-foreground">
             Add what your writing should be built on: projects, results with their numbers, reading notes, certifications. Every item starts private and
             unverified, and stays out of public writing until you allow it.

@@ -47,7 +47,7 @@ export default async function ReadArticlePage({ params }: { params: Promise<{ id
       </div>
 
       <div className="grid gap-10 xl:grid-cols-[minmax(0,44rem)_14rem] xl:justify-center">
-        <article aria-labelledby="article-title" className="min-w-0">
+        <article aria-labelledby="article-title" className="min-w-0 rounded-2xl border bg-surface px-6 py-8 sm:px-10 sm:py-10">
           <header className="mb-8 border-b pb-6">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <ArticleStatusBadge status={article.status} />

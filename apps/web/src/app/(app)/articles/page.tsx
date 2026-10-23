@@ -74,7 +74,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
 
       {counts.total > 0 || filtered ? (
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <nav aria-label="Filter by status" className="-mx-1 flex gap-1 overflow-x-auto border-b px-1 lg:border-b-0">
+          <nav aria-label="Filter by status" className="-mx-1 flex gap-1 overflow-x-auto overflow-y-hidden border-b px-1 lg:border-b-0">
             {tabs.map((tab) => {
               const current = (status || '') === tab.key;
               return (

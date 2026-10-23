@@ -6,7 +6,7 @@ import { PlatformTabs } from '@/components/platforms/platform-tabs';
 export default function PlatformsLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <PageHeader title="Platforms" description="Every place your writing can go, what the app can do for each today, and how to connect your accounts." />
+      <PageHeader eyebrow="Where it goes" title="Platforms" description="Every place your writing can go, what the app can do for each today, and how to connect your accounts." />
       <PlatformTabs />
       {children}
     </>
