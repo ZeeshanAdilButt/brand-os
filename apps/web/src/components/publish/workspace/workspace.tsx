@@ -46,7 +46,7 @@ function Header({ title, serif, children }: { title: string; serif: boolean; chi
     <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
       <div className="flex min-w-[12rem] flex-1 basis-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
         <p className="mono-label shrink-0 text-muted-foreground">Publishing</p>
-        <h1 title={title} data-testid={serif ? 'selected-article' : undefined} className={cn('min-w-0 truncate', serif ? 'font-serif text-2xl leading-9 font-semibold' : 'text-2xl leading-9 font-bold')}>
+        <h1 title={title} data-testid={serif ? 'selected-article' : undefined} className={cn('min-w-0 line-clamp-2 break-words sm:line-clamp-1', serif ? 'font-serif text-2xl leading-9 font-semibold' : 'text-2xl leading-9 font-bold')}>
           {title}
         </h1>
       </div>
