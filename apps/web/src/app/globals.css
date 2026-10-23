@@ -7,63 +7,87 @@
 );
 
 /*
- * Design system v2, "Warm Editorial" (see DECISIONS.md). Warm gray workspace, nearly white working surfaces, white
- * overlays, deep forest for actions and selection. Serif is for article titles and reading text only; the interface is
- * sans. Category colours appear only on small icons and labels. Every text pair is checked for WCAG AA, and the
- * boundary of every form control for 3:1, in test/design-tokens.test.ts. Fonts are local stacks only: nothing to
- * download.
+ * Design system v3, "Field Notes" (see DECISIONS.md). A deep forest and lime brand on bone paper with a faint field
+ * grid. Forest is the base and the brand everywhere; lime marks selection on forest; vermilion (the warm accent) is
+ * only for attention and action states: things to set up or fix, links and the active tab. Display type is Bricolage
+ * Grotesque, text is Instrument Sans, labels and states are IBM Plex Mono, and a warm serif is only for article titles
+ * and the article preview. Every text pair is checked for WCAG AA, and the boundary of every form control for 3:1, in
+ * test/design-tokens.test.ts. Fonts are self-hosted by next/font at build time: the browser downloads nothing from a
+ * third party.
  */
 :root {
   color-scheme: light;
 
-  /* Workspace, working surface, elevated overlay */
-  --background: #f4f2ee;
-  --surface: #fffefc;
-  --raised: #ffffff;
+  /* Brand constants: the same in both themes, used by the logo and the forest surfaces */
+  --forest: #12372a;
+  --lime: #d6f36b;
+  --bone: #f6f4ec;
 
-  --foreground: #242824;
+  /* Workspace, working surface, elevated overlay */
+  --background: #f6f4ec;
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --grid: #e6e3d6;
+
+  --foreground: #14211b;
   --text: var(--foreground);
-  --muted-foreground: #62675f;
-  --muted: #ecede7;
+  --muted-foreground: #4b6256;
+  --muted: #ecefdf;
 
   /* Decorative separators versus the boundary of a control (3:1) */
-  --border: #daddd5;
-  --input-border: #858a80;
+  --border: #c9cfbd;
+  --border-strong: #12372a;
+  --input-border: #5b7566;
   --input: var(--input-border);
 
-  --primary: #285347;
-  --primary-foreground: #ffffff;
-  --primary-hover: #1d4036;
-  --primary-active: #16322a;
+  --primary: #12372a;
+  --primary-foreground: #d6f36b;
+  --primary-hover: #0a2219;
+  --primary-active: #061711;
 
-  --secondary: #e9e7e1;
+  --secondary: #e9eddb;
   --secondary-foreground: var(--foreground);
-  --accent: #e7eee8;
-  --accent-foreground: #244d40;
+  --accent: #eef3dc;
+  --accent-foreground: #12372a;
+
+  /* The warm accent: vermilion on its own soft tint, with a deep brown for text on that tint */
+  --accent-warm: #b73c1f;
+  --accent-warm-soft: #f6e1d8;
+  --accent-warm-ink: #6b2410;
+
+  /* A solid brand surface: a selected card, the title bar of a preview window */
+  --solid: #12372a;
+  --solid-foreground: #f6f4ec;
+  --solid-muted: #b9cdbf;
+  --solid-accent: #d6f36b;
 
   /* Coloured text and icons on their own subtle backgrounds */
   --success: #2f6844;
-  --success-bg: #e7f0e8;
-  --warning: #845709;
-  --warning-bg: #f8efd9;
-  --danger: #a13c35;
-  --danger-bg: #f8eae6;
+  --success-bg: #e4f0dc;
+  --warning: #7a5208;
+  --warning-bg: #f6edc9;
+  --danger: #8a2b14;
+  --danger-bg: #fbe0d8;
   --danger-foreground: #ffffff;
-  --info: #345e84;
-  --info-bg: #e7edf5;
+  --info: #2f5d73;
+  --info-bg: #e2edf0;
 
   --destructive: var(--danger);
   --destructive-foreground: var(--danger-foreground);
-  --ring: #285347;
-  --link: #285347;
+  --ring: #12372a;
+  --link: var(--accent-warm);
 
-  --code-background: #ecede7;
-  --selection: #d3e4d8;
-  --selection-foreground: #242824;
+  --code-background: #ecefdf;
+  --selection: #d6f36b;
+  --selection-foreground: #14211b;
 
-  --sidebar: #eeece6;
-  --sidebar-foreground: var(--foreground);
-  --sidebar-border: var(--border);
+  /* The forest rail */
+  --sidebar: #12372a;
+  --sidebar-foreground: #e9f0df;
+  --sidebar-muted: #9db3a4;
+  --sidebar-active: #1c4a39;
+  --sidebar-accent: #d6f36b;
+  --sidebar-border: #2c5a47;
 
   --card: var(--surface);
   --card-foreground: var(--foreground);
@@ -96,16 +120,17 @@
   --teal: var(--primary);
   --sand: var(--border);
 
-  --radius: 0.75rem;
-  --radius-control: 0.5rem;
-  --radius-panel: 0.75rem;
-  --radius-dialog: 1rem;
+  --radius: 1rem;
+  --radius-control: 0.75rem;
+  --radius-panel: 1rem;
+  --radius-dialog: 1.25rem;
 
   --elevation-0: none;
-  --elevation-xs: 0 1px 2px rgb(36 40 36 / 0.05);
-  --elevation-1: 0 1px 2px rgb(36 40 36 / 0.04), 0 4px 12px rgb(36 40 36 / 0.04);
-  --elevation-2: 0 8px 24px rgb(36 40 36 / 0.1);
-  --elevation-3: 0 16px 48px rgb(36 40 36 / 0.16);
+  --elevation-xs: 0 1px 2px rgb(18 55 42 / 0.06);
+  --elevation-1: 0 1px 2px rgb(18 55 42 / 0.05), 0 4px 12px rgb(18 55 42 / 0.05);
+  --elevation-2: 0 8px 24px rgb(18 55 42 / 0.12);
+  --elevation-3: 0 16px 48px rgb(18 55 42 / 0.2);
+  --elevation-window: 0 30px 60px -20px rgb(18 55 42 / 0.45), 0 4px 0 #12372a;
   --shadow-soft: var(--elevation-1);
   --shadow-raised: var(--elevation-2);
 
@@ -118,44 +143,58 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --background: #191c19;
-  --surface: #222722;
-  --raised: #2b322b;
+  --background: #0e1a14;
+  --surface: #14241c;
+  --raised: #1a2e24;
+  --grid: #15261d;
 
-  --foreground: #f0f1e9;
-  --muted-foreground: #afb8aa;
-  --muted: #2d342c;
+  --foreground: #eaf0e2;
+  --muted-foreground: #a9bcaf;
+  --muted: #1c3027;
 
-  --border: #414a40;
-  --input-border: #7d8978;
+  --border: #2c4538;
+  --border-strong: #5e7d6c;
+  --input-border: #7c9a89;
 
-  --primary: #a9cdb8;
-  --primary-foreground: #193a2d;
-  --primary-hover: #bedccb;
-  --primary-active: #d3e8dc;
+  --primary: #d6f36b;
+  --primary-foreground: #0f2a20;
+  --primary-hover: #e3f68f;
+  --primary-active: #edfaaf;
 
-  --secondary: #2d342c;
-  --accent: #303e33;
-  --accent-foreground: #c4decc;
+  --secondary: #1c3027;
+  --accent: #1f3a2c;
+  --accent-foreground: #d6f36b;
+
+  --accent-warm: #f2a184;
+  --accent-warm-soft: #3a2219;
+  --accent-warm-ink: #fad3c4;
+
+  --solid: #1f5440;
+  --solid-foreground: #f6f4ec;
+  --solid-muted: #b9cdbf;
+  --solid-accent: #d6f36b;
 
   --success: #9fd3ab;
-  --success-bg: #243d2b;
+  --success-bg: #1e3a2a;
   --warning: #e5c07b;
-  --warning-bg: #40351f;
-  --danger: #f0aaa1;
-  --danger-bg: #422d29;
-  --danger-foreground: #191c19;
-  --info: #a8c8eb;
-  --info-bg: #293744;
+  --warning-bg: #3b3320;
+  --danger: #f2a99b;
+  --danger-bg: #3f2620;
+  --danger-foreground: #0e1a14;
+  --info: #9cc4d6;
+  --info-bg: #1b3440;
 
-  --ring: #a9cdb8;
-  --link: #a9cdb8;
+  --ring: #d6f36b;
 
-  --code-background: #1b211c;
-  --selection: #3c5947;
-  --selection-foreground: #f0f1e9;
+  --code-background: #0f1f17;
+  --selection: #2f5a3c;
+  --selection-foreground: #eaf0e2;
 
-  --sidebar: #1d211d;
+  --sidebar: #0a130e;
+  --sidebar-foreground: #e4ecdb;
+  --sidebar-muted: #8fa698;
+  --sidebar-active: #173324;
+  --sidebar-border: #1c3126;
 
   --category-blogs: #dda88e;
   --category-social: #a9c7ed;
@@ -170,6 +209,7 @@
   --elevation-1: 0 1px 2px rgb(0 0 0 / 0.2), 0 4px 12px rgb(0 0 0 / 0.24);
   --elevation-2: 0 8px 24px rgb(0 0 0 / 0.32);
   --elevation-3: 0 16px 48px rgb(0 0 0 / 0.44);
+  --elevation-window: 0 30px 60px -20px rgb(0 0 0 / 0.6), 0 4px 0 #2c4538;
 }
 
 @theme inline {
@@ -183,6 +223,10 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
 
+  --color-forest: var(--forest);
+  --color-lime: var(--lime);
+  --color-bone: var(--bone);
+
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
@@ -193,6 +237,14 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-warm: var(--accent-warm);
+  --color-accent-warm-soft: var(--accent-warm-soft);
+  --color-accent-warm-ink: var(--accent-warm-ink);
+
+  --color-solid: var(--solid);
+  --color-solid-foreground: var(--solid-foreground);
+  --color-solid-muted: var(--solid-muted);
+  --color-solid-accent: var(--solid-accent);
 
   --color-neutral: var(--neutral);
   --color-neutral-subtle: var(--neutral-subtle);
@@ -213,6 +265,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
 
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-link: var(--link);
@@ -222,6 +275,9 @@
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-border: var(--sidebar-border);
 
   --color-category-blogs: var(--category-blogs);
@@ -240,9 +296,11 @@
   --color-teal: var(--teal);
   --color-sand: var(--sand);
 
-  --font-sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  --font-mono: "Cascadia Code", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /* The families are loaded by next/font in the root layout, which sets these three variables on <html>. */
+  --font-sans: var(--font-instrument-sans), "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-instrument-sans), "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-mono: var(--font-plex-mono), "Cascadia Code", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
@@ -260,12 +318,12 @@
   --text-2xl--line-height: 2rem;
   --text-3xl: 1.875rem;
   --text-3xl--line-height: 2.25rem;
-  --text-4xl: 2rem;
+  --text-4xl: 2.25rem;
   --text-4xl--line-height: 2.5rem;
 
   --radius-sm: 0.375rem;
   --radius-md: var(--radius-control);
-  --radius-lg: var(--radius-panel);
+  --radius-lg: var(--radius-control);
   --radius-xl: var(--radius-panel);
   --radius-2xl: var(--radius-dialog);
 
@@ -273,9 +331,11 @@
   --shadow-sm: var(--elevation-1);
   --shadow-md: var(--elevation-2);
   --shadow-lg: var(--elevation-3);
+  --shadow-window: var(--elevation-window);
 }
 
 @theme {
+  /* One 4px scale: every gap, padding and margin is a multiple of this. */
   --spacing: 0.25rem;
 }
 
@@ -289,19 +349,26 @@
     text-size-adjust: 100%;
   }
 
+  /* The field grid: faint, 32px, only on the page itself. Dense text sits on white surfaces, never on the grid. */
   body {
     @apply bg-background font-sans text-foreground antialiased;
     font-size: 0.9375rem;
     line-height: 1.6;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 32px 32px;
   }
 
   h1,
   h2,
   h3,
   h4 {
-    @apply font-sans text-foreground;
+    @apply font-display text-foreground;
     letter-spacing: -0.02em;
     text-wrap: balance;
+  }
+
+  h1 {
+    letter-spacing: -0.03em;
   }
 
   ::selection {
@@ -315,6 +382,12 @@
     outline-offset: 3px;
   }
 
+  /* On a forest surface the ring is lime, which is the only colour that shows there. */
+  [data-surface="forest"] :focus-visible,
+  [data-surface="forest"]:focus-visible {
+    outline-color: var(--lime);
+  }
+
   button,
   [role="button"],
   a {
@@ -323,14 +396,24 @@
 }
 
 @layer utilities {
-  /* Kept for existing callers: a quiet sentence-case label. */
+  /* Kept for existing callers: a small mono label. */
   .label-caps {
-    font-family: var(--font-sans);
-    font-size: 0.8125rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
     font-weight: 500;
-    line-height: 1.125rem;
-    letter-spacing: 0;
-    text-transform: none;
+    line-height: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* A mono state or fact label: smaller, still readable. */
+  .mono-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .shadow-soft {

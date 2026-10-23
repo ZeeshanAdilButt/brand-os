@@ -47,7 +47,20 @@ const PAIRS: [string, string, number][] = [
   ['accent-foreground', 'accent', 4.5],
   ['muted-foreground', 'surface', 4.5],
   ['muted-foreground', 'muted', 4.5],
-  ['muted-foreground', 'sidebar', 4.5],
+  ['sidebar-foreground', 'sidebar', 4.5],
+  ['sidebar-muted', 'sidebar', 4.5],
+  ['sidebar-muted', 'sidebar-active', 4.5],
+  ['sidebar-foreground', 'sidebar-active', 4.5],
+  ['sidebar-accent', 'sidebar', 4.5],
+  ['sidebar-accent', 'sidebar-active', 4.5],
+  ['solid-foreground', 'solid', 4.5],
+  ['solid-muted', 'solid', 4.5],
+  ['solid-accent', 'solid', 4.5],
+  ['accent-warm', 'background', 4.5],
+  ['accent-warm', 'surface', 4.5],
+  ['accent-warm', 'raised', 4.5],
+  ['accent-warm', 'accent-warm-soft', 4.5],
+  ['accent-warm-ink', 'accent-warm-soft', 4.5],
   ['primary-foreground', 'primary', 4.5],
   ['primary-foreground', 'primary-hover', 4.5],
   ['primary-foreground', 'primary-active', 4.5],
@@ -115,14 +128,15 @@ describe.each([
   });
 });
 
-describe('design system v2', () => {
+describe('design system v3, Field Notes', () => {
   const light = block(':root');
   const dark = block('.dark,\n[data-theme="dark"]');
+  const all = { dark: { ...light, ...dark }, light };
 
   it('defines every status, category and surface token in both themes', () => {
-    for (const name of ['surface', 'surface-raised', 'raised', 'input-border', 'primary-hover', 'primary-active', 'neutral', 'neutral-subtle', 'success', 'success-subtle', 'warning', 'warning-subtle', 'danger', 'danger-subtle', 'info', 'info-subtle', 'code-background']) {
+    for (const name of ['surface', 'surface-raised', 'raised', 'input-border', 'primary-hover', 'primary-active', 'neutral', 'neutral-subtle', 'success', 'success-subtle', 'warning', 'warning-subtle', 'danger', 'danger-subtle', 'info', 'info-subtle', 'code-background', 'accent-warm', 'accent-warm-soft', 'accent-warm-ink', 'solid', 'sidebar', 'sidebar-muted']) {
       expect(light[name], `light ${name}`).toBeTruthy();
-      expect({ ...light, ...dark }[name], `dark ${name}`).toBeTruthy();
+      expect(all.dark[name], `dark ${name}`).toBeTruthy();
     }
     for (const area of ['blogs', 'social', 'communities', 'video', 'conferences', 'editorial', 'launches', 'aggregators']) {
       expect(light[`category-${area}`], area).toMatch(/^#/);
@@ -130,32 +144,58 @@ describe('design system v2', () => {
     }
   });
 
-  it('uses a warm gray canvas, near white working surfaces, white overlays and a deep forest action colour', () => {
-    expect(light.background).toBe('#f4f2ee');
-    expect(light.surface).toBe('#fffefc');
-    expect(light.raised).toBe('#ffffff');
-    expect(light.primary).toBe('#285347');
-    // The action colour is green, not blue: its green channel leads its blue one.
+  it('uses bone paper, white surfaces, forest as the action colour and lime for selection', () => {
+    expect(light.background).toBe('#f6f4ec');
+    expect(light.surface).toBe('#ffffff');
+    expect(light.foreground).toBe('#14211b');
+    expect(light.primary).toBe('#12372a');
+    expect(light.sidebar).toBe('#12372a');
+    expect(light['primary-foreground']).toBe('#d6f36b');
+    expect(light.accent).toBe('#eef3dc');
+    expect(light.danger).toBe('#8a2b14');
+    expect(light['danger-bg']).toBe('#fbe0d8');
+    expect(light.border).toBe('#c9cfbd');
+    // Forest is green, not blue: its green channel leads its blue one.
     const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt((light.primary as string).slice(i, i + 2), 16)) as [number, number, number];
     expect(g).toBeGreaterThan(b);
     expect(g).toBeGreaterThan(r);
-    // Page and surface are distinguishable by more than a hair, and the dark canvas is darker than its surface.
+  });
+
+  it('has a deep green dark theme: every dark neutral leans green, never blue and never plain grey', () => {
+    for (const name of ['background', 'surface', 'raised', 'border', 'muted', 'sidebar']) {
+      const hex = dark[name] as string;
+      const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+      expect(g, `${name} ${hex}`).toBeGreaterThan(r);
+      expect(g, `${name} ${hex}`).toBeGreaterThan(b);
+    }
     expect(luminance(dark.surface as string)).toBeGreaterThan(luminance(dark.background as string));
+    expect(luminance(dark.raised as string)).toBeGreaterThan(luminance(dark.surface as string));
   });
 
   it('keeps the old brand names only as aliases of the new tokens, if at all', () => {
     for (const legacy of ['cream', 'rust', 'sand', 'ink', 'success-subtle', 'danger-subtle', 'neutral-subtle']) expect(light[legacy] === undefined || light[legacy]?.startsWith('var(')).toBe(true);
   });
 
-  it('uses the sans stack for the application and reserves serif for reading', () => {
-    expect(css).toMatch(/--font-sans:\s*"Segoe UI"/);
-    expect(css).toMatch(/--font-serif:\s*"Iowan Old Style"/);
-    expect(css).toMatch(/h1,\s*\n\s*h2,\s*\n\s*h3,\s*\n\s*h4 \{\s*\n\s*@apply font-sans/);
+  it('uses Instrument Sans for the interface, Bricolage Grotesque for headings, Plex Mono for labels and a serif for articles only', () => {
+    expect(css).toMatch(/--font-sans:\s*var\(--font-instrument-sans\)/);
+    expect(css).toMatch(/--font-display:\s*var\(--font-bricolage\)/);
+    expect(css).toMatch(/--font-mono:\s*var\(--font-plex-mono\)/);
+    expect(css).toMatch(/--font-serif:\s*var\(--font-newsreader\)/);
+    expect(css).toMatch(/h1,\s*\n\s*h2,\s*\n\s*h3,\s*\n\s*h4 \{\s*\n\s*@apply font-display/);
   });
 
-  it('uses local font stacks only (no network fonts)', () => {
+  it('loads its fonts through next/font, with no font service link in the stylesheet', () => {
     expect(css).not.toMatch(/@import\s+url\(/);
     expect(css).not.toMatch(/fonts\.googleapis|fonts\.gstatic/);
+    const layout = fs.readFileSync(path.resolve(import.meta.dirname, '../src/app/layout.tsx'), 'utf8');
+    for (const family of ['Bricolage_Grotesque', 'Instrument_Sans', 'IBM_Plex_Mono', 'Newsreader']) expect(layout).toContain(family);
+    expect(layout).not.toMatch(/<link[^>]+fonts\./);
+  });
+
+  it('draws a faint 32px field grid on the page', () => {
+    expect(css).toMatch(/background-size:\s*32px 32px/);
+    expect(light.grid).toBeTruthy();
+    expect(dark.grid).toBeTruthy();
   });
 
   it('respects reduced motion', () => {
