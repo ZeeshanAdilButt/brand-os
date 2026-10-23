@@ -47,8 +47,7 @@ export function OriginalPane({ articleId, title, html, jump }: { articleId: stri
   }, [jump]);
   return (
     <section aria-label="Your article" className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-        <h2 className="min-w-0 truncate text-sm font-semibold">Original</h2>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-b px-4 py-2">
         <Link href={`/articles/${articleId}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
           <ArrowLeft aria-hidden />
           Back to the studio

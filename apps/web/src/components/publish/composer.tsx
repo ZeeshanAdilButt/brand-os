@@ -1,15 +1,19 @@
 'use client';
 
-import { ArrowRight, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, Maximize2, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AREA_STYLE } from '@/components/platforms/area-style';
+import { useShellLayout } from '@/components/shell/shell-layout';
+import { useViewPrefs } from '@/components/shell/view-prefs';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { CollapsibleArea } from '@/components/ui/collapsible-area';
 import { StatusChip } from '@/components/ui/status-chip';
 import { draftChip } from '@/lib/chips';
 import { DIRECTORY } from '@/lib/directory';
 import { computeJourney, toJourneyDestinations, workspaceHref } from '@/lib/next-step';
 import { RECOMMENDED_ORDER, type DestinationDTO, type PlatformId } from '@/lib/publishing';
+import { toggled, type ComposerPane } from '@/lib/view-prefs';
 import { cn } from '@/lib/utils';
 import type { AiState } from './ai-assist';
 import type { SiteFacts } from './approval-review';
@@ -18,6 +22,7 @@ import { OriginalPane } from './original-pane';
 import { NoticeBar } from './shared';
 import { SuggestionsPane } from './suggestions-pane';
 import type { PublishApi } from './use-publish';
+import { PreviewExpandProvider, type ExpandEntry } from './workspace/preview-expand';
 
 type MobileTab = 'original' | 'destinations' | 'suggestions';
 
@@ -90,6 +95,23 @@ export function Composer({
   const [checking, setChecking] = useState(false);
   const [showOthers, setShowOthers] = useState(false);
   const list = useRef<HTMLUListElement>(null);
+  const { prefs, update } = useViewPrefs();
+  // Focus mode: only the destinations. The sidebar, top bar and both side panes go; the button (or Esc) brings them back.
+  const [focus, setFocus] = useState(false);
+  useShellLayout(focus, { hideSidebar: true, hideHeader: true, wide: true });
+  useEffect(() => {
+    if (!focus) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('[role="dialog"]')) return;
+      setFocus(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [focus]);
+  const originalFolded = prefs.collapsedPanes.includes('original');
+  const suggestionsFolded = prefs.collapsedPanes.includes('suggestions');
+  const fold = (pane: ComposerPane, folded: boolean) => update({ collapsedPanes: toggled(prefs.collapsedPanes, pane, folded) });
+  const columns = focus ? 'minmax(0,1fr)' : `${originalFolded ? '3rem' : 'minmax(0,1fr)'} minmax(0,1.1fr) ${suggestionsFolded ? '3rem' : 'minmax(0,1fr)'}`;
   const opener = useRef<HTMLElement | null>(null);
 
   const added = useMemo(() => api.destinations.filter((d) => d.added).sort((a, b) => a.position - b.position), [api.destinations]);
@@ -160,9 +182,16 @@ export function Composer({
     { id: 'suggestions', label: 'Suggestions' },
   ];
 
+  // Every preview in the destination drawer can be expanded, and the expanded view moves across the prepared destinations.
+  const expandEntries = useMemo<ExpandEntry[]>(
+    () => added.filter((d) => d.draft).map((d) => ({ platform: d.platform, name: d.info.name, lint: d.draft!.lint, input: { platform: d.platform, payload: d.draft!.payload, extras: d.draft!.extras, account: d.draft!.account } })),
+    [added],
+  );
+
   return (
+    <PreviewExpandProvider entries={expandEntries}>
     <div className="grid grid-cols-1 gap-4">
-      <div role="tablist" aria-label="Sections" className="flex gap-1.5 md:hidden">
+      <div role="tablist" aria-label="Sections" className={cn('flex gap-1.5 md:hidden', focus && 'hidden')}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -178,10 +207,27 @@ export function Composer({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className={cn('rounded-xl border bg-surface xl:max-h-[calc(100dvh-14rem)] xl:overflow-y-auto', mobileTab !== 'original' && 'hidden md:block')}>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {focus ? <span className="text-xs text-muted-foreground">Esc to leave</span> : null}
+        <Button type="button" size="sm" variant={focus ? 'default' : 'outline'} aria-pressed={focus} onClick={() => setFocus((f) => !f)} title="Hide the sidebar and the side panes so only the destinations show">
+          <Maximize2 aria-hidden />
+          Focus mode
+        </Button>
+      </div>
+
+      <div style={{ '--cols': columns } as React.CSSProperties} className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-[var(--cols)]">
+        <CollapsibleArea
+          title="Original"
+          summary={article.title || 'Untitled article'}
+          collapsed={originalFolded}
+          onCollapsedChange={(folded) => fold('original', folded)}
+          flush
+          bar="xl"
+          className={cn('xl:max-h-[calc(100dvh-14rem)] xl:overflow-y-auto', mobileTab !== 'original' && 'hidden md:flex', focus && 'hidden md:hidden')}
+          collapsedClassName={cn('xl:h-full', mobileTab !== 'original' && 'hidden md:block', focus && 'hidden md:hidden')}
+        >
           <OriginalPane articleId={articleId} title={article.title} html={html} jump={jump} />
-        </div>
+        </CollapsibleArea>
 
         <section aria-label="Destinations" className={cn('min-w-0 xl:max-h-[calc(100dvh-14rem)] xl:overflow-y-auto', mobileTab !== 'destinations' && 'hidden md:block')}>
           <div className="grid gap-3">
@@ -221,7 +267,17 @@ export function Composer({
           </div>
         </section>
 
-        <div className={cn('rounded-xl border bg-surface md:col-span-2 xl:col-span-1 xl:max-h-[calc(100dvh-14rem)] xl:overflow-y-auto', mobileTab !== 'suggestions' && 'hidden md:block')}>
+        <CollapsibleArea
+          title="Suggestions"
+          summary="Editor’s review and checks"
+          side="right"
+          collapsed={suggestionsFolded}
+          onCollapsedChange={(folded) => fold('suggestions', folded)}
+          flush
+          bar="xl"
+          className={cn('md:col-span-2 xl:col-span-1 xl:max-h-[calc(100dvh-14rem)] xl:overflow-y-auto', mobileTab !== 'suggestions' && 'hidden md:flex', focus && 'hidden md:hidden')}
+          collapsedClassName={cn('md:col-span-2 xl:col-span-1 xl:h-full', mobileTab !== 'suggestions' && 'hidden md:block', focus && 'hidden md:hidden')}
+        >
           <SuggestionsPane
             articleId={articleId}
             destinations={api.destinations}
@@ -235,7 +291,7 @@ export function Composer({
             onCheckCanonical={() => void checkCanonical()}
             checkingCanonical={checking}
           />
-        </div>
+        </CollapsibleArea>
       </div>
 
       <div className="sticky bottom-0 z-20 -mx-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t bg-background px-4 py-3 md:hidden">
@@ -248,6 +304,7 @@ export function Composer({
 
       <DestinationDrawer destination={openDestination} api={api} article={article} ai={ai} facts={facts} tab={tab} onTab={setTab} onClose={closeDrawer} onApplied={() => void api.reload()} />
     </div>
+    </PreviewExpandProvider>
   );
 }
 

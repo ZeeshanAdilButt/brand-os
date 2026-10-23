@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, BookOpen, Columns2, Eye, History, PenLine, Save, Send, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Columns2, Eye, History, Maximize2, Minimize2, PenLine, Save, Send, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,11 +11,14 @@ import { AssistBar } from '@/components/ai/assist-bar';
 import type { TaskActions } from '@/components/ai/task-card';
 import { useArticleTasks } from '@/components/ai/use-task-stream';
 import { NextStepBar } from '@/components/guided/next-step-bar';
+import { useShellLayout } from '@/components/shell/shell-layout';
+import { useViewPrefs } from '@/components/shell/view-prefs';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { type ContextPreviewDTO, type ReadyProvider, type TaskDTO, type TaskKind } from '@/lib/ai';
 import { api, sendSave, toDraft } from '@/lib/api-client';
 import { countWords, readingMinutes, slugify, SLUG_PATTERN, STATUS_LABELS, type ArticleDTO, type AssetDTO } from '@/lib/articles';
 import { SaveController, type ControllerStatus, type Draft } from '@/lib/autosave';
+import { isTypingTarget } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 import { ConflictDialog } from './conflict-dialog';
 import { HistoryPanel } from './history-panel';
@@ -56,7 +59,22 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
   const previewScroll = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<ControllerStatus | null>(null);
   const [mode, setMode] = useState<Mode>(() => (isWide() ? 'split' : 'edit'));
-  const [panel, setPanel] = useState<Panel>(null);
+  const { prefs, update: updatePrefs } = useViewPrefs();
+  // The side panel that was open last is open again, so the first paint has no jump. On a screen too narrow to dock it
+  // (it would cover the editor) it stays closed until it is opened by hand.
+  const [panel, setPanelState] = useState<Panel>(prefs.studioPanel);
+  const [restored, setRestored] = useState(prefs.studioPanel !== null);
+  const setPanel = useCallback(
+    (next: Panel) => {
+      setPanelState(next);
+      setRestored(false);
+      updatePrefs({ studioPanel: next });
+    },
+    [updatePrefs],
+  );
+  // Focus mode: only the editor (and the live preview if wanted). The sidebar and top bar go; a visible control leaves.
+  const [focus, setFocus] = useState(false);
+  useShellLayout(focus, { hideSidebar: true, hideHeader: true, wide: true });
   const [toast, setToast] = useState<string | null>(null);
   const [selection, setSelection] = useState<EditorSelectionInfo | null>(null);
   const [starting, setStarting] = useState(false);
@@ -227,13 +245,24 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
   }, [saveNow, togglePreview]);
 
   useEffect(() => {
-    if (!panel) return;
+    if (!panel || restored) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !document.querySelector('[role="dialog"]')) setPanel(null);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [panel]);
+  }, [panel, restored, setPanel]);
+
+  // Escape leaves focus mode, except while typing (it belongs to the editor then) or over a dialog.
+  useEffect(() => {
+    if (!focus) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || isTypingTarget(event.target) || document.querySelector('[role="dialog"]')) return;
+      setFocus(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [focus]);
 
   /* ---- uploads ---- */
 
@@ -435,9 +464,9 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
   const previewCls = mode === 'edit' ? 'hidden' : mode === 'split' ? 'hidden lg:block' : '';
 
   return (
-    <div className="flex h-[calc(100dvh-5.25rem)] min-h-[34rem] flex-col overflow-hidden rounded-xl border bg-card shadow-soft">
+    <div className={cn('flex min-h-[34rem] flex-col overflow-hidden rounded-xl border bg-card shadow-soft', focus ? 'h-[calc(100dvh-1.25rem)] sm:h-[calc(100dvh-1.75rem)]' : 'h-[calc(100dvh-5.25rem)]')}>
       <header className="shrink-0 border-b bg-background">
-        <div className="flex items-center gap-2 px-2 py-2 sm:px-3">
+        <div className={cn('items-center gap-2 px-2 py-2 sm:px-3', focus ? 'hidden' : 'flex')}>
           <Link
             href="/articles"
             className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -460,7 +489,8 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
               type="button"
               variant={panel === 'details' ? 'secondary' : 'ghost'}
               size="sm"
-              aria-pressed={panel === 'details'}
+              aria-expanded={panel === 'details'}
+              aria-controls="studio-side-panel"
               onClick={() => setPanel(panel === 'details' ? null : 'details')}
               aria-label="Details"
               title="Details: status, slug, tags, cover"
@@ -472,7 +502,8 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
               type="button"
               variant={panel === 'ai' ? 'secondary' : 'ghost'}
               size="sm"
-              aria-pressed={panel === 'ai'}
+              aria-expanded={panel === 'ai'}
+              aria-controls="studio-side-panel"
               onClick={() => setPanel(panel === 'ai' ? null : 'ai')}
               aria-label={waitingForReview > 0 ? `AI tasks, ${waitingForReview} ready to review` : 'AI tasks'}
               title="AI tasks for this article"
@@ -495,7 +526,8 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
               type="button"
               variant={panel === 'history' ? 'secondary' : 'ghost'}
               size="sm"
-              aria-pressed={panel === 'history'}
+              aria-expanded={panel === 'history'}
+              aria-controls="studio-side-panel"
               onClick={() => setPanel(panel === 'history' ? null : 'history')}
               aria-label="Version history"
               title="Version history"
@@ -505,7 +537,13 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
             </Button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t px-2 py-1.5 sm:px-3">
+        <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 px-2 py-1.5 sm:px-3', focus ? '' : 'border-t')}>
+          {focus ? (
+            <Button type="button" size="sm" variant="default" onClick={() => setFocus(false)} aria-label="Exit focus mode" title="Exit focus mode (Esc, when not typing)">
+              <Minimize2 aria-hidden />
+              Exit focus
+            </Button>
+          ) : null}
           <div role="group" aria-label="View" className="inline-flex shrink-0 overflow-hidden rounded-md border">
             <button type="button" className={modeButton(mode === 'edit')} aria-pressed={mode === 'edit'} onClick={() => setMode('edit')}>
               <PenLine aria-hidden className="size-3.5" />
@@ -527,6 +565,12 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
             <Save aria-hidden />
             Save
           </Button>
+          {focus ? null : (
+            <Button type="button" size="sm" variant="outline" onClick={() => setFocus(true)} aria-label="Focus mode" title="Focus mode: only the editor, with the live preview if you want it">
+              <Maximize2 aria-hidden />
+              <span className="hidden sm:inline">Focus</span>
+            </Button>
+          )}
           <Link
             href={`/articles/${initial.id}/read`}
             className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -547,11 +591,11 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
         </div>
       ) : null}
 
-      <div className="shrink-0 border-b px-2 py-2 sm:px-3">
+      <div className={cn('shrink-0 border-b px-2 py-2 sm:px-3', focus && 'hidden')}>
         <NextStepBar articleId={initial.id} title={draft.title} hasText={draft.bodyMarkdown.trim().length > 0} reloadKey={state.revision} />
       </div>
 
-      {mode !== 'preview' ? (
+      {mode !== 'preview' && !focus ? (
         <AssistBar available={providers.length > 0} selectedChars={selection ? selection.end - selection.start : 0} busy={starting} onRun={(kind) => void runAssist(kind)} onAsk={openAsk} />
       ) : null}
 
@@ -578,12 +622,13 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
           </div>
         </div>
 
-        {panel ? <div className="fixed inset-0 z-30 bg-black/40 2xl:hidden" onClick={() => setPanel(null)} aria-hidden /> : null}
+        {panel && !focus && !restored ? <div className="fixed inset-0 z-30 bg-black/40 2xl:hidden" onClick={() => setPanel(null)} aria-hidden /> : null}
         <aside
+          id="studio-side-panel"
           aria-label={panel === 'history' ? 'Version history' : panel === 'ai' ? 'AI tasks' : 'Article details'}
           className={cn(
             'z-40 flex w-[min(26rem,100vw)] shrink-0 flex-col border-l bg-card shadow-lg',
-            panel ? 'fixed inset-y-0 right-0 2xl:static 2xl:z-auto 2xl:w-96 2xl:shadow-none' : 'hidden',
+            panel && !focus ? cn('fixed inset-y-0 right-0 2xl:static 2xl:z-auto 2xl:w-96 2xl:shadow-none', restored && 'max-2xl:hidden') : 'hidden',
           )}
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
@@ -636,7 +681,7 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
         </aside>
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-0.5 border-t bg-background px-3 py-1.5 text-xs text-muted-foreground">
+      <footer className={cn('shrink-0 flex-wrap items-center gap-x-4 gap-y-0.5 border-t bg-background px-3 py-1.5 text-xs text-muted-foreground', focus ? 'hidden' : 'flex')}>
         <span>{words.toLocaleString('en')} words</span>
         <span>{minutes === 0 ? 'Nothing to read yet' : `${minutes} min read`}</span>
         <span className="hidden sm:inline">{draft.bodyMarkdown.length.toLocaleString('en')} characters</span>
