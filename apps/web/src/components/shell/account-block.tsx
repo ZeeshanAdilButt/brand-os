@@ -4,6 +4,7 @@ import { LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tip } from '@/components/ui/tooltip';
 
 export interface AccountInfo {
   name: string;
@@ -11,7 +12,7 @@ export interface AccountInfo {
 }
 
 /** Who is signed in, and the sign-out control. Hosted mode only: local mode has no account to leave. */
-export function AccountBlock({ account }: { account: AccountInfo }) {
+export function AccountBlock({ account, collapsed = false }: { account: AccountInfo; collapsed?: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -27,6 +28,18 @@ export function AccountBlock({ account }: { account: AccountInfo }) {
       router.replace('/sign-in');
       router.refresh();
     }
+  }
+
+  if (collapsed) {
+    return (
+      <div className="shrink-0 border-t border-sidebar-border px-2 py-3">
+        <Tip label={`Sign out ${account.name}`}>
+          <Button type="button" variant="outline" size="icon" className="w-full" onClick={signOut} disabled={pending} aria-label={`Sign out ${account.name}`}>
+            <LogOut aria-hidden />
+          </Button>
+        </Tip>
+      </div>
+    );
   }
 
   return (
