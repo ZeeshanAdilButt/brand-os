@@ -59,7 +59,7 @@ export function PreviewComparison({ items, initial }: { items: PreviewInput[]; i
           </label>
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 @2xl:grid-cols-2">
         <PlatformPreview key={`l-${left}`} input={a} defaultDevice="mobile" />
         <PlatformPreview key={`r-${right}`} input={b} defaultDevice="mobile" />
       </div>

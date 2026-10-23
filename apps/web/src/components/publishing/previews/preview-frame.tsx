@@ -1,9 +1,11 @@
 'use client';
 
-import { Info, Monitor, Moon, Smartphone, Sun } from 'lucide-react';
+import { Info, Maximize2, Monitor, Moon, Smartphone, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/utils';
+import { usePreviewScale } from './preview-context';
 import './previews.css';
 
 export type Device = 'desktop' | 'mobile';
@@ -36,6 +38,7 @@ export function PreviewFrame({
   controls = [],
   footer,
   note,
+  onExpand,
   children,
   className,
 }: {
@@ -47,6 +50,8 @@ export function PreviewFrame({
   controls?: FrameControl[];
   footer?: ReactNode;
   note?: string;
+  /** When given, an Expand control opens this preview large. It receives the button so focus can return to it. */
+  onExpand?: (button: HTMLButtonElement) => void;
   children: ReactNode;
   className?: string;
 }) {
@@ -80,6 +85,12 @@ export function PreviewFrame({
               { value: 'dark', label: <><Moon aria-hidden className="size-4" /><span className="sr-only">Dark</span></>, title: 'Show the platform in dark' },
             ]}
           />
+          {onExpand ? (
+            <Button type="button" size="sm" variant="outline" aria-haspopup="dialog" aria-label={`Expand ${name} preview`} onClick={(e) => onExpand(e.currentTarget)}>
+              <Maximize2 aria-hidden />
+              Expand
+            </Button>
+          ) : null}
         </div>
       </header>
       <div className="overflow-x-auto px-2 py-4 sm:px-4">{children}</div>
@@ -93,6 +104,8 @@ export function PreviewFrame({
 
 /** The simulated surface itself: carries the appearance, device and skin as data attributes for the stylesheet. */
 export function Sim({ device, appearance, skin, kind, accent, children, label }: { device: Device; appearance: Appearance; skin: string; kind: 'feed' | 'article'; accent?: string; children: ReactNode; label: string }) {
+  // The size choice scales the whole surface; the maximum width is divided by the same factor so it still fits its column.
+  const scale = usePreviewScale();
   return (
     <div
       className="sim mx-auto"
@@ -101,7 +114,7 @@ export function Sim({ device, appearance, skin, kind, accent, children, label }:
       data-skin={skin}
       role="group"
       aria-label={label}
-      style={{ width: SIM_WIDTH[kind][device], ...(accent ? { ['--sim-accent' as string]: accent } : {}) }}
+      style={{ width: SIM_WIDTH[kind][device], ...(scale !== 1 ? { zoom: scale, maxWidth: `calc(100% / ${scale})` } : {}), ...(accent ? { ['--sim-accent' as string]: accent } : {}) }}
     >
       {children}
     </div>

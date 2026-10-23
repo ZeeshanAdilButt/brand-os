@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { PLATFORMS, type PlatformId } from '@/lib/catalog';
 import type { DraftExtras, DraftPayload } from '@/lib/publishing';
 import { Button } from '@/components/ui/button';
+import { usePreviewExpand } from './preview-context';
 import { PreviewFrame, type Appearance, type Device, type FrameControl } from './preview-frame';
 import { ArticleSkin, Counters, SocialSkin, SubmissionSkin, VideoSkin } from './skins';
 
@@ -20,7 +21,7 @@ export interface PreviewInput {
  * (desktop or phone), the platform in light or dark, and the views that matter for that platform: in the feed or
  * opened for a post, listing or form for Hacker News, card or watch page for YouTube, inbox or opened for a newsletter.
  */
-export function PlatformPreview({ input, defaultDevice = 'desktop', className }: { input: PreviewInput; defaultDevice?: Device; className?: string }) {
+export function PlatformPreview({ input, defaultDevice = 'desktop', onDeviceChange, className }: { input: PreviewInput; defaultDevice?: Device; onDeviceChange?: (device: Device) => void; className?: string }) {
   const { platform, payload } = input;
   const info = PLATFORMS[platform];
   const [device, setDevice] = useState<Device>(defaultDevice);
@@ -30,6 +31,7 @@ export function PlatformPreview({ input, defaultDevice = 'desktop', className }:
   const [submission, setSubmission] = useState<'listing' | 'fields'>('listing');
   const [video, setVideo] = useState<'card' | 'watch'>('card');
   const [newsletter, setNewsletter] = useState<'inbox' | 'opened'>('opened');
+  const expand = usePreviewExpand();
   const account = input.account ?? null;
   const base = { platform, payload, account, device, appearance };
 
@@ -116,7 +118,7 @@ export function PlatformPreview({ input, defaultDevice = 'desktop', className }:
   }
 
   return (
-    <PreviewFrame name={info.name} device={device} onDevice={setDevice} appearance={appearance} onAppearance={setAppearance} controls={controls} footer={footer} {...(className ? { className } : {})}>
+    <PreviewFrame name={info.name} device={device} onDevice={(next) => { setDevice(next); onDeviceChange?.(next); }} appearance={appearance} onAppearance={setAppearance} controls={controls} footer={footer} {...(expand ? { onExpand: (button: HTMLButtonElement) => expand.open(platform, button) } : {})} {...(className ? { className } : {})}>
       {body}
     </PreviewFrame>
   );

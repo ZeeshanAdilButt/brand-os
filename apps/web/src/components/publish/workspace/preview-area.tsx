@@ -1,18 +1,24 @@
 'use client';
 
-import { GitCompare, Pencil } from 'lucide-react';
+import { Columns2, Columns3, GitCompare, Pencil, Square, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PlatformPreview } from '@/components/publishing/previews/platform-preview';
+import { PreviewScaleContext } from '@/components/publishing/previews/preview-context';
 import { PreviewComparison } from '@/components/publishing/previews/preview-comparison';
+import { useViewPrefs } from '@/components/shell/view-prefs';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
+import { Segmented } from '@/components/ui/segmented';
 import { StatusChip } from '@/components/ui/status-chip';
 import { draftChip } from '@/lib/chips';
+import { effectiveLayout, gridClass, SIZE_SCALE } from '@/lib/preview-layout';
 import type { DestinationDTO, PlatformId } from '@/lib/publishing';
+import type { PreviewLayout, PreviewSize } from '@/lib/view-prefs';
 import { cn } from '@/lib/utils';
 import { LintList, NoticeBar } from '../shared';
 import type { PublishApi } from '../use-publish';
+import { PreviewExpandProvider, type ExpandEntry } from './preview-expand';
 
 const IDLE_MS = 600;
 
@@ -139,9 +145,63 @@ export function QuickEdit({ destination, api }: { destination: DestinationDTO; a
   );
 }
 
+/** What one platform's preview shows: its heading, notices, checks and the preview itself. The single view adds the quick edit. */
+function PreviewCard({ destination, api, articleId, detailed }: { destination: DestinationDTO; api: PublishApi; articleId: string; detailed: boolean }) {
+  const draft = destination.draft;
+  const errors = draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
+  return (
+    <div className="grid min-w-0 content-start gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-base font-semibold">{destination.info.name}</h3>
+        <StatusChip chip={draftChip(destination.platform, draft)} />
+        {detailed ? (
+          <span className="text-sm text-muted-foreground">{destination.info.state === 'adapter' ? 'Brand OS can publish this after your approval.' : 'You post this one by hand.'}</span>
+        ) : null}
+      </div>
+      <NoticeBar notice={api.notices[destination.platform]} />
+      {draft ? (
+        <>
+          <LintList issues={draft.lint} empty="No problems found for this platform." />
+          <PlatformPreview input={{ platform: destination.platform, payload: draft.payload, extras: draft.extras, account: draft.account }} />
+          {detailed ? (
+            <details className="rounded-lg border bg-surface" open={errors > 0}>
+              <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm font-medium">
+                <Pencil aria-hidden className="size-4" />
+                Edit title, description and tags
+              </summary>
+              <div className="border-t p-3">
+                <QuickEdit destination={destination} api={api} />
+                <Link href={`/articles/${articleId}/publish?view=composer&d=${destination.platform}`} className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'mt-2' })}>
+                  Open the full editor
+                </Link>
+              </div>
+            </details>
+          ) : null}
+        </>
+      ) : (
+        <p className="rounded-xl border bg-surface p-6 text-sm text-muted-foreground">Preparing the preview…</p>
+      )}
+    </div>
+  );
+}
+
+const LAYOUT_OPTIONS: { value: PreviewLayout; icon: LucideIcon; name: string; title: string }[] = [
+  { value: 'single', icon: Square, name: 'One large', title: 'One large preview, with a tab for each platform' },
+  { value: 'grid2', icon: Columns2, name: '2 columns', title: 'A grid of 2 columns' },
+  { value: 'grid3', icon: Columns3, name: '3 columns', title: 'A grid of 3 columns' },
+  { value: 'compare', icon: GitCompare, name: 'Compare', title: 'Compare two platforms side by side' },
+];
+
+const SIZE_OPTIONS: { value: PreviewSize; label: string; title: string }[] = [
+  { value: 'compact', label: 'Compact', title: 'Smaller previews, more on screen' },
+  { value: 'comfortable', label: 'Comfortable', title: 'The usual size' },
+  { value: 'large', label: 'Large', title: 'Bigger previews, easier to read' },
+];
+
 /**
- * Area 3: one preview per chosen platform, live. Choose a tab to see that platform's approximate preview of this
- * article, with the device and light or dark toggles of the preview itself; "Compare side by side" shows two.
+ * Area 3: one preview per chosen platform, live. Show them one large with a tab per platform, in a grid of two or
+ * three columns, or two side by side to compare. A size control scales every preview, and each preview can be
+ * expanded to the whole screen. The layout and size are remembered in this browser.
  */
 export function PreviewArea({
   api,
@@ -156,9 +216,14 @@ export function PreviewArea({
   active: PlatformId | null;
   onActive(platform: PlatformId): void;
 }) {
-  const [compare, setCompare] = useState(false);
+  const { prefs, update } = useViewPrefs();
   const current = chosen.find((d) => d.platform === active) ?? chosen[0] ?? null;
   const prepared = useMemo(() => chosen.filter((d) => d.draft), [chosen]);
+  const layout = effectiveLayout(prefs.previewLayout, prepared.length);
+  const entries = useMemo<ExpandEntry[]>(
+    () => prepared.map((d) => ({ platform: d.platform, name: d.info.name, lint: d.draft!.lint, input: { platform: d.platform, payload: d.draft!.payload, extras: d.draft!.extras, account: d.draft!.account } })),
+    [prepared],
+  );
 
   if (chosen.length === 0) {
     return (
@@ -169,74 +234,76 @@ export function PreviewArea({
     );
   }
 
-  const errors = current?.draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div role="tablist" aria-label="Previews" className="-mx-1 flex min-w-0 flex-1 gap-1 overflow-x-auto px-1 pb-0.5">
-          {chosen.map((d) => {
-            const n = d.draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
-            return (
-              <button
-                key={d.platform}
-                type="button"
-                role="tab"
-                aria-selected={!compare && current?.platform === d.platform}
-                onClick={() => {
-                  setCompare(false);
-                  onActive(d.platform);
-                }}
-                className={cn(
-                  'inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-[120ms]',
-                  !compare && current?.platform === d.platform ? 'border-primary bg-accent text-accent-foreground' : 'border-border bg-surface text-muted-foreground hover:bg-accent hover:text-foreground',
-                )}
-              >
-                {d.info.name}
-                {n > 0 ? <span className="rounded-full bg-danger px-1.5 text-xs font-semibold text-danger-foreground">{n}</span> : null}
-              </button>
-            );
-          })}
-        </div>
-        {prepared.length > 1 ? (
-          <Button type="button" size="sm" variant={compare ? 'default' : 'outline'} aria-pressed={compare} onClick={() => setCompare((c) => !c)}>
-            <GitCompare aria-hidden />
-            Compare side by side
-          </Button>
-        ) : null}
-      </div>
-
-      {compare ? (
-        <PreviewComparison items={prepared.map((d) => ({ platform: d.platform, payload: d.draft!.payload, extras: d.draft!.extras, account: d.draft!.account }))} />
-      ) : current ? (
-        <div className="grid gap-3" key={current.platform}>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold">{current.info.name}</h3>
-            <StatusChip chip={draftChip(current.platform, current.draft)} />
-            <span className="text-sm text-muted-foreground">{current.info.state === 'adapter' ? 'Brand OS can publish this after your approval.' : 'You post this one by hand.'}</span>
+    <PreviewScaleContext.Provider value={SIZE_SCALE[prefs.previewSize]}>
+      <PreviewExpandProvider entries={entries}>
+        <div className="@container grid gap-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Layout</span>
+              <Segmented
+                label="Preview layout"
+                value={layout}
+                onChange={(value) => update({ previewLayout: value })}
+                options={LAYOUT_OPTIONS.map((o) => ({
+                  value: o.value,
+                  title: o.value === 'compare' && prepared.length < 2 ? 'Prepare at least two previews to compare them' : o.title,
+                  disabled: o.value === 'compare' && prepared.length < 2,
+                  label: (
+                    <>
+                      <o.icon aria-hidden className="size-4" />
+                      <span className="sr-only @lg:not-sr-only">{o.name}</span>
+                    </>
+                  ),
+                }))}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Size</span>
+              <Segmented label="Preview size" value={prefs.previewSize} onChange={(value) => update({ previewSize: value })} options={SIZE_OPTIONS.map((o) => ({ value: o.value, label: o.label, title: o.title }))} />
+            </div>
           </div>
-          <NoticeBar notice={api.notices[current.platform]} />
-          {current.draft ? (
-            <>
-              <LintList issues={current.draft.lint} empty="No problems found for this platform." />
-              <PlatformPreview input={{ platform: current.platform, payload: current.draft.payload, extras: current.draft.extras, account: current.draft.account }} />
-              <details className="rounded-lg border bg-surface" open={errors > 0}>
-                <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm font-medium">
-                  <Pencil aria-hidden className="size-4" />
-                  Edit title, description and tags
-                </summary>
-                <div className="border-t p-3">
-                  <QuickEdit destination={current} api={api} />
-                  <Link href={`/articles/${articleId}/publish?view=composer&d=${current.platform}`} className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'mt-2' })}>
-                    Open the full editor
-                  </Link>
-                </div>
-              </details>
-            </>
+
+          {layout === 'single' ? (
+            <div role="tablist" aria-label="Previews" className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 pb-0.5">
+              {chosen.map((d) => {
+                const n = d.draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
+                return (
+                  <button
+                    key={d.platform}
+                    type="button"
+                    role="tab"
+                    aria-selected={current?.platform === d.platform}
+                    onClick={() => onActive(d.platform)}
+                    className={cn(
+                      'inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-[120ms]',
+                      current?.platform === d.platform ? 'border-primary bg-accent text-accent-foreground' : 'border-border bg-surface text-muted-foreground hover:bg-accent hover:text-foreground',
+                    )}
+                  >
+                    {d.info.name}
+                    {n > 0 ? <span className="rounded-full bg-danger px-1.5 text-xs font-semibold text-danger-foreground">{n}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {layout === 'compare' ? (
+            <PreviewComparison items={entries.map((e) => e.input)} />
+          ) : layout === 'single' ? (
+            current ? <PreviewCard key={current.platform} destination={current} api={api} articleId={articleId} detailed /> : null
           ) : (
-            <p className="rounded-xl border bg-surface p-6 text-sm text-muted-foreground">Preparing the preview…</p>
+            <>
+              <p className="text-xs text-muted-foreground @2xl:hidden">This area is narrow, so the previews stack. Use Full view to see them side by side.</p>
+              <div className={cn('grid grid-cols-1 items-start gap-4', gridClass(layout))}>
+                {chosen.map((d) => (
+                  <PreviewCard key={d.platform} destination={d} api={api} articleId={articleId} detailed={false} />
+                ))}
+              </div>
+            </>
           )}
         </div>
-      ) : null}
-    </div>
+      </PreviewExpandProvider>
+    </PreviewScaleContext.Provider>
   );
 }
