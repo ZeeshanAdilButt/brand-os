@@ -133,7 +133,36 @@ describe('the platform selector', () => {
     render(<PlatformSelector rows={rows} selected={none} busy={none} onToggle={onToggle} recommendations={[]} />);
     fireEvent.click(screen.getByLabelText(/^DEV\.to/));
     expect(onToggle).toHaveBeenCalledWith('devto');
-    expect(screen.getAllByText('Preview here, post by hand').length).toBeGreaterThan(0);
+  });
+
+  it('gives each row one real fact from the catalog and one word of state, and a Connect link where a key is missing', () => {
+    render(<PlatformSelector rows={rows} selected={none} busy={none} onToggle={() => undefined} recommendations={[]} />);
+    // The same sentence is no longer repeated on every row.
+    expect(screen.queryByText('Preview and publish from Brand OS')).toBeNull();
+    expect(screen.queryByText('Preview here, post by hand')).toBeNull();
+    expect(screen.getAllByText('Markdown · canonical link').length).toBeGreaterThan(1);
+    expect(screen.getByText('Needs key')).toBeTruthy();
+    expect(screen.getByText('Set up')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Connect DEV.to', hidden: true }).getAttribute('href')).toBe('/platforms/integrations#devto');
+  });
+
+  it('pins what is chosen at the top, whatever category is open', () => {
+    render(<PlatformSelector rows={rows} selected={new Set<PlatformId>(['linkedin'])} busy={none} onToggle={() => undefined} recommendations={[]} />);
+    expect(screen.getByText('Chosen')).toBeTruthy();
+    const first = screen.getAllByRole('checkbox')[0] as HTMLInputElement;
+    expect(first.checked).toBe(true);
+    expect(first).toBe(screen.getByLabelText(/^LinkedIn/));
+    // It is listed once, even when its own category is the open one.
+    fireEvent.click(screen.getByRole('tab', { name: /^Social/ }));
+    expect(screen.getAllByLabelText(/^LinkedIn/)).toHaveLength(1);
+  });
+
+  it('has a category select for a phone beside the filter, and wrapping tabs rather than a scroll strip', () => {
+    render(<PlatformSelector rows={rows} selected={none} busy={none} onToggle={() => undefined} recommendations={[]} />);
+    const select = screen.getByRole('combobox', { name: 'Category' }) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'video' } });
+    expect(screen.getByLabelText(/YouTube/)).toBeTruthy();
+    expect(screen.getByRole('tablist', { name: 'Categories' }).className).toMatch(/flex-wrap/);
   });
 
   it('filters by category tab and by search', () => {
@@ -269,9 +298,9 @@ describe('the publishing workspace', () => {
     expect(screen.getByRole('button', { name: 'Change article' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Where should it go?', level: 2 })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'How it will look', level: 2 })).toBeTruthy();
-    expect(screen.getByText('0 platforms selected')).toBeTruthy();
-    expect((screen.getByRole('button', { name: /review and approve/i }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.queryByRole('link', { name: /review and approve/i })).toBeNull();
+    expect(screen.getByText('0 selected')).toBeTruthy();
+    expect((screen.getByRole('button', { name: /choose a platform/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('link', { name: /^review/i })).toBeNull();
     expect(screen.getByText(/Choose a platform to see its preview/)).toBeTruthy();
   });
 
@@ -279,7 +308,7 @@ describe('the publishing workspace', () => {
     const calls = serve({ added: new Set() });
     render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(), platform: null }} />);
     fireEvent.click(screen.getByLabelText(/^DEV\.to/));
-    await waitFor(() => expect(screen.getByText('1 platform selected')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('1 selected')).toBeTruthy());
     // The preview of this article on that platform is labelled as approximate, and shows the adapted title.
     await waitFor(() => expect(screen.getByText('Approximate preview')).toBeTruthy());
     expect(screen.getAllByText(/Why the write path stalls \(devto\)/).length).toBeGreaterThan(0);
@@ -289,7 +318,7 @@ describe('the publishing workspace', () => {
     expect(calls.some((c) => /stage|approve|request-approval|publish/.test(c.url))).toBe(false);
     expect(loadRemembered(window.localStorage)).toContain('devto');
     // The way on is open now, and it leads to the one-at-a-time approval queue.
-    const review = await screen.findByRole('link', { name: /review and approve/i });
+    const review = await screen.findByRole('link', { name: /review 1 post/i });
     expect(review.getAttribute('href')).toBe(`/articles/${A1}/publish?view=guided&step=3`);
   });
 
@@ -299,7 +328,7 @@ describe('the publishing workspace', () => {
     const group = screen.getByRole('region', { name: /recommended for this article/i });
     const names = within(group).getAllByRole('button', { pressed: false }).map((b) => b.textContent);
     fireEvent.click(within(group).getByRole('button', { name: /^Choose all/ }));
-    await waitFor(() => expect(screen.getByText(`${names.length} platforms selected`)).toBeTruthy(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByText(`${names.length} selected`)).toBeTruthy(), { timeout: 4000 });
     const writes = calls.filter((c) => c.method !== 'GET').map((c) => c.method + ' ' + c.url.replace(/[0-9a-f-]{36}/, ':id'));
     expect(writes.filter((w) => w === 'POST /api/articles/:id/destinations')).toHaveLength(names.length);
     expect(writes.filter((w) => w === 'POST /api/platform-drafts')).toHaveLength(names.length);
@@ -309,14 +338,13 @@ describe('the publishing workspace', () => {
   it('shows one preview per chosen platform, switches between them, and removes one when unticked', async () => {
     const calls = serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
     render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />);
-    expect(screen.getByText('2 platforms selected')).toBeTruthy();
+    expect(screen.getByText('2 selected')).toBeTruthy();
     const tabs = within(screen.getByRole('tablist', { name: 'Previews' })).getAllByRole('tab');
     expect(tabs.map((t) => t.textContent)).toEqual(['DEV.to', 'Hashnode']);
     fireEvent.click(tabs[1]!);
     expect(screen.getByRole('heading', { name: 'Hashnode', level: 3 })).toBeTruthy();
-    expect(within(screen.getByRole('group', { name: 'Preview layout' })).getByRole('button', { name: /compare/i })).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox', { name: /^Hashnode/ }));
-    await waitFor(() => expect(screen.getByText('1 platform selected')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('1 selected')).toBeTruthy());
     expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/destinations/hashnode'))).toBe(true);
     expect(within(screen.getByRole('tablist', { name: 'Previews' })).getAllByRole('tab')).toHaveLength(1);
   });
@@ -328,20 +356,20 @@ describe('the publishing workspace', () => {
     expect(ghost.disabled).toBe(true);
     fireEvent.click(ghost);
     expect(calls).toHaveLength(0);
-    expect(screen.getByText('0 platforms selected')).toBeTruthy();
+    expect(screen.getByText('0 selected')).toBeTruthy();
   });
 
   it('changing the article loads its own platforms and previews without leaving the page', async () => {
     const state = { added: new Set<PlatformId>() };
     const calls = serve(state);
     render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />);
-    expect(screen.getByText('1 platform selected')).toBeTruthy();
+    expect(screen.getByText('1 selected')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /change/i }));
     fireEvent.click(screen.getByLabelText(/A short note on retries/));
     await waitFor(() => expect(screen.getByTestId('selected-article').textContent).toBe('A short note on retries'));
     expect(calls.filter((c) => c.method === 'GET').map((c) => c.url.replace(A2, ':id'))).toEqual(expect.arrayContaining(['/api/articles/:id', '/api/articles/:id/destinations']));
     // The other article's choice is not carried over: this one has nothing chosen yet.
-    await waitFor(() => expect(screen.getByText('0 platforms selected')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('0 selected')).toBeTruthy());
   });
 });
 
@@ -361,21 +389,31 @@ function inProvider(prefs: Partial<ViewPrefs> = {}) {
 /** The element that holds the Platforms area (the left column). */
 const leftGroup = () => screen.getByRole('heading', { name: 'Where should it go?', level: 2 }).closest('section')!.parentElement!;
 
-describe('folding the areas and the full view', () => {
-  it('folds an area to a bar that says what it holds, keeps it mounted, and opens it again on click', async () => {
+/** Opens the View panel of the first preview on the page and returns it. */
+async function openView() {
+  fireEvent.click(screen.getAllByRole('button', { name: /View options/ })[0]!);
+  return within(await screen.findByRole('dialog'));
+}
+
+const closeView = async () => {
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+};
+
+describe('hiding the platform list and the full view', () => {
+  it('hides the platform list from the View panel to a bar that says what it holds, keeps it mounted, and opens it again on click', async () => {
     serve({ added: new Set<PlatformId>(['devto']) });
     const { wrap, writes } = inProvider();
     render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
-    const fold = screen.getByRole('button', { name: 'Fold Platforms' });
-    expect(fold.getAttribute('aria-expanded')).toBe('true');
-    const bodyId = fold.getAttribute('aria-controls')!;
-    expect(document.getElementById(bodyId)!.hidden).toBe(false);
-    fireEvent.click(fold);
+    // There is no fold button on the page itself: the one place for it is the View panel.
+    expect(screen.queryByRole('button', { name: 'Fold Platforms' })).toBeNull();
+    const view = await openView();
+    fireEvent.click(view.getByRole('button', { name: 'Hide platform list' }));
     expect(writes.at(-1)!.collapsedAreas).toEqual(['platforms']);
     // The folded bar is one button: its name holds the title and the one-line summary, and it controls the (still mounted) body.
     const bar = screen.getByRole('button', { name: /Platforms.*1 platform selected/ });
     expect(bar.getAttribute('aria-expanded')).toBe('false');
-    expect(bar.getAttribute('aria-controls')).toBe(bodyId);
+    const bodyId = bar.getAttribute('aria-controls')!;
     expect(document.getElementById(bodyId)!.hidden).toBe(true);
     expect(document.getElementById(bodyId)!.querySelectorAll('input[type=checkbox]').length).toBeGreaterThan(0);
     fireEvent.click(bar);
@@ -383,22 +421,23 @@ describe('folding the areas and the full view', () => {
     expect(document.getElementById(bodyId)!.hidden).toBe(false);
   });
 
-  it('starts folded from the saved choice, and the folded bars say what they hold', () => {
+  it('starts folded from the saved choice and still shows the article and the previews', () => {
     serve({ added: new Set() });
-    const { wrap } = inProvider({ collapsedAreas: ['platforms', 'previews'] });
+    const { wrap } = inProvider({ collapsedAreas: ['platforms'] });
     render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(), platform: null }} />));
     expect(screen.getByRole('button', { name: /Platforms.*0 platforms selected/ }).getAttribute('aria-expanded')).toBe('false');
-    expect(screen.getByRole('button', { name: /Previews/ }).getAttribute('aria-expanded')).toBe('false');
-    // The article is named in the page title, whatever is folded.
     expect(screen.getByRole('heading', { name: 'Why the write path stalls', level: 1 })).toBeTruthy();
+    expect(screen.getByText(/Choose a platform to see its preview/)).toBeTruthy();
   });
 
-  it('full view hides the sidebar and the Article and Platforms areas, keeps the previews live, and Esc or the button brings everything back', async () => {
+  it('full view hides the sidebar and the platform list, keeps the previews live, and Esc or a button brings everything back', async () => {
     serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
     const { wrap, layouts } = inProvider();
     render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />));
     expect(leftGroup().className).not.toMatch(/\bhidden\b/);
-    const button = screen.getByRole('button', { name: 'Full view' });
+    expect(screen.queryByRole('button', { name: 'Leave full view' })).toBeNull();
+    const view = await openView();
+    const button = view.getByRole('button', { name: 'Full view' });
     expect(button.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(button);
     expect(button.getAttribute('aria-pressed')).toBe('true');
@@ -406,72 +445,178 @@ describe('folding the areas and the full view', () => {
     expect(layouts.at(-1)).toMatchObject({ hideSidebar: true, wide: true });
     // The previews and the selection are still there and live.
     expect(within(screen.getByRole('tablist', { name: 'Previews' })).getAllByRole('tab')).toHaveLength(2);
-    expect(screen.getByText('2 platforms selected')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Leave full view' })).toBeTruthy();
+    // The first Escape closes the View panel, the next one leaves full view.
+    await closeView();
+    expect(leftGroup().className).toMatch(/\bhidden\b/);
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(leftGroup().className).not.toMatch(/\bhidden\b/);
     // Back to the page's own layout: the sidebar is shown and the page is not full width.
     expect(layouts.at(-1)).toMatchObject({ hideSidebar: false, hideHeader: false, wide: false });
-    // The same button also leaves it.
-    fireEvent.click(button);
+    expect(screen.queryByRole('button', { name: 'Leave full view' })).toBeNull();
+    // The visible button leaves it too.
+    const again = await openView();
+    fireEvent.click(again.getByRole('button', { name: 'Full view' }));
     expect(leftGroup().className).toMatch(/\bhidden\b/);
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Leave full view' }));
     expect(leftGroup().className).not.toMatch(/\bhidden\b/);
   });
 
-  it('Esc does not leave full view while a dialog is open over it', () => {
+  it('Esc does not leave full view while a dialog is open over it', async () => {
     serve({ added: new Set<PlatformId>(['devto']) });
     const { wrap } = inProvider();
     render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
-    fireEvent.click(screen.getByRole('button', { name: 'Full view' }));
+    const view = await openView();
+    fireEvent.click(view.getByRole('button', { name: 'Full view' }));
+    await closeView();
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
     document.body.append(dialog);
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(screen.getByRole('button', { name: 'Full view' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Leave full view' })).toBeTruthy();
     dialog.remove();
+  });
+
+  it('on a phone one list shows at a time, chosen by a switch at the top', () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />);
+    const preview = () => screen.getByRole('heading', { name: 'How it will look', level: 2 }).closest('section')!;
+    const show = within(screen.getByRole('group', { name: 'Show' }));
+    expect(show.getByRole('button', { name: 'Platforms (1)' }).getAttribute('aria-pressed')).toBe('true');
+    expect(preview().className).toMatch(/max-lg:hidden/);
+    expect(leftGroup().className).not.toMatch(/max-lg:hidden/);
+    fireEvent.click(show.getByRole('button', { name: 'Preview' }));
+    expect(preview().className).not.toMatch(/max-lg:hidden/);
+    expect(leftGroup().className).toMatch(/max-lg:hidden/);
   });
 });
 
-describe('preview layouts and sizes', () => {
-  it('switches between one large preview, two or three columns and compare, and remembers the choice', () => {
+describe('the View panel', () => {
+  it('switches between one large preview, two or three columns and compare, and remembers the choice', async () => {
     serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
     const { wrap, writes } = inProvider();
     render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />));
-    const layout = within(screen.getByRole('group', { name: 'Preview layout' }));
-    expect(layout.getByRole('button', { name: /One large/ }).getAttribute('aria-pressed')).toBe('true');
+    // Nothing about layout is on the page until the panel is opened.
+    expect(screen.queryByRole('group', { name: 'Preview layout' })).toBeNull();
+    const layout = within((await openView()).getByRole('group', { name: 'Preview layout' }));
+    expect(layout.getByRole('button', { name: /Single/ }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getAllByRole('region', { name: /preview$/ })).toHaveLength(1);
-    fireEvent.click(layout.getByRole('button', { name: '2 columns' }));
+    fireEvent.click(layout.getByRole('button', { name: '2 col' }));
     expect(writes.at(-1)!.previewLayout).toBe('grid2');
     // A grid shows every chosen platform at once and has no tabs.
     expect(screen.getAllByRole('region', { name: /preview$/ })).toHaveLength(2);
     expect(screen.queryByRole('tablist', { name: 'Previews' })).toBeNull();
-    fireEvent.click(layout.getByRole('button', { name: /Compare/ }));
+    const again = within((await openView()).getByRole('group', { name: 'Preview layout' }));
+    fireEvent.click(again.getByRole('button', { name: /Compare/ }));
     expect(writes.at(-1)!.previewLayout).toBe('compare');
     expect(screen.getByText('What differs')).toBeTruthy();
   });
 
-  it('cannot compare with fewer than two prepared previews', () => {
+  it('cannot compare with fewer than two prepared previews', async () => {
     serve({ added: new Set<PlatformId>(['devto']) });
     const { wrap } = inProvider({ previewLayout: 'compare' });
     render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
-    const compare = within(screen.getByRole('group', { name: 'Preview layout' })).getByRole('button', { name: /Compare/ }) as HTMLButtonElement;
+    const compare = within((await openView()).getByRole('group', { name: 'Preview layout' })).getByRole('button', { name: /Compare/ }) as HTMLButtonElement;
     expect(compare.disabled).toBe(true);
     // The saved choice is compare, but with one preview the page shows the single view.
     expect(screen.getByRole('tablist', { name: 'Previews' })).toBeTruthy();
   });
 
-  it('the size control scales the preview surface and is remembered', () => {
+  it('the size control scales the preview surface and is remembered', async () => {
     serve({ added: new Set<PlatformId>(['devto']) });
     const { wrap, writes } = inProvider();
     const { container } = render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />));
     const sim = () => container.querySelector('.sim') as HTMLElement;
     expect(sim().style.zoom).toBe('');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Preview size' })).getByRole('button', { name: 'Large' }));
+    const view = await openView();
+    fireEvent.click(within(view.getByRole('group', { name: 'Preview size' })).getByRole('button', { name: 'Large' }));
     expect(writes.at(-1)!.previewSize).toBe('large');
     expect(sim().style.zoom).toBe('1.25');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Preview size' })).getByRole('button', { name: 'Compact' }));
+    fireEvent.click(within(view.getByRole('group', { name: 'Preview size' })).getByRole('button', { name: 'Compact' }));
     expect(sim().style.zoom).toBe('0.85');
+  });
+
+  it('device and appearance are chosen once for every preview, and remembered', async () => {
+    serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
+    const { wrap, writes } = inProvider();
+    const { container } = render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />));
+    const sim = () => container.querySelector('.sim') as HTMLElement;
+    expect(sim().getAttribute('data-device')).toBe('desktop');
+    expect(sim().getAttribute('data-appearance')).toBe('light');
+    const view = await openView();
+    fireEvent.click(view.getByRole('button', { name: 'Mobile' }));
+    fireEvent.click(view.getByRole('button', { name: 'Dark' }));
+    expect(writes.at(-1)).toMatchObject({ previewDevice: 'mobile', previewAppearance: 'dark' });
+    expect(sim().getAttribute('data-device')).toBe('mobile');
+    expect(sim().getAttribute('data-appearance')).toBe('dark');
+    await closeView();
+    // The choice follows the person to the next platform instead of resetting.
+    fireEvent.click(within(screen.getByRole('tablist', { name: 'Previews' })).getAllByRole('tab')[1]!);
+    expect(sim().getAttribute('data-device')).toBe('mobile');
+  });
+
+  it('keeps the placeholder note and the Float, Full view and platform list choices in the same panel', async () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />);
+    const view = await openView();
+    expect(view.getByRole('button', { name: 'Float window' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Full view' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Hide platform list' })).toBeTruthy();
+    expect(view.getByText(/placeholders and inert/)).toBeTruthy();
+  });
+});
+
+describe('the checks pill', () => {
+  const withIssues = () =>
+    ALL(['devto']).map((d) =>
+      d.platform === 'devto'
+        ? { ...d, draft: { ...d.draft!, lint: [{ code: 'canonical', severity: 'error', message: 'Add a canonical link.' }, { code: 'tags', severity: 'warning', message: 'These tags are long.' }] as PlatformDraftDTO['lint'] } }
+        : d,
+    );
+
+  it('says what is wrong in one short pill and opens the full list in place, closed to start with', () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: withIssues(), platform: null }} />);
+    const pill = screen.getByRole('button', { name: /1 to fix · 1 heads up/ });
+    expect(pill.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('See checks')).toBeNull();
+    const list = screen.getByText('Add a canonical link.').closest('[hidden]');
+    expect(list).toBeTruthy();
+    fireEvent.click(pill);
+    expect(pill.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('Add a canonical link.').closest('[hidden]')).toBeNull();
+    expect(pill.getAttribute('aria-controls')).toBe(list!.id);
+  });
+
+  it('is a quiet note, not a control, when nothing needs a look', () => {
+    serve({ added: new Set<PlatformId>(['devto']) });
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />);
+    expect(screen.getByText('Checks passed')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /heads up|to fix/ })).toBeNull();
+  });
+});
+
+describe('what is left out of the page', () => {
+  it('has no row of open-preview chips in the footer: the tabs already switch previews', () => {
+    serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />);
+    expect(screen.queryByRole('list', { name: 'Open a preview large' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Expand .* preview$/ })).toHaveLength(1);
+  });
+
+  it('shows the suggestions only to someone with nothing chosen and nothing connected', () => {
+    serve({ added: new Set<PlatformId>() });
+    const first = render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(), platform: null }} />);
+    expect(screen.getByRole('region', { name: /recommended for this article/i })).toBeTruthy();
+    first.unmount();
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto']), platform: null }} />);
+    expect(screen.queryByRole('region', { name: /recommended for this article/i })).toBeNull();
+  });
+
+  it('names the number of posts on the one primary button', () => {
+    serve({ added: new Set<PlatformId>(['devto', 'hashnode']) });
+    render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(['devto', 'hashnode']), platform: null }} />);
+    expect(screen.getByRole('link', { name: /Review 2 posts/ }).getAttribute('href')).toBe('/articles/' + A1 + '/publish?view=guided&step=3');
   });
 });
 

@@ -1,28 +1,30 @@
 'use client';
 
-import { ArrowRight, Maximize2, PictureInPicture2 } from 'lucide-react';
+import { ArrowRight, Maximize2, PanelLeftClose, PictureInPicture2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { EmptyState } from '@/components/brand/branch-art';
-import { usePreviewExpand } from '@/components/publishing/previews/preview-context';
+import { PreviewViewContext, usePreviewExpand, type PreviewView } from '@/components/publishing/previews/preview-context';
+import { ViewSection } from '@/components/publishing/previews/preview-frame';
 import { useViewPrefs } from '@/components/shell/view-prefs';
 import { useShellLayout, useShellSteps } from '@/components/shell/shell-layout';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CollapsibleArea } from '@/components/ui/collapsible-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormNotice } from '@/components/ui/field';
+import { Segmented } from '@/components/ui/segmented';
 import { api as http } from '@/lib/api-client';
 import type { ArticleDTO } from '@/lib/articles';
 import { RECOMMENDED_ORDER, type DestinationDTO, type PlatformId } from '@/lib/publishing';
 import { journeySteps, selectorRows, type ArticleOption } from '@/lib/publish-workspace';
 import { articleFacts, recommend } from '@/lib/recommend';
-import { toggled, type PublishArea } from '@/lib/view-prefs';
+import { toggled } from '@/lib/view-prefs';
 import { loadRemembered, saveRemembered } from '@/lib/wizard-state';
 import { cn } from '@/lib/utils';
 import { usePublish, type PublishApi } from '../use-publish';
 import { ArticlePicker } from './article-picker';
 import { PlatformSelector } from './platform-selector';
-import { PreviewArea, previewEntries } from './preview-area';
+import { LayoutAndSize, PreviewArea, previewEntries } from './preview-area';
 import { PreviewExpandProvider } from './preview-expand';
 import { PreviewWindow } from './preview-window';
 
@@ -36,33 +38,28 @@ export interface WorkspaceArticle {
 }
 
 const LAST_ARTICLE_KEY = 'brand-os.last-article';
-const DESCRIPTION = 'Choose where it goes, and see how it will look. Nothing is sent from here. You approve every post yourself.';
 
-/** The top of the page: a small label, the page's own title (the article's title once one is chosen) and the actions. */
-function Header({ title, serif, actions, children }: { title: string; serif: boolean; actions?: ReactNode; children?: ReactNode }) {
+/** One slim line: a small label, the page's own title (the article's title once one is chosen) and the actions. */
+function Header({ title, serif, children }: { title: string; serif: boolean; children?: ReactNode }) {
   return (
-    <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-      <div className="min-w-0">
-        <p className="mono-label mb-2 text-muted-foreground">Publishing</p>
-        <h1 data-testid={serif ? 'selected-article' : undefined} className={cn(serif ? 'font-serif text-3xl leading-9 font-semibold sm:text-[2rem] sm:leading-10' : 'text-3xl leading-9 font-bold sm:text-4xl sm:leading-10')}>
+    <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="flex min-w-0 flex-1 basis-64 flex-col sm:flex-row sm:items-baseline sm:gap-3">
+        <p className="mono-label shrink-0 text-muted-foreground">Publishing</p>
+        <h1 title={title} data-testid={serif ? 'selected-article' : undefined} className={cn('min-w-0 truncate', serif ? 'font-serif text-2xl leading-9 font-semibold' : 'text-2xl leading-9 font-bold')}>
           {title}
         </h1>
-        {serif ? null : <p className="mt-3 max-w-[64ch] text-[0.9375rem] leading-6 text-muted-foreground">Choose an article, then where it goes. You approve every post yourself.</p>}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {children}
-        {actions}
-      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>
     </header>
   );
 }
 
 /**
- * The one publishing screen. The page names the article and can change it. Left: where should it go, with suggestions,
- * category tabs and a plain list. Right: how it will look, a preview of each chosen platform. Choosing a platform
- * prepares its preview at once (nothing is sent) and unchoosing removes it. The choice is saved with the article, so it
- * is still there on the next visit. "Review and approve" continues into the approval queue, where every post is approved
- * on its own.
+ * The one publishing screen. The page names the article and can change it. Left: where should it go, a plain list of
+ * platforms. Right: how it will look, a preview of each chosen platform with its checks and one View panel. Choosing a
+ * platform prepares its preview at once (nothing is sent) and unchoosing removes it. The choice is saved with the
+ * article, so it is still there on the next visit. "Review" continues into the approval queue, where every post is
+ * approved on its own.
  */
 export function PublishWorkspace({
   articles,
@@ -122,13 +119,14 @@ export function PublishWorkspace({
   }
   return (
     <>
-      <Header title="Publishing" serif={false} actions={actions} />
+      <Header title="Publishing" serif={false}>
+        {actions}
+      </Header>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <section aria-labelledby="choose-article" className="min-w-0 rounded-xl border bg-surface p-5">
-          <h2 id="choose-article" className="mb-1 text-xl leading-7 font-semibold">
-            Article
+          <h2 id="choose-article" className="mb-4 text-xl leading-7 font-semibold">
+            Choose an article
           </h2>
-          <p className="mb-4 text-sm text-muted-foreground">Choose the article to publish.</p>
           <ArticlePicker articles={articles} selectedId={articleId} onSelect={choose} />
           {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading…</p> : null}
           {error ? (
@@ -147,36 +145,74 @@ export function PublishWorkspace({
   );
 }
 
-/** The footer chips: one for each preview that is ready. Each opens that preview large. */
-function PreviewChips({ chosen, active }: { chosen: DestinationDTO[]; active: PlatformId | null }) {
-  const expand = usePreviewExpand();
-  const ready = chosen.filter((d) => d.draft);
-  if (ready.length === 0) return null;
+/** The workspace's part of the View panel: how the previews are laid out and sized, and the ways to give them more room. */
+function WorkspaceViewMenu({
+  windowed,
+  ready,
+  floating,
+  onFloat,
+  fullView,
+  onFullView,
+  platformsFolded,
+  onFoldPlatforms,
+}: {
+  windowed: boolean;
+  ready: number;
+  floating: boolean;
+  onFloat(on: boolean): void;
+  fullView: boolean;
+  onFullView(on: boolean): void;
+  platformsFolded: boolean;
+  onFoldPlatforms(folded: boolean): void;
+}) {
   return (
-    <ul aria-label="Open a preview large" className="hidden flex-wrap items-center gap-2 sm:flex">
-      {ready.map((d) => (
-        <li key={d.platform}>
-          <button
-            type="button"
-            aria-label={`Open ${d.info.name} preview large`}
-            aria-haspopup="dialog"
-            onClick={(e) => expand?.open(d.platform, e.currentTarget)}
-            className={cn(
-              'inline-flex h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors duration-[120ms] hover:bg-secondary',
-              active === d.platform ? 'border-border-strong bg-accent' : 'border-border bg-surface',
-            )}
-          >
-            {d.info.name}
-            <Maximize2 aria-hidden className="size-3.5" />
-          </button>
-        </li>
-      ))}
-    </ul>
+    <>
+      {windowed ? null : <LayoutAndSize ready={ready} />}
+      <ViewSection title="Room">
+        {floating ? (
+          <Button type="button" variant="outline" className="hidden lg:inline-flex" onClick={() => onFloat(false)}>
+            <X aria-hidden />
+            Dock the preview
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" className="hidden lg:inline-flex" onClick={() => onFloat(true)} title="Show the preview in a floating window you can move">
+            <PictureInPicture2 aria-hidden />
+            Float window
+          </Button>
+        )}
+        <Button type="button" variant={fullView ? 'default' : 'outline'} aria-pressed={fullView} onClick={() => onFullView(!fullView)} title="Hide the sidebar and the platform list so the previews use the whole width. Esc leaves it.">
+          <Maximize2 aria-hidden />
+          Full view
+        </Button>
+        {windowed || fullView ? null : (
+          <Button type="button" variant="outline" className="hidden lg:inline-flex" aria-pressed={platformsFolded} onClick={() => onFoldPlatforms(!platformsFolded)}>
+            <PanelLeftClose aria-hidden />
+            {platformsFolded ? 'Show platform list' : 'Hide platform list'}
+          </Button>
+        )}
+      </ViewSection>
+    </>
   );
 }
 
 /** The floating window: the active platform's preview, in a window you can move, shrink, open large or close. */
-function FloatingPreview({ api, articleId, chosen, active, onActive, onClose }: { api: PublishApi; articleId: string; chosen: DestinationDTO[]; active: PlatformId | null; onActive(platform: PlatformId): void; onClose(): void }) {
+function FloatingPreview({
+  api,
+  articleId,
+  chosen,
+  active,
+  onActive,
+  onClose,
+  view,
+}: {
+  api: PublishApi;
+  articleId: string;
+  chosen: DestinationDTO[];
+  active: PlatformId | null;
+  onActive(platform: PlatformId): void;
+  onClose(): void;
+  view: PreviewView;
+}) {
   const expand = usePreviewExpand();
   const [minimized, setMinimized] = useState(false);
   const current = chosen.find((d) => d.platform === active) ?? chosen[0] ?? null;
@@ -191,7 +227,9 @@ function FloatingPreview({ api, articleId, chosen, active, onActive, onClose }: 
       expandLabel={`Open ${name} preview large`}
       className="hidden lg:flex"
     >
-      <PreviewArea api={api} articleId={articleId} chosen={chosen} active={active} onActive={onActive} windowed />
+      <PreviewViewContext.Provider value={view}>
+        <PreviewArea api={api} articleId={articleId} chosen={chosen} active={active} onActive={onActive} windowed />
+      </PreviewViewContext.Provider>
     </PreviewWindow>
   );
 }
@@ -219,14 +257,12 @@ function WorkspaceBody({
   const [working, setWorking] = useState<ReadonlySet<PlatformId>>(new Set());
   const [changing, setChanging] = useState(false);
   const [floating, setFloating] = useState(false);
+  const [mobileView, setMobileView] = useState<'platforms' | 'preview'>('platforms');
   const { prefs, update } = useViewPrefs();
   const [fullView, setFullView] = useState(false);
   // Full view gives the previews the whole window: the sidebar goes too, and comes back when it ends or the page is left.
   useShellLayout(true, fullView ? { hideSidebar: true, wide: true } : { fluid: true });
-  const folded = useMemo(() => new Set(prefs.collapsedAreas), [prefs.collapsedAreas]);
-  const previewsFolded = folded.has('previews') && !fullView;
-  const platformsFolded = folded.has('platforms');
-  const fold = (area: PublishArea, collapsed: boolean) => update({ collapsedAreas: toggled(prefs.collapsedAreas, area, collapsed) });
+  const platformsFolded = prefs.collapsedAreas.includes('platforms') && !fullView;
   // A floating window replaces the previews column; below the lg breakpoint there is no window, so the column stays.
   const detached = floating && !fullView;
 
@@ -256,6 +292,8 @@ function WorkspaceBody({
   const prepared = chosen.filter((d) => d.draft).length;
   const decided = chosen.filter((d) => d.draft && ['approved', 'publishing', 'published'].includes(d.draft.status)).length;
   const published = chosen.filter((d) => d.draft?.status === 'published').length;
+  // The suggestions are for a first visit: nothing chosen and nothing connected yet.
+  const firstRun = chosen.length === 0 && connected.size === 0;
 
   async function toggle(platform: PlatformId) {
     if (working.has(platform)) return;
@@ -291,21 +329,39 @@ function WorkspaceBody({
   }, [selected]);
 
   const steps = useMemo(() => journeySteps({ selected: chosen.length, prepared, decided, published }), [chosen.length, prepared, decided, published]);
-  // The sidebar shows the steps on a wide screen; the strip below shows them on a narrow one.
+  // The sidebar shows the steps (the drawer on a phone).
   useShellSteps(steps);
-  const stepNumber = Math.max(1, steps.findIndex((s) => s.state === 'current') + 1 || steps.length);
   const blockedReason = !hasText ? 'This article has no text yet.' : chosen.length === 0 ? 'Choose at least one platform.' : prepared < chosen.length || working.size > 0 ? 'Previews are still being prepared.' : null;
   const reviewHref = `/articles/${article.id}/publish?view=guided&step=3`;
+  const reviewLabel = chosen.length === 0 ? 'Choose a platform' : `Review ${chosen.length} ${chosen.length === 1 ? 'post' : 'posts'}`;
 
-  const leftOpen = 'lg:flex-[5_1_0%]';
-  const rightOpen = 'lg:flex-[7_1_0%]';
+  const foldPlatforms = (folded: boolean) => update({ collapsedAreas: toggled(prefs.collapsedAreas, 'platforms', folded) });
+  const menu = (windowed: boolean) => (
+    <WorkspaceViewMenu windowed={windowed} ready={entries.length} floating={floating} onFloat={setFloating} fullView={fullView} onFullView={setFullView} platformsFolded={platformsFolded} onFoldPlatforms={foldPlatforms} />
+  );
+  const view = (windowed: boolean): PreviewView => ({
+    device: prefs.previewDevice,
+    onDevice: (previewDevice) => update({ previewDevice }),
+    appearance: prefs.previewAppearance,
+    onAppearance: (previewAppearance) => update({ previewAppearance }),
+    menu: menu(windowed),
+  });
+
+  // Each column scrolls on its own on a wide screen, so the page itself holds still.
+  const columnHeight = 'lg:max-h-[calc(100dvh-16rem)] lg:overflow-y-auto lg:overscroll-contain';
 
   return (
     <PreviewExpandProvider entries={entries}>
-      <Header title={article.title || 'Untitled article'} serif actions={actions}>
+      <Header title={article.title || 'Untitled article'} serif>
+        {fullView ? (
+          <Button type="button" variant="default" size="lg" onClick={() => setFullView(false)}>
+            Leave full view
+          </Button>
+        ) : null}
         <Button type="button" variant="outline" size="lg" aria-haspopup="dialog" onClick={() => setChanging(true)}>
           Change article
         </Button>
+        {actions}
       </Header>
 
       <Dialog open={changing} onOpenChange={setChanging}>
@@ -326,20 +382,17 @@ function WorkspaceBody({
         </DialogContent>
       </Dialog>
 
-      <div className="mb-4 lg:hidden">
-        <p className="mono-label text-muted-foreground">
-          Step {stepNumber} of {steps.length}
-          <span className="text-foreground"> · {steps[stepNumber - 1]?.label}</span>
-        </p>
-        <ol aria-label="Progress" className="mt-2 grid grid-cols-4 gap-1.5">
-          {steps.map((s) => (
-            <li key={s.id} aria-current={s.state === 'current' ? 'step' : undefined} className={cn('h-1.5 rounded-full', s.state === 'todo' ? 'bg-border' : s.state === 'current' ? 'bg-accent-warm' : 'bg-solid')}>
-              <span className="sr-only">
-                {s.label}: {s.state === 'done' ? 'done' : s.state === 'current' ? 'current' : 'not yet'}
-              </span>
-            </li>
-          ))}
-        </ol>
+      <div className="sticky top-16 z-10 -mx-5 mb-4 bg-background px-5 py-2 sm:-mx-8 sm:px-8 lg:hidden">
+        <Segmented<'platforms' | 'preview'>
+          label="Show"
+          columns={2}
+          value={mobileView}
+          onChange={setMobileView}
+          options={[
+            { value: 'platforms', label: `Platforms${chosen.length > 0 ? ` (${chosen.length})` : ''}` },
+            { value: 'preview', label: 'Preview' },
+          ]}
+        />
       </div>
 
       {!hasText ? <p className="mb-4 rounded-xl border border-info/25 bg-info-bg px-4 py-3 text-sm">This article has no text yet, so there is nothing to preview. Add some in the studio first.</p> : null}
@@ -350,47 +403,34 @@ function WorkspaceBody({
       ) : null}
 
       <div className={cn('flex flex-col gap-6 lg:flex-row lg:items-start', loading && 'opacity-60')} aria-busy={loading}>
-        <div className={cn('min-w-0', fullView && 'hidden', platformsFolded ? 'lg:w-12 lg:shrink-0' : detached ? 'lg:max-w-3xl lg:flex-1' : leftOpen)}>
+        <div className={cn('min-w-0', fullView && 'hidden', mobileView !== 'platforms' && 'max-lg:hidden', platformsFolded ? 'lg:w-12 lg:shrink-0' : cn(columnHeight, detached ? 'lg:max-w-3xl lg:flex-1' : 'lg:min-w-[24rem] lg:flex-[5_1_0%]'))}>
           <CollapsibleArea
             title="Platforms"
             heading="Where should it go?"
             summary={`${chosen.length} ${chosen.length === 1 ? 'platform' : 'platforms'} selected`}
-            note="Tick any. Each one gets its own preview. Nothing is sent from here."
-            collapsed={platformsFolded}
-            onCollapsedChange={(c) => fold('platforms', c)}
-          >
-            <PlatformSelector rows={rows} selected={selected} busy={working} onToggle={(p) => void toggle(p)} onChooseAll={(list) => void chooseAll(list)} recommendations={recommendations} />
-          </CollapsibleArea>
-        </div>
-        <div className={cn('min-w-0', detached && 'lg:hidden', previewsFolded ? 'lg:w-12 lg:shrink-0' : cn('lg:min-w-0', fullView ? 'lg:flex-1' : rightOpen))}>
-          <CollapsibleArea
-            title="Previews"
-            heading="How it will look"
-            summary={chosen.length === 0 ? 'Nothing to preview yet' : `${prepared} of ${chosen.length} ready`}
-            side="right"
-            collapsed={previewsFolded}
-            onCollapsedChange={(c) => fold('previews', c)}
-            canCollapse={!fullView}
             actions={
-              <>
-                {fullView ? <span className="hidden self-center text-xs text-muted-foreground sm:inline">Esc to leave</span> : null}
-                <Button type="button" size="sm" variant="outline" className="hidden lg:inline-flex" onClick={() => setFloating(true)} title="Show the preview in a floating window you can move">
-                  <PictureInPicture2 aria-hidden />
-                  Float
-                </Button>
-                <Button type="button" size="sm" variant={fullView ? 'default' : 'outline'} aria-pressed={fullView} onClick={() => setFullView((v) => !v)} title="Hide the sidebar and the platform list so the previews use the whole width">
-                  <Maximize2 aria-hidden />
-                  Full view
-                </Button>
-              </>
+              <span className="self-center text-sm text-muted-foreground" aria-live="polite">
+                {chosen.length} selected
+              </span>
             }
+            collapsed={platformsFolded}
+            onCollapsedChange={foldPlatforms}
+            canCollapse={false}
           >
-            <PreviewArea api={api} articleId={article.id} chosen={chosen} active={active} onActive={setActive} />
+            <PlatformSelector rows={rows} selected={selected} busy={working} onToggle={(p) => void toggle(p)} onChooseAll={(list) => void chooseAll(list)} recommendations={firstRun ? recommendations : []} />
           </CollapsibleArea>
         </div>
+        <section aria-labelledby="how-it-looks" className={cn('min-w-0', mobileView !== 'preview' && 'max-lg:hidden', detached ? 'lg:hidden' : cn(columnHeight, fullView ? 'lg:flex-1' : 'lg:flex-[7_1_0%]'))}>
+          <h2 id="how-it-looks" className="sr-only">
+            How it will look
+          </h2>
+          <PreviewViewContext.Provider value={view(false)}>
+            <PreviewArea api={api} articleId={article.id} chosen={chosen} active={active} onActive={setActive} />
+          </PreviewViewContext.Provider>
+        </section>
       </div>
 
-      {detached ? <FloatingPreview api={api} articleId={article.id} chosen={chosen} active={active} onActive={setActive} onClose={() => setFloating(false)} /> : null}
+      {detached ? <FloatingPreview api={api} articleId={article.id} chosen={chosen} active={active} onActive={setActive} onClose={() => setFloating(false)} view={view(true)} /> : null}
 
       <div
         className={cn(
@@ -399,21 +439,15 @@ function WorkspaceBody({
           fullView ? '-mx-2 px-2 sm:-mx-4 sm:px-4' : '-mx-5 px-5 sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10',
         )}
       >
-        <PreviewChips chosen={chosen} active={active} />
-        <p className="min-w-0 flex-1 text-sm" aria-live="polite">
-          <span className="font-semibold">
-            {chosen.length} {chosen.length === 1 ? 'platform' : 'platforms'} selected
-          </span>
-          <span className="text-muted-foreground"> · {blockedReason ?? 'Nothing is sent. Each post is approved on its own, with its exact text in front of you.'}</span>
-        </p>
+        <p className="min-w-0 flex-1 text-sm text-muted-foreground">{chosen.length > 0 && blockedReason ? blockedReason : 'You approve each post on its own, with its exact text in front of you.'}</p>
         {blockedReason ? (
-          <button type="button" disabled title={blockedReason} className={cn(buttonVariants({ size: 'lg' }), 'h-12')}>
-            Review and approve
+          <button type="button" disabled title={blockedReason} className={cn(buttonVariants({ size: 'lg' }))}>
+            {reviewLabel}
             <ArrowRight aria-hidden />
           </button>
         ) : (
-          <Link href={reviewHref} className={cn(buttonVariants({ size: 'lg' }), 'h-12')}>
-            Review and approve
+          <Link href={reviewHref} className={cn(buttonVariants({ size: 'lg' }))}>
+            {reviewLabel}
             <ArrowRight aria-hidden />
           </Link>
         )}
