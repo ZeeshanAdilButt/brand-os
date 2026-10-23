@@ -3,12 +3,16 @@
 import { ChevronDown, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AREA_STYLE } from '@/components/platforms/area-style';
+import { CategoryColumn, type CategoryOption } from '@/components/platforms/category-column';
+import { useViewPrefs } from '@/components/shell/view-prefs';
+import { DensityToggle } from '@/components/ui/density-toggle';
 import { Input } from '@/components/ui/field';
 import { StatusChip } from '@/components/ui/status-chip';
 import { directoryChip, type Chip } from '@/lib/chips';
-import { AREAS, AREA_BLURBS, AREA_LABELS, DIRECTORY, METHOD_LABELS, directoryStatus, type DirectoryEntry } from '@/lib/directory';
+import { AREAS, AREA_BLURBS, AREA_LABELS, DIRECTORY, METHOD_LABELS, directoryStatus, type Area, type DirectoryEntry } from '@/lib/directory';
 import type { ConnectionDTO } from '@/lib/publishing';
 import type { SiteSettingsDTO } from '@/lib/site-export';
+import type { Density } from '@/lib/view-prefs';
 import { cn } from '@/lib/utils';
 import type { IntegrationDTO, SavedCredentialDTO } from '@/server/actions/integrations';
 import { LiveConnection, type ConnectionView } from './live-connection';
@@ -40,6 +44,7 @@ function Entry({
   onConnection,
   onSaved,
   defaultOpen,
+  density,
 }: {
   entry: DirectoryEntry;
   connection: ConnectionDTO | null;
@@ -50,6 +55,7 @@ function Entry({
   onConnection(connection: ConnectionDTO | null): void;
   onSaved(saved: SavedCredentialDTO[]): void;
   defaultOpen: boolean;
+  density: Density;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const area = AREA_STYLE[entry.area];
@@ -77,7 +83,7 @@ function Entry({
   else body = <ManualNote entry={entry} />;
 
   return (
-    <li id={entry.id} className="scroll-mt-24 rounded-xl border bg-surface">
+    <li id={entry.id} className={cn('scroll-mt-24 rounded-xl border bg-surface', open && density !== 'list' && 'col-span-full')}>
       <h3>
         <button
           type="button"
@@ -118,11 +124,16 @@ export function IntegrationsHub({ connections, saved, site, appUrl }: HubProps) 
   const [conns, setConns] = useState<Record<string, ConnectionDTO | null>>(() => Object.fromEntries(connections.map((c) => [c.platform, c.connection])));
   const [stored, setStored] = useState<Record<string, SavedCredentialDTO[]>>(() => Object.fromEntries(saved.map((s) => [s.platform, s.saved])));
   const [query, setQuery] = useState('');
+  const [area, setArea] = useState<Area | 'all'>('all');
+  const { prefs, update } = useViewPrefs();
+  const density = prefs.integrationsDensity;
 
   const visible = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     return DIRECTORY.filter((e) => words.every((w) => `${e.name} ${e.id} ${e.summary}`.toLowerCase().includes(w)));
   }, [query]);
+
+  const categories: CategoryOption[] = [{ id: 'all', label: 'All categories', count: visible.length }, ...AREAS.map((a) => ({ id: a, label: AREA_LABELS[a], count: visible.filter((e) => e.area === a).length }))];
 
   return (
     <div className="grid gap-6">
@@ -135,21 +146,27 @@ export function IntegrationsHub({ connections, saved, site, appUrl }: HubProps) 
         </p>
       </section>
 
-      <div className="relative sm:w-96">
-        <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search platforms" aria-label="Search integrations" className="pl-9" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-96">
+          <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search platforms" aria-label="Search integrations" className="pl-9" />
+        </div>
+        <DensityToggle value={density} onChange={(value) => update({ integrationsDensity: value })} label="Layout of the integrations list" />
       </div>
 
+      <div className={cn('grid items-start gap-4 lg:gap-6', prefs.filtersCollapsed ? 'lg:grid-cols-[3rem_minmax(0,1fr)]' : 'lg:grid-cols-[13.5rem_minmax(0,1fr)]')}>
+        <CategoryColumn options={categories} value={area} onChange={(id) => setArea(id as Area | 'all')} collapsed={prefs.filtersCollapsed} onCollapsedChange={(c) => update({ filtersCollapsed: c })} />
+        <div className="min-w-0">
       {AREAS.map((a) => {
-        const entries = visible.filter((e) => e.area === a);
+        const entries = visible.filter((e) => e.area === a && (area === 'all' || area === a));
         if (entries.length === 0) return null;
         return (
-          <section key={a} aria-labelledby={`int-${a}`}>
+          <section key={a} aria-labelledby={`int-${a}`} className="mb-6 last:mb-0">
             <h2 id={`int-${a}`} className="text-lg font-semibold">
               {AREA_LABELS[a]}
             </h2>
             <p className="mt-0.5 mb-3 text-sm text-muted-foreground">{AREA_BLURBS[a]}</p>
-            <ul className="grid gap-3">
+            <ul className={cn('grid', density === 'list' ? 'gap-3' : density === 'compact' ? 'items-start gap-3 sm:grid-cols-2 xl:grid-cols-3' : 'items-start gap-3 md:grid-cols-2')}>
               {entries.map((entry) => (
                 <Entry
                   key={entry.id}
@@ -162,6 +179,7 @@ export function IntegrationsHub({ connections, saved, site, appUrl }: HubProps) 
                   onConnection={(c) => setConns((m) => ({ ...m, [entry.id]: c }))}
                   onSaved={(s) => setStored((m) => ({ ...m, [entry.id]: s }))}
                   defaultOpen={false}
+                  density={density}
                 />
               ))}
             </ul>
@@ -169,6 +187,8 @@ export function IntegrationsHub({ connections, saved, site, appUrl }: HubProps) 
         );
       })}
       {visible.length === 0 ? <p className="rounded-xl border p-8 text-center text-sm text-muted-foreground">No platform matches that search.</p> : null}
+        </div>
+      </div>
     </div>
   );
 }
