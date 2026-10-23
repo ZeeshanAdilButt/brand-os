@@ -240,7 +240,7 @@ export function PlatformDirectory({ items, initialArea }: { items: DirectoryItem
 
       <div className={cn('grid items-start gap-4 lg:gap-6', prefs.filtersCollapsed ? 'lg:grid-cols-[3rem_minmax(0,1fr)]' : 'lg:grid-cols-[13.5rem_minmax(0,1fr)]')}>
         <CategoryColumn options={categories} value={area} onChange={(id) => setArea(id as Area | 'all')} collapsed={prefs.filtersCollapsed} onCollapsedChange={(c) => update({ filtersCollapsed: c })} />
-        <div className="min-w-0">
+        <div className="@container min-w-0">
       {grouped.length === 0 ? (
         <section className="rounded-xl border bg-surface p-8 text-center">
           <h2 className="text-lg font-semibold">Nothing matches</h2>
@@ -264,7 +264,7 @@ export function PlatformDirectory({ items, initialArea }: { items: DirectoryItem
               {AREA_LABELS[g.area]}
             </h2>
             <p className="mt-0.5 mb-4 text-sm text-muted-foreground">{AREA_BLURBS[g.area]}</p>
-            <ul className={cn('grid', density === 'list' ? 'gap-2' : density === 'compact' ? 'gap-3 sm:grid-cols-2 xl:grid-cols-3' : 'gap-4 md:grid-cols-2')}>
+            <ul className={cn('grid', density === 'list' ? 'gap-2' : density === 'compact' ? 'gap-3 @xl:grid-cols-2 @4xl:grid-cols-3' : 'gap-4 @2xl:grid-cols-2')}>
               {g.items.map((item) => (density === 'list' ? <PlatformRow key={item.entry.id} item={item} /> : <PlatformCard key={item.entry.id} item={item} compact={density === 'compact'} />))}
             </ul>
           </section>

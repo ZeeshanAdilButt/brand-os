@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 import { PlatformPreview, type PreviewInput } from '@/components/publishing/previews/platform-preview';
 import { PreviewExpandContext, PreviewScaleContext, type ExpandApi } from '@/components/publishing/previews/preview-context';
 import type { Device } from '@/components/publishing/previews/preview-frame';
@@ -12,6 +12,15 @@ import { OVERLAY_SCALE } from '@/lib/preview-layout';
 import type { LintIssue } from '@/lib/publishing';
 import { isTypingTarget, wrapIndex } from '@/lib/shortcuts';
 import { LintList } from '../shared';
+
+const NARROW = '(max-width: 639px)';
+function watchNarrow(onChange: () => void) {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const media = window.matchMedia(NARROW);
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
+}
+const isNarrow = () => typeof window.matchMedia === 'function' && window.matchMedia(NARROW).matches;
 
 /** One platform that can be opened large: what to draw and what its checks said. */
 export interface ExpandEntry {
@@ -59,6 +68,8 @@ export function ExpandedPreview({
   opener?: { current: HTMLElement | null };
 }) {
   const [device, setDevice] = useState<Device>('desktop');
+  // On a phone the preview is already as wide as the screen, so it is not scaled up further.
+  const narrow = useSyncExternalStore(watchNarrow, isNarrow, () => false);
   const index = current ? entries.findIndex((e) => e.platform === current) : -1;
   const entry = index >= 0 ? entries[index]! : null;
   const count = entries.length;
@@ -129,7 +140,7 @@ export function ExpandedPreview({
               <div className="mx-auto grid max-w-[min(100%,80rem)] gap-4">
                 <LintList issues={entry.lint} empty="No problems found for this platform." />
                 <PreviewExpandContext.Provider value={null}>
-                  <PreviewScaleContext.Provider value={OVERLAY_SCALE}>
+                  <PreviewScaleContext.Provider value={narrow ? 1 : OVERLAY_SCALE}>
                     <PlatformPreview key={entry.platform} input={entry.input} defaultDevice={device} onDeviceChange={setDevice} />
                   </PreviewScaleContext.Provider>
                 </PreviewExpandContext.Provider>

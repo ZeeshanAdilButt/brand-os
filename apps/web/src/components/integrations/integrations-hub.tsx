@@ -156,7 +156,7 @@ export function IntegrationsHub({ connections, saved, site, appUrl }: HubProps) 
 
       <div className={cn('grid items-start gap-4 lg:gap-6', prefs.filtersCollapsed ? 'lg:grid-cols-[3rem_minmax(0,1fr)]' : 'lg:grid-cols-[13.5rem_minmax(0,1fr)]')}>
         <CategoryColumn options={categories} value={area} onChange={(id) => setArea(id as Area | 'all')} collapsed={prefs.filtersCollapsed} onCollapsedChange={(c) => update({ filtersCollapsed: c })} />
-        <div className="min-w-0">
+        <div className="@container min-w-0">
       {AREAS.map((a) => {
         const entries = visible.filter((e) => e.area === a && (area === 'all' || area === a));
         if (entries.length === 0) return null;
@@ -166,7 +166,7 @@ export function IntegrationsHub({ connections, saved, site, appUrl }: HubProps) 
               {AREA_LABELS[a]}
             </h2>
             <p className="mt-0.5 mb-3 text-sm text-muted-foreground">{AREA_BLURBS[a]}</p>
-            <ul className={cn('grid', density === 'list' ? 'gap-3' : density === 'compact' ? 'items-start gap-3 sm:grid-cols-2 xl:grid-cols-3' : 'items-start gap-3 md:grid-cols-2')}>
+            <ul className={cn('grid', density === 'list' ? 'gap-3' : density === 'compact' ? 'items-start gap-3 @xl:grid-cols-2 @4xl:grid-cols-3' : 'items-start gap-3 @2xl:grid-cols-2')}>
               {entries.map((entry) => (
                 <Entry
                   key={entry.id}
