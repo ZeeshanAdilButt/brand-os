@@ -4,6 +4,7 @@ import { Columns2, Columns3, GitCompare, Pencil, Square, type LucideIcon } from 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PlatformPreview } from '@/components/publishing/previews/platform-preview';
+import { EmptyState } from '@/components/brand/branch-art';
 import { PreviewScaleContext } from '@/components/publishing/previews/preview-context';
 import { PreviewComparison } from '@/components/publishing/previews/preview-comparison';
 import { useViewPrefs } from '@/components/shell/view-prefs';
@@ -16,9 +17,9 @@ import { effectiveLayout, gridClass, SIZE_SCALE } from '@/lib/preview-layout';
 import type { DestinationDTO, PlatformId } from '@/lib/publishing';
 import type { PreviewLayout, PreviewSize } from '@/lib/view-prefs';
 import { cn } from '@/lib/utils';
-import { LintList, NoticeBar } from '../shared';
+import { ChecksRow, NoticeBar } from '../shared';
 import type { PublishApi } from '../use-publish';
-import { PreviewExpandProvider, type ExpandEntry } from './preview-expand';
+import type { ExpandEntry } from './preview-expand';
 
 const IDLE_MS = 600;
 
@@ -145,14 +146,14 @@ export function QuickEdit({ destination, api }: { destination: DestinationDTO; a
   );
 }
 
-/** What one platform's preview shows: its heading, notices, checks and the preview itself. The single view adds the quick edit. */
-function PreviewCard({ destination, api, articleId, detailed }: { destination: DestinationDTO; api: PublishApi; articleId: string; detailed: boolean }) {
+/** What one platform's preview shows: its heading, notices, the checks as pills and the preview itself. The single view adds the quick edit. */
+export function PreviewCard({ destination, api, articleId, detailed }: { destination: DestinationDTO; api: PublishApi; articleId: string; detailed: boolean }) {
   const draft = destination.draft;
   const errors = draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
   return (
     <div className="grid min-w-0 content-start gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-base font-semibold">{destination.info.name}</h3>
+        <h3 className="text-lg font-semibold">{destination.info.name}</h3>
         <StatusChip chip={draftChip(destination.platform, draft)} />
         {detailed ? (
           <span className="text-sm text-muted-foreground">{destination.info.state === 'adapter' ? 'Brand OS can publish this after your approval.' : 'You post this one by hand.'}</span>
@@ -161,15 +162,15 @@ function PreviewCard({ destination, api, articleId, detailed }: { destination: D
       <NoticeBar notice={api.notices[destination.platform]} />
       {draft ? (
         <>
-          <LintList issues={draft.lint} empty="No problems found for this platform." />
+          <ChecksRow issues={draft.lint} empty="No problems found for this platform." />
           <PlatformPreview input={{ platform: destination.platform, payload: draft.payload, extras: draft.extras, account: draft.account }} />
           {detailed ? (
-            <details className="rounded-lg border bg-surface" open={errors > 0}>
-              <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm font-medium">
+            <details className="rounded-xl border bg-surface" open={errors > 0}>
+              <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-medium">
                 <Pencil aria-hidden className="size-4" />
                 Edit title, description and tags
               </summary>
-              <div className="border-t p-3">
+              <div className="border-t p-4">
                 <QuickEdit destination={destination} api={api} />
                 <Link href={`/articles/${articleId}/publish?view=composer&d=${destination.platform}`} className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'mt-2' })}>
                   Open the full editor
@@ -198,10 +199,49 @@ const SIZE_OPTIONS: { value: PreviewSize; label: string; title: string }[] = [
   { value: 'large', label: 'Large', title: 'Bigger previews, easier to read' },
 ];
 
+/** Inside the floating window the surface is drawn smaller, because the window has a fixed width. Expand shows it large. */
+export const WINDOW_SCALE = 0.65;
+
+/** What the expanded overlay and the footer chips need to know about each preview that is ready. */
+export function previewEntries(chosen: DestinationDTO[]): ExpandEntry[] {
+  return chosen
+    .filter((d) => d.draft)
+    .map((d) => ({ platform: d.platform, name: d.info.name, lint: d.draft!.lint, input: { platform: d.platform, payload: d.draft!.payload, extras: d.draft!.extras, account: d.draft!.account } }));
+}
+
+/** One tab per chosen platform, in one bordered group. The tab for a platform with something to fix carries the count. */
+export function PreviewTabs({ chosen, current, onActive }: { chosen: DestinationDTO[]; current: PlatformId | null; onActive(platform: PlatformId): void }) {
+  return (
+    <div role="tablist" aria-label="Previews" className="flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-xl border-[1.5px] border-border-strong bg-surface p-1">
+      {chosen.map((d) => {
+        const n = d.draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
+        const selected = current === d.platform;
+        return (
+          <button
+            key={d.platform}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onActive(d.platform)}
+            className={cn(
+              'inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors duration-[120ms]',
+              selected ? 'bg-solid font-semibold text-solid-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+            )}
+          >
+            {d.info.name}
+            {n > 0 ? <span className="rounded-full bg-danger px-1.5 text-xs font-semibold text-danger-foreground">{n}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
- * Area 3: one preview per chosen platform, live. Show them one large with a tab per platform, in a grid of two or
- * three columns, or two side by side to compare. A size control scales every preview, and each preview can be
- * expanded to the whole screen. The layout and size are remembered in this browser.
+ * The previews: one per chosen platform, live. Show them one large with a tab per platform, in a grid of two or three
+ * columns, or two side by side to compare. A size control scales every preview, and each preview can be expanded to
+ * the whole screen. The layout and size are remembered in this browser. `windowed` is the compact form inside the
+ * floating window: one preview at a time, drawn smaller, with no layout controls.
  */
 export function PreviewArea({
   api,
@@ -209,46 +249,43 @@ export function PreviewArea({
   chosen,
   active,
   onActive,
+  windowed = false,
 }: {
   api: PublishApi;
   articleId: string;
   chosen: DestinationDTO[];
   active: PlatformId | null;
   onActive(platform: PlatformId): void;
+  windowed?: boolean;
 }) {
   const { prefs, update } = useViewPrefs();
   const current = chosen.find((d) => d.platform === active) ?? chosen[0] ?? null;
-  const prepared = useMemo(() => chosen.filter((d) => d.draft), [chosen]);
-  const layout = effectiveLayout(prefs.previewLayout, prepared.length);
-  const entries = useMemo<ExpandEntry[]>(
-    () => prepared.map((d) => ({ platform: d.platform, name: d.info.name, lint: d.draft!.lint, input: { platform: d.platform, payload: d.draft!.payload, extras: d.draft!.extras, account: d.draft!.account } })),
-    [prepared],
-  );
+  const entries = useMemo(() => previewEntries(chosen), [chosen]);
+  const layout = windowed ? 'single' : effectiveLayout(prefs.previewLayout, entries.length);
 
   if (chosen.length === 0) {
     return (
-      <div className="rounded-xl border bg-surface p-8 text-center">
-        <h3 className="text-lg font-semibold">Choose a platform to see its preview</h3>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Each platform you tick gets a live, approximate preview of this article. Nothing is sent.</p>
-      </div>
+      <EmptyState title="Choose a platform to see its preview" branches={3}>
+        Each platform you tick gets a live, approximate preview of this article. Nothing is sent.
+      </EmptyState>
     );
   }
 
   return (
-    <PreviewScaleContext.Provider value={SIZE_SCALE[prefs.previewSize]}>
-      <PreviewExpandProvider entries={entries}>
-        <div className="@container grid gap-3">
+    <PreviewScaleContext.Provider value={windowed ? WINDOW_SCALE : SIZE_SCALE[prefs.previewSize]}>
+      <div className="@container grid gap-4">
+        {windowed ? null : (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Layout</span>
+              <span className="mono-label text-muted-foreground">Layout</span>
               <Segmented
                 label="Preview layout"
                 value={layout}
                 onChange={(value) => update({ previewLayout: value })}
                 options={LAYOUT_OPTIONS.map((o) => ({
                   value: o.value,
-                  title: o.value === 'compare' && prepared.length < 2 ? 'Prepare at least two previews to compare them' : o.title,
-                  disabled: o.value === 'compare' && prepared.length < 2,
+                  title: o.value === 'compare' && entries.length < 2 ? 'Prepare at least two previews to compare them' : o.title,
+                  disabled: o.value === 'compare' && entries.length < 2,
                   label: (
                     <>
                       <o.icon aria-hidden className="size-4" />
@@ -259,51 +296,29 @@ export function PreviewArea({
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Size</span>
+              <span className="mono-label text-muted-foreground">Size</span>
               <Segmented label="Preview size" value={prefs.previewSize} onChange={(value) => update({ previewSize: value })} options={SIZE_OPTIONS.map((o) => ({ value: o.value, label: o.label, title: o.title }))} />
             </div>
           </div>
+        )}
 
-          {layout === 'single' ? (
-            <div role="tablist" aria-label="Previews" className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 pb-0.5">
-              {chosen.map((d) => {
-                const n = d.draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
-                return (
-                  <button
-                    key={d.platform}
-                    type="button"
-                    role="tab"
-                    aria-selected={current?.platform === d.platform}
-                    onClick={() => onActive(d.platform)}
-                    className={cn(
-                      'inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-[120ms]',
-                      current?.platform === d.platform ? 'border-primary bg-accent text-accent-foreground' : 'border-border bg-surface text-muted-foreground hover:bg-accent hover:text-foreground',
-                    )}
-                  >
-                    {d.info.name}
-                    {n > 0 ? <span className="rounded-full bg-danger px-1.5 text-xs font-semibold text-danger-foreground">{n}</span> : null}
-                  </button>
-                );
-              })}
+        {layout === 'single' ? <PreviewTabs chosen={chosen} current={current?.platform ?? null} onActive={onActive} /> : null}
+
+        {layout === 'compare' ? (
+          <PreviewComparison items={entries.map((e) => e.input)} />
+        ) : layout === 'single' ? (
+          current ? <PreviewCard key={current.platform} destination={current} api={api} articleId={articleId} detailed /> : null
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground @2xl:hidden">This area is narrow, so the previews stack. Use Full view to see them side by side.</p>
+            <div className={cn('grid grid-cols-1 items-start gap-4', gridClass(layout))}>
+              {chosen.map((d) => (
+                <PreviewCard key={d.platform} destination={d} api={api} articleId={articleId} detailed={false} />
+              ))}
             </div>
-          ) : null}
-
-          {layout === 'compare' ? (
-            <PreviewComparison items={entries.map((e) => e.input)} />
-          ) : layout === 'single' ? (
-            current ? <PreviewCard key={current.platform} destination={current} api={api} articleId={articleId} detailed /> : null
-          ) : (
-            <>
-              <p className="text-xs text-muted-foreground @2xl:hidden">This area is narrow, so the previews stack. Use Full view to see them side by side.</p>
-              <div className={cn('grid grid-cols-1 items-start gap-4', gridClass(layout))}>
-                {chosen.map((d) => (
-                  <PreviewCard key={d.platform} destination={d} api={api} articleId={articleId} detailed={false} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </PreviewExpandProvider>
+          </>
+        )}
+      </div>
     </PreviewScaleContext.Provider>
   );
 }

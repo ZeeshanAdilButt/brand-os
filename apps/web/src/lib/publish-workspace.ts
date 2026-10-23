@@ -1,5 +1,5 @@
 import type { ArticleStatus } from './articles';
-import { DIRECTORY, directoryStatus, type Area, type DirectoryEntry, type DirectoryStatus } from './directory';
+import { AREAS, DIRECTORY, directoryStatus, type Area, type DirectoryEntry, type DirectoryStatus } from './directory';
 import type { PlatformId } from './catalog';
 
 /** What the article picker needs about one article. The list never loads bodies, so words are an estimate. */
@@ -74,16 +74,80 @@ export function rowsInArea(rows: readonly SelectorRow[], area: Area | 'all', que
   return rows.filter((r) => (area === 'all' || r.entry.area === area) && words.every((w) => `${r.entry.name} ${r.entry.id} ${r.entry.summary}`.toLowerCase().includes(w)));
 }
 
-/** The steps shown above the areas on a narrow screen. */
-export function workspaceProgress(input: { hasArticle: boolean; selected: number; prepared: number }): { id: 'article' | 'platforms' | 'previews'; label: string; state: 'done' | 'current' | 'todo' }[] {
-  const articleDone = input.hasArticle;
-  const platformsDone = input.selected > 0;
-  const previewsDone = input.selected > 0 && input.prepared === input.selected;
-  const current = !articleDone ? 'article' : !platformsDone ? 'platforms' : 'previews';
-  const state = (id: 'article' | 'platforms' | 'previews', done: boolean) => (done && id !== current ? 'done' : id === current ? 'current' : 'todo');
-  return [
-    { id: 'article', label: 'Article', state: state('article', articleDone) },
-    { id: 'platforms', label: 'Platforms', state: state('platforms', platformsDone) },
-    { id: 'previews', label: 'Previews', state: previewsDone && current === 'previews' ? 'current' : state('previews', previewsDone) },
+/** The short category names the selector's tabs use. The long names stay on the Platforms directory. */
+export const SHORT_AREA_LABELS: Record<Area, string> = {
+  blogs: 'Blogs',
+  social: 'Social',
+  communities: 'Communities',
+  video: 'Video',
+  conferences: 'Talks',
+  editorial: 'Editorial',
+  launches: 'Launches',
+  aggregators: 'Aggregators',
+};
+
+/** How many entries each category holds, for the counts on the tabs. */
+export function areaCounts(rows: readonly SelectorRow[]): Record<Area, number> {
+  const counts = Object.fromEntries(AREAS.map((a) => [a, 0])) as Record<Area, number>;
+  for (const row of rows) counts[row.entry.area] += 1;
+  return counts;
+}
+
+/** The category to show first: where the first suggestion lives, else the first category that has anything. */
+export function startArea(rows: readonly SelectorRow[], suggested: readonly PlatformId[]): Area {
+  const first = suggested.map((id) => rows.find((r) => r.composer === id)).find(Boolean);
+  return first?.entry.area ?? AREAS.find((a) => rows.some((r) => r.entry.area === a)) ?? 'blogs';
+}
+
+/** Two or three letters for a platform's tile, so a row can be recognised before it is read. */
+export function monogramOf(name: string): string {
+  // "DEV.to" is one word whose first part is the mark: DEV.
+  const words = name.split(/\s+/).map((w) => w.split('.')[0] ?? '').map((w) => w.replace(/[^A-Za-z0-9]/g, '')).filter(Boolean);
+  if (words.length === 0) return '?';
+  const [first, second] = words as [string, string?];
+  if (second) return (first.charAt(0) + second.charAt(0)).toUpperCase();
+  if (first === first.toUpperCase() && first.length <= 4) return first;
+  return first.charAt(0).toUpperCase() + first.charAt(1).toLowerCase();
+}
+
+/** The state of a row in a word or two, with whether it asks for the person's attention (set up, connect). */
+export function rowState(row: SelectorRow): { label: string; attention: boolean } {
+  switch (row.status) {
+    case 'available_now':
+      return { label: 'Ready', attention: false };
+    case 'needs_connection':
+      return { label: row.composer === 'site' ? 'Set up' : 'Connect', attention: true };
+    case 'preview_only':
+      return { label: 'Preview', attention: false };
+    case 'manual_only':
+      return { label: 'Manual', attention: false };
+    case 'planned':
+      return { label: 'Planned', attention: false };
+  }
+}
+
+export interface JourneyStep {
+  id: 'article' | 'platforms' | 'approve' | 'share';
+  label: string;
+  state: 'done' | 'current' | 'todo';
+}
+
+/**
+ * The four steps of publishing, for the rail in the sidebar: the post is chosen, platforms are picked and their previews
+ * ready, every chosen post is decided (approved or published) one at a time, and the live links are shared. The first
+ * step not done is the current one.
+ */
+export function journeySteps(input: { selected: number; prepared: number; decided: number; published: number }): JourneyStep[] {
+  const platformsDone = input.selected > 0 && input.prepared >= input.selected;
+  const approveDone = platformsDone && input.decided >= input.selected;
+  const shareDone = approveDone && input.published >= input.selected;
+  const done = [true, platformsDone, approveDone, shareDone];
+  const current = done.indexOf(false);
+  const labels: Pick<JourneyStep, 'id' | 'label'>[] = [
+    { id: 'article', label: 'Post chosen' },
+    { id: 'platforms', label: 'Pick platforms' },
+    { id: 'approve', label: 'Approve each' },
+    { id: 'share', label: 'Share the links' },
   ];
+  return labels.map((l, i) => ({ ...l, state: done[i] ? 'done' : i === current ? 'current' : 'todo' }));
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { CircleAlert, ExternalLink, Info, ShieldCheck, TriangleAlert } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FormNotice, Input } from '@/components/ui/field';
@@ -14,7 +14,7 @@ export function NoticeBar({ notice }: { notice: Notice | undefined }) {
   if (!notice) return null;
   if (notice.tone === 'info') {
     return (
-      <p role="status" className="flex items-start gap-2 rounded-lg border border-info/25 bg-info-subtle px-3 py-2 text-sm text-info">
+      <p role="status" className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-subtle px-4 py-3 text-sm text-info">
         <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
         <span>{notice.text}</span>
       </p>
@@ -45,7 +45,7 @@ export function LintList({ issues, fixes = {}, empty = 'No problems found.' }: {
         const fix = fixes[issue.code];
         const error = issue.severity === 'error';
         return (
-          <li key={issue.code + (issue.items?.[0] ?? '')} className={cn('rounded-lg border px-3 py-2 text-sm', error ? 'border-danger/30 bg-danger-subtle' : 'border-warning/30 bg-warning-subtle')}>
+          <li key={issue.code + (issue.items?.[0] ?? '')} className={cn('rounded-xl border px-4 py-3 text-sm', error ? 'border-danger/30 bg-danger-subtle' : 'border-warning/30 bg-warning-subtle')}>
             <p className="flex items-start gap-2">
               {error ? <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-danger" /> : <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-warning" />}
               <span className="min-w-0 flex-1">
@@ -71,6 +71,54 @@ export function LintList({ issues, fixes = {}, empty = 'No problems found.' }: {
         );
       })}
     </ul>
+  );
+}
+
+/** "1 to fix", "2 heads up": the same counts the full list below it gives, in words. */
+export function checkCounts(issues: LintIssue[]): { fix: number; headsUp: number } {
+  const fix = issues.filter((i) => i.severity === 'error').length;
+  return { fix, headsUp: issues.length - fix };
+}
+
+/**
+ * The checks of one preview as a row of small pills, so the preview itself comes first: "1 to fix", "1 heads up" and a
+ * "See checks" link that opens the full list under them. With nothing to report it says so in one pill.
+ */
+export function ChecksRow({ issues, fixes, empty = 'No problems found for this platform.', defaultOpen = false }: { issues: LintIssue[]; fixes?: Partial<Record<string, LintFix>>; empty?: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const listId = useId();
+  const { fix, headsUp } = checkCounts(issues);
+  if (issues.length === 0) {
+    return (
+      <p className="inline-flex h-7 w-fit items-center gap-1.5 rounded-full bg-success-bg px-3 text-sm font-medium text-success">
+        <ShieldCheck aria-hidden className="size-4" />
+        {empty}
+      </p>
+    );
+  }
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {fix > 0 ? (
+          <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-danger-bg px-3 font-medium text-danger">
+            <CircleAlert aria-hidden className="size-4" />
+            {fix} to fix
+          </span>
+        ) : null}
+        {headsUp > 0 ? (
+          <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-warning-bg px-3 font-medium text-warning">
+            <TriangleAlert aria-hidden className="size-4" />
+            {headsUp} heads up
+          </span>
+        ) : null}
+        <button type="button" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((o) => !o)} className="ml-1 rounded-md py-1 font-medium text-link underline-offset-4 hover:underline">
+          {open ? 'Hide checks' : 'See checks'}
+        </button>
+      </div>
+      <div id={listId} hidden={!open}>
+        <LintList issues={issues} {...(fixes ? { fixes } : {})} empty={empty} />
+      </div>
+    </div>
   );
 }
 
@@ -108,7 +156,7 @@ export function LiveLink({ draft, name }: { draft: PlatformDraftDTO; name: strin
   if (draft.status !== 'published') return null;
   const by = draft.publishedVia === 'manual';
   return (
-    <div className="rounded-xl border border-success/30 bg-success-subtle p-3 text-sm">
+    <div className="rounded-xl border border-success/30 bg-success-subtle p-4 text-sm">
       <p className="font-semibold text-success">{by ? `Posted by hand on ${name}` : draft.platform === 'site' ? 'Pull request opened' : `Published on ${name}`}</p>
       {draft.platform === 'site' && !by ? <p className="mt-0.5 text-foreground">Merge it in GitHub to go live.</p> : null}
       {by ? <p className="mt-0.5 text-foreground">You recorded this link. This app did not publish it.</p> : null}

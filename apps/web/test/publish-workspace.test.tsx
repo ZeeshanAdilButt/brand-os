@@ -6,11 +6,11 @@ import { PlatformSelector } from '../src/components/publish/workspace/platform-s
 import { ExpandedPreview, type ExpandEntry } from '../src/components/publish/workspace/preview-expand';
 import { PublishWorkspace } from '../src/components/publish/workspace/workspace';
 import { ViewPrefsProvider } from '../src/components/shell/view-prefs';
-import { NORMAL_LAYOUT, ShellLayoutContext, type ShellLayout } from '../src/components/shell/shell-layout';
+import { ShellLayoutContext, type ShellLayout } from '../src/components/shell/shell-layout';
 import { DEFAULT_VIEW_PREFS, type ViewPrefs } from '../src/lib/view-prefs';
 import { DIRECTORY } from '../src/lib/directory';
 import { PLATFORM_IDS, PLATFORMS, RECOMMENDED_ORDER, type DestinationDTO, type PlatformDraftDTO, type PlatformId } from '../src/lib/publishing';
-import { filterArticles, pickInitialArticle, rowsInArea, selectorRows, sortArticles, workspaceProgress, wordsFromChars, type ArticleOption } from '../src/lib/publish-workspace';
+import { areaCounts, filterArticles, journeySteps, monogramOf, pickInitialArticle, rowState, rowsInArea, selectorRows, sortArticles, startArea, wordsFromChars, type ArticleOption } from '../src/lib/publish-workspace';
 import { loadRemembered } from '../src/lib/wizard-state';
 
 afterEach(cleanup);
@@ -57,10 +57,30 @@ describe('workspace helpers', () => {
     expect(rowsInArea(rows, 'all', 'hacker').map((r) => r.entry.id)).toContain('hackernews');
   });
 
-  it('says where the person is: article, platforms, previews', () => {
-    expect(workspaceProgress({ hasArticle: true, selected: 0, prepared: 0 }).map((p) => p.state)).toEqual(['done', 'current', 'todo']);
-    expect(workspaceProgress({ hasArticle: true, selected: 2, prepared: 1 }).map((p) => p.state)).toEqual(['done', 'done', 'current']);
-    expect(workspaceProgress({ hasArticle: false, selected: 0, prepared: 0 }).map((p) => p.state)).toEqual(['current', 'todo', 'todo']);
+  it('says where the person is in the four steps, and the first step not done is the current one', () => {
+    const states = (i: Parameters<typeof journeySteps>[0]) => journeySteps(i).map((p) => p.state);
+    expect(states({ selected: 0, prepared: 0, decided: 0, published: 0 })).toEqual(['done', 'current', 'todo', 'todo']);
+    expect(states({ selected: 2, prepared: 1, decided: 0, published: 0 })).toEqual(['done', 'current', 'todo', 'todo']);
+    expect(states({ selected: 2, prepared: 2, decided: 0, published: 0 })).toEqual(['done', 'done', 'current', 'todo']);
+    expect(states({ selected: 2, prepared: 2, decided: 1, published: 0 })).toEqual(['done', 'done', 'current', 'todo']);
+    expect(states({ selected: 2, prepared: 2, decided: 2, published: 1 })).toEqual(['done', 'done', 'done', 'current']);
+    expect(states({ selected: 2, prepared: 2, decided: 2, published: 2 })).toEqual(['done', 'done', 'done', 'done']);
+    expect(journeySteps({ selected: 0, prepared: 0, decided: 0, published: 0 }).map((p) => p.label)).toEqual(['Post chosen', 'Pick platforms', 'Approve each', 'Share the links']);
+  });
+
+  it('gives each platform a short tile mark, counts every category and opens on the category of the first suggestion', () => {
+    expect(monogramOf('Personal site')).toBe('PS');
+    expect(monogramOf('DEV.to')).toBe('DEV');
+    expect(monogramOf('Hacker News')).toBe('HN');
+    expect(monogramOf('Medium')).toBe('Me');
+    expect(monogramOf('X')).toBe('X');
+    const rows = selectorRows(new Set());
+    const counts = areaCounts(rows);
+    expect(Object.values(counts).reduce((x, y) => x + y, 0)).toBe(DIRECTORY.length);
+    expect(startArea(rows, ['linkedin', 'devto'])).toBe('social');
+    expect(startArea(rows, [])).toBe('blogs');
+    expect(rowState(rows.find((r) => r.composer === 'devto')!).attention).toBe(true);
+    expect(rowState(rows.find((r) => r.entry.id === 'ghost')!)).toEqual({ label: 'Planned', attention: false });
   });
 });
 
@@ -92,13 +112,20 @@ describe('the platform selector', () => {
   it('lists every platform and marks the ones that are not built yet, never fake-enabled', () => {
     const onToggle = vi.fn();
     render(<PlatformSelector rows={rows} selected={none} busy={none} onToggle={onToggle} recommendations={[]} />);
-    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    // One category shows at a time; going through every tab lists every platform exactly once.
+    const boxes: HTMLInputElement[] = [];
+    for (const tab of screen.getAllByRole('tab')) {
+      fireEvent.click(tab);
+      boxes.push(...(screen.queryAllByRole('checkbox') as HTMLInputElement[]));
+    }
     expect(boxes).toHaveLength(DIRECTORY.length);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toHaveLength(8);
     const disabled = boxes.filter((b) => b.disabled);
     expect(disabled).toHaveLength(DIRECTORY.length - PLATFORM_IDS.length);
     for (const box of disabled) fireEvent.click(box);
     expect(onToggle).not.toHaveBeenCalled();
-    expect(screen.getAllByText(/Not built yet|Directory only/).length).toBe(disabled.length);
+    // Every blocked entry says why, in its own row (the rows on screen are the last category's).
+    for (const row of rows.filter((r) => r.composer === null && r.entry.area === 'aggregators')) expect(screen.getByLabelText(row.entry.name).getAttribute('aria-describedby')).toBeTruthy();
   });
 
   it('chooses a platform that can be previewed, on click', () => {
@@ -111,10 +138,13 @@ describe('the platform selector', () => {
 
   it('filters by category tab and by search', () => {
     render(<PlatformSelector rows={rows} selected={none} busy={none} onToggle={() => undefined} recommendations={[]} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Video' }));
+    // It opens on one category, with a count on every tab.
+    expect(screen.getByRole('tab', { name: /^Blogs/ }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.queryByLabelText(/YouTube/)).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: /^Video/ }));
     expect(screen.getByLabelText(/YouTube/)).toBeTruthy();
     expect(screen.queryByLabelText(/^DEV\.to/)).toBeNull();
-    fireEvent.click(screen.getByRole('tab', { name: 'All' }));
+    // Searching looks in every category.
     fireEvent.change(screen.getByLabelText('Search platforms'), { target: { value: 'mastodon' } });
     expect(screen.getAllByRole('checkbox')).toHaveLength(1);
     fireEvent.change(screen.getByLabelText('Search platforms'), { target: { value: 'zzzz' } });
@@ -235,9 +265,10 @@ describe('the publishing workspace', () => {
   it('starts with the three areas, and no way to review before something is chosen', () => {
     serve({ added: new Set() });
     render(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(), platform: null }} />);
-    expect(screen.getByRole('heading', { name: 'Article', level: 2 })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Platforms', level: 2 })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Previews', level: 2 })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Why the write path stalls', level: 1 })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Change article' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Where should it go?', level: 2 })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'How it will look', level: 2 })).toBeTruthy();
     expect(screen.getByText('0 platforms selected')).toBeTruthy();
     expect((screen.getByRole('button', { name: /review and approve/i }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole('link', { name: /review and approve/i })).toBeNull();
@@ -327,8 +358,8 @@ function inProvider(prefs: Partial<ViewPrefs> = {}) {
   return { writes, layouts, wrap };
 }
 
-/** The element that holds the Article and Platforms areas (the left group). */
-const leftGroup = () => screen.getByRole('heading', { name: 'Article', level: 2 }).closest('section')!.parentElement!;
+/** The element that holds the Platforms area (the left column). */
+const leftGroup = () => screen.getByRole('heading', { name: 'Where should it go?', level: 2 }).closest('section')!.parentElement!;
 
 describe('folding the areas and the full view', () => {
   it('folds an area to a bar that says what it holds, keeps it mounted, and opens it again on click', async () => {
@@ -352,13 +383,14 @@ describe('folding the areas and the full view', () => {
     expect(document.getElementById(bodyId)!.hidden).toBe(false);
   });
 
-  it('shows the chosen article title when the Article area is folded, and starts folded from the saved choice', () => {
+  it('starts folded from the saved choice, and the folded bars say what they hold', () => {
     serve({ added: new Set() });
-    const { wrap } = inProvider({ collapsedAreas: ['article', 'previews'] });
+    const { wrap } = inProvider({ collapsedAreas: ['platforms', 'previews'] });
     render(wrap(<PublishWorkspace articles={ARTICLES} initial={{ article: article(), destinations: ALL(), platform: null }} />));
-    expect(screen.getByRole('button', { name: /Article.*Why the write path stalls/ }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: /Platforms.*0 platforms selected/ }).getAttribute('aria-expanded')).toBe('false');
     expect(screen.getByRole('button', { name: /Previews/ }).getAttribute('aria-expanded')).toBe('false');
-    expect(screen.getByRole('button', { name: 'Fold Platforms' })).toBeTruthy();
+    // The article is named in the page title, whatever is folded.
+    expect(screen.getByRole('heading', { name: 'Why the write path stalls', level: 1 })).toBeTruthy();
   });
 
   it('full view hides the sidebar and the Article and Platforms areas, keeps the previews live, and Esc or the button brings everything back', async () => {
@@ -378,7 +410,8 @@ describe('folding the areas and the full view', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(leftGroup().className).not.toMatch(/\bhidden\b/);
-    expect(layouts.at(-1)).toEqual(NORMAL_LAYOUT);
+    // Back to the page's own layout: the sidebar is shown and the page is not full width.
+    expect(layouts.at(-1)).toMatchObject({ hideSidebar: false, hideHeader: false, wide: false });
     // The same button also leaves it.
     fireEvent.click(button);
     expect(leftGroup().className).toMatch(/\bhidden\b/);

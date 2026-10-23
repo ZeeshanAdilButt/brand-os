@@ -121,7 +121,7 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
             <main
               id="main"
               tabIndex={-1}
-              className={cn('mx-auto w-full outline-none', wide ? 'max-w-none px-2 py-2 sm:px-4 sm:py-3' : 'max-w-[1120px] px-5 py-6 sm:px-8 lg:px-10 lg:pt-8')}
+              className={cn('mx-auto w-full outline-none', wide ? 'max-w-none px-2 py-2 sm:px-4 sm:py-3' : cn('px-5 py-6 sm:px-8 lg:px-10 lg:pt-8', layout.fluid ? 'max-w-none' : 'max-w-[1120px]'))}
             >
               {children}
             </main>

@@ -10,9 +10,11 @@ export interface ShellLayout {
   hideHeader: boolean;
   /** Let the page use the whole width instead of the reading column. */
   wide: boolean;
+  /** The full width with the usual page padding: for a page of two or more columns that wants room but not the edge. */
+  fluid: boolean;
 }
 
-export const NORMAL_LAYOUT: ShellLayout = { hideSidebar: false, hideHeader: false, wide: false };
+export const NORMAL_LAYOUT: ShellLayout = { hideSidebar: false, hideHeader: false, wide: false, fluid: false };
 
 export const ShellLayoutContext = createContext<(layout: ShellLayout) => void>(() => undefined);
 
@@ -22,12 +24,12 @@ export const ShellLayoutContext = createContext<(layout: ShellLayout) => void>((
  */
 export function useShellLayout(active: boolean, layout: Partial<ShellLayout>): void {
   const set = useContext(ShellLayoutContext);
-  const { hideSidebar = false, hideHeader = false, wide = false } = layout;
+  const { hideSidebar = false, hideHeader = false, wide = false, fluid = false } = layout;
   useEffect(() => {
     if (!active) return;
-    set({ hideSidebar, hideHeader, wide });
+    set({ hideSidebar, hideHeader, wide, fluid });
     return () => set(NORMAL_LAYOUT);
-  }, [active, hideSidebar, hideHeader, wide, set]);
+  }, [active, hideSidebar, hideHeader, wide, fluid, set]);
 }
 
 /** One step of the rail the sidebar shows on a page that has a short journey (Publishing). */

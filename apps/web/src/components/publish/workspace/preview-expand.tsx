@@ -11,7 +11,7 @@ import type { PlatformId } from '@/lib/catalog';
 import { OVERLAY_SCALE } from '@/lib/preview-layout';
 import type { LintIssue } from '@/lib/publishing';
 import { isTypingTarget, wrapIndex } from '@/lib/shortcuts';
-import { LintList } from '../shared';
+import { ChecksRow } from '../shared';
 
 const NARROW = '(max-width: 639px)';
 function watchNarrow(onChange: () => void) {
@@ -107,29 +107,29 @@ export function ExpandedPreview({
             }
           }}
           aria-describedby="expanded-preview-hint"
-          className="fixed inset-0 z-50 flex flex-col bg-background outline-none sm:inset-3 sm:rounded-2xl sm:border sm:shadow-lg"
+          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background outline-none sm:inset-3 sm:rounded-2xl sm:border-[1.5px] sm:border-border-strong sm:shadow-window"
         >
-          <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 py-3 sm:px-5">
+          <header data-surface="forest" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 bg-solid px-3 py-2.5 text-solid-foreground sm:px-5">
             <div className="min-w-0 flex-1">
-              <DialogPrimitive.Title className="truncate text-lg font-semibold">{entry ? `${entry.name} preview` : 'Preview'}</DialogPrimitive.Title>
-              <DialogPrimitive.Description id="expanded-preview-hint" className="text-xs text-muted-foreground">
+              <DialogPrimitive.Title className="truncate font-sans text-base font-semibold tracking-normal text-solid-foreground">{entry ? `${entry.name} preview` : 'Preview'}</DialogPrimitive.Title>
+              <DialogPrimitive.Description id="expanded-preview-hint" className="text-xs text-solid-muted">
                 {entry && count > 1 ? `Preview ${index + 1} of ${count}. Left and right arrow keys move between platforms. Esc closes.` : 'Esc closes.'}
               </DialogPrimitive.Description>
             </div>
             {previous && next ? (
               <div className="flex items-center gap-1" role="group" aria-label="Move between platforms">
-                <Button type="button" variant="outline" size="sm" onClick={() => move(-1)} aria-label={`Previous platform: ${previous.name}`}>
+                <Button type="button" variant="outline" size="sm" className="border-solid-muted/60 bg-transparent text-solid-foreground hover:bg-white/15 hover:text-solid-foreground" onClick={() => move(-1)} aria-label={`Previous platform: ${previous.name}`}>
                   <ChevronLeft aria-hidden />
                   <span className="hidden sm:inline">{previous.name}</span>
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => move(1)} aria-label={`Next platform: ${next.name}`}>
+                <Button type="button" variant="outline" size="sm" className="border-solid-muted/60 bg-transparent text-solid-foreground hover:bg-white/15 hover:text-solid-foreground" onClick={() => move(1)} aria-label={`Next platform: ${next.name}`}>
                   <span className="hidden sm:inline">{next.name}</span>
                   <ChevronRight aria-hidden />
                 </Button>
               </div>
             ) : null}
             <DialogPrimitive.Close asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Close expanded preview">
+              <Button type="button" variant="ghost" size="icon-sm" className="text-solid-foreground hover:bg-white/15 hover:text-solid-foreground" aria-label="Close expanded preview">
                 <X aria-hidden />
               </Button>
             </DialogPrimitive.Close>
@@ -138,7 +138,7 @@ export function ExpandedPreview({
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
             {entry ? (
               <div className="mx-auto grid max-w-[min(100%,80rem)] gap-4">
-                <LintList issues={entry.lint} empty="No problems found for this platform." />
+                <ChecksRow issues={entry.lint} empty="No problems found for this platform." defaultOpen />
                 <PreviewExpandContext.Provider value={null}>
                   <PreviewScaleContext.Provider value={narrow ? 1 : OVERLAY_SCALE}>
                     <PlatformPreview key={entry.platform} input={entry.input} defaultDevice={device} onDeviceChange={setDevice} />

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
-import { PageHeader } from '@/components/page-header';
 import { PublishWorkspace } from '@/components/publish/workspace/workspace';
 import { buttonVariants } from '@/components/ui/button';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -90,15 +89,17 @@ export default async function PublishingPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader title="Publishing" description="Choose an article, choose where it goes, and see a preview of each. You approve every post yourself.">
-        {first ? (
-          <Link href={publishHref(first.articleId, { step: '3', d: first.platform })} className={buttonVariants({ variant: 'outline' })}>
-            {unknown.length > 0 ? 'Check post status' : waiting.length > 0 ? 'Review next post' : 'Fix next post'}
-          </Link>
-        ) : null}
-      </PageHeader>
-
-      <PublishWorkspace articles={options} initial={initial} />
+      <PublishWorkspace
+        articles={options}
+        initial={initial}
+        actions={
+          first ? (
+            <Link href={publishHref(first.articleId, { step: '3', d: first.platform })} className={buttonVariants({ variant: 'outline', size: 'lg' })}>
+              {unknown.length > 0 ? 'Check post status' : waiting.length > 0 ? 'Review next post' : 'Fix next post'}
+            </Link>
+          ) : null
+        }
+      />
 
       {drafts.length > 0 ? (
         <div className="mt-10">

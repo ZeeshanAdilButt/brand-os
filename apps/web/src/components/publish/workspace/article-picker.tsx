@@ -14,8 +14,8 @@ const wordsText = (words: number) => (words === 0 ? 'No text yet' : `about ${wor
  * Area 1: choose the article. The chosen article is always visible; "Change" opens a searchable list, newest first.
  * The list is a radio group, so the arrow keys move through it and Enter or Space chooses.
  */
-export function ArticlePicker({ articles, selectedId, onSelect }: { articles: ArticleOption[]; selectedId: string | null; onSelect(id: string): void }) {
-  const [open, setOpen] = useState(selectedId === null);
+export function ArticlePicker({ articles, selectedId, onSelect, listOnly = false }: { articles: ArticleOption[]; selectedId: string | null; onSelect(id: string): void; /** Only the search and the list (the page header shows the chosen article and opens this in a dialog). */ listOnly?: boolean }) {
+  const [open, setOpen] = useState(selectedId === null || listOnly);
   const [query, setQuery] = useState('');
   const name = useId();
   const selected = articles.find((a) => a.id === selectedId) ?? null;
@@ -23,7 +23,7 @@ export function ArticlePicker({ articles, selectedId, onSelect }: { articles: Ar
 
   if (articles.length === 0) {
     return (
-      <div className="rounded-lg bg-muted px-3 py-3 text-sm">
+      <div className="rounded-xl bg-muted px-4 py-4 text-sm">
         <p className="font-medium">You have no articles yet.</p>
         <p className="mt-0.5 text-muted-foreground">Import or write one first, then come back here to choose where it goes.</p>
       </div>
@@ -32,10 +32,10 @@ export function ArticlePicker({ articles, selectedId, onSelect }: { articles: Ar
 
   return (
     <div className="grid gap-3">
-      {selected ? (
-        <div className="flex items-start gap-3 rounded-lg border bg-background p-3">
+      {selected && !listOnly ? (
+        <div className="flex items-start gap-3 rounded-xl border bg-background p-4">
           <div className="min-w-0 flex-1">
-            <p className="font-serif text-lg leading-6" data-testid="selected-article">
+            <p className="font-serif text-xl leading-7 font-medium" data-testid="selected-article">
               {selected.title || 'Untitled article'}
             </p>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -48,7 +48,7 @@ export function ArticlePicker({ articles, selectedId, onSelect }: { articles: Ar
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-input bg-surface px-2.5 text-sm font-medium hover:bg-accent"
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border-[1.5px] border-border-strong bg-surface px-3 text-sm font-medium hover:bg-accent"
           >
             <ChevronsUpDown aria-hidden className="size-4" />
             {open ? 'Close' : 'Change'}
@@ -60,9 +60,9 @@ export function ArticlePicker({ articles, selectedId, onSelect }: { articles: Ar
         <div className="grid gap-2">
           <div className="relative">
             <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your articles" aria-label="Search your articles" className="pl-9" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your articles" aria-label="Search your articles" className="pl-9" autoFocus={listOnly} />
           </div>
-          <fieldset className="max-h-64 overflow-y-auto rounded-lg border bg-background">
+          <fieldset className={cn('overflow-y-auto rounded-xl border bg-background', listOnly ? 'max-h-[min(24rem,60dvh)]' : 'max-h-64')}>
             <legend className="sr-only">Choose an article</legend>
             {shown.length === 0 ? (
               <p className="px-3 py-4 text-sm text-muted-foreground">No article matches “{query}”.</p>
@@ -72,7 +72,7 @@ export function ArticlePicker({ articles, selectedId, onSelect }: { articles: Ar
                   const id = `${name}-${a.id}`;
                   return (
                     <li key={a.id}>
-                      <label htmlFor={id} className={cn('flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-accent', a.id === selectedId && 'bg-accent')}>
+                      <label htmlFor={id} className={cn('flex min-h-12 cursor-pointer items-start gap-3 px-4 py-3 hover:bg-accent', a.id === selectedId && 'bg-accent')}>
                         <input
                           id={id}
                           type="radio"
