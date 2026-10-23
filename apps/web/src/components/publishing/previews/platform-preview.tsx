@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { PLATFORMS, type PlatformId } from '@/lib/catalog';
 import type { DraftExtras, DraftPayload } from '@/lib/publishing';
 import { Button } from '@/components/ui/button';
-import { usePreviewExpand } from './preview-context';
+import { usePreviewExpand, usePreviewView } from './preview-context';
 import { PreviewFrame, type Appearance, type Device, type FrameControl } from './preview-frame';
 import { ArticleSkin, Counters, SocialSkin, SubmissionSkin, VideoSkin } from './skins';
 
@@ -21,11 +21,17 @@ export interface PreviewInput {
  * (desktop or phone), the platform in light or dark, and the views that matter for that platform: in the feed or
  * opened for a post, listing or form for Hacker News, card or watch page for YouTube, inbox or opened for a newsletter.
  */
-export function PlatformPreview({ input, defaultDevice = 'desktop', onDeviceChange, className }: { input: PreviewInput; defaultDevice?: Device; onDeviceChange?: (device: Device) => void; className?: string }) {
+export function PlatformPreview({ input, defaultDevice = 'desktop', onDeviceChange, className, leading, below }: { input: PreviewInput; defaultDevice?: Device; onDeviceChange?: (device: Device) => void; className?: string; /** In a page that keeps the view choices in one place: the checks, at the start of the slim bar and under it. */ leading?: React.ReactNode; below?: React.ReactNode }) {
   const { platform, payload } = input;
   const info = PLATFORMS[platform];
-  const [device, setDevice] = useState<Device>(defaultDevice);
-  const [appearance, setAppearance] = useState<Appearance>('light');
+  const [ownDevice, setOwnDevice] = useState<Device>(defaultDevice);
+  const [ownAppearance, setOwnAppearance] = useState<Appearance>('light');
+  // A page that keeps the view choices in one place (the publishing screen) decides device and appearance for every preview.
+  const view = usePreviewView();
+  const device = view?.device ?? ownDevice;
+  const appearance = view?.appearance ?? ownAppearance;
+  const setDevice = view?.onDevice ?? setOwnDevice;
+  const setAppearance = view?.onAppearance ?? setOwnAppearance;
   const [mode, setMode] = useState<'feed' | 'opened'>('feed');
   const [showFull, setShowFull] = useState(false);
   const [submission, setSubmission] = useState<'listing' | 'fields'>('listing');
@@ -118,7 +124,7 @@ export function PlatformPreview({ input, defaultDevice = 'desktop', onDeviceChan
   }
 
   return (
-    <PreviewFrame name={info.name} device={device} onDevice={(next) => { setDevice(next); onDeviceChange?.(next); }} appearance={appearance} onAppearance={setAppearance} controls={controls} footer={footer} {...(expand ? { onExpand: (button: HTMLButtonElement) => expand.open(platform, button) } : {})} {...(className ? { className } : {})}>
+    <PreviewFrame name={info.name} device={device} onDevice={(next) => { setDevice(next); onDeviceChange?.(next); }} appearance={appearance} onAppearance={setAppearance} controls={controls} footer={footer} {...(view ? { compact: true, leading, below, menu: view.menu } : {})} {...(expand ? { onExpand: (button: HTMLButtonElement) => expand.open(platform, button) } : {})} {...(className ? { className } : {})}>
       {body}
     </PreviewFrame>
   );

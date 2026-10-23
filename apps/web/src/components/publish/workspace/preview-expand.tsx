@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 import { PlatformPreview, type PreviewInput } from '@/components/publishing/previews/platform-preview';
-import { PreviewExpandContext, PreviewScaleContext, type ExpandApi } from '@/components/publishing/previews/preview-context';
+import { PreviewExpandContext, PreviewScaleContext, PreviewViewContext, type ExpandApi } from '@/components/publishing/previews/preview-context';
 import type { Device } from '@/components/publishing/previews/preview-frame';
 import { Button } from '@/components/ui/button';
 import type { PlatformId } from '@/lib/catalog';
@@ -140,9 +140,11 @@ export function ExpandedPreview({
               <div className="mx-auto grid max-w-[min(100%,80rem)] gap-4">
                 <ChecksRow issues={entry.lint} empty="No problems found for this platform." defaultOpen />
                 <PreviewExpandContext.Provider value={null}>
-                  <PreviewScaleContext.Provider value={narrow ? 1 : OVERLAY_SCALE}>
-                    <PlatformPreview key={entry.platform} input={entry.input} defaultDevice={device} onDeviceChange={setDevice} />
-                  </PreviewScaleContext.Provider>
+                  <PreviewViewContext.Provider value={null}>
+                    <PreviewScaleContext.Provider value={narrow ? 1 : OVERLAY_SCALE}>
+                      <PlatformPreview key={entry.platform} input={entry.input} defaultDevice={device} onDeviceChange={setDevice} />
+                    </PreviewScaleContext.Provider>
+                  </PreviewViewContext.Provider>
                 </PreviewExpandContext.Provider>
               </div>
             ) : null}

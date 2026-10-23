@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleAlert, ExternalLink, Info, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ChevronDown, CircleAlert, ExternalLink, Info, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,50 +74,76 @@ export function LintList({ issues, fixes = {}, empty = 'No problems found.' }: {
   );
 }
 
-/** "1 to fix", "2 heads up": the same counts the full list below it gives, in words. */
+/** The counts the checks pill states: what blocks approval and what is only worth a look. */
 export function checkCounts(issues: LintIssue[]): { fix: number; headsUp: number } {
   const fix = issues.filter((i) => i.severity === 'error').length;
   return { fix, headsUp: issues.length - fix };
 }
 
-/**
- * The checks of one preview as a row of small pills, so the preview itself comes first: "1 to fix", "1 heads up" and a
- * "See checks" link that opens the full list under them. With nothing to report it says so in one pill.
- */
-export function ChecksRow({ issues, fixes, empty = 'No problems found for this platform.', defaultOpen = false }: { issues: LintIssue[]; fixes?: Partial<Record<string, LintFix>>; empty?: string; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const listId = useId();
+/** "1 to fix", "1 to fix · 2 heads up", "2 heads up": the whole of the checks in one short phrase. */
+export function checksSummary(issues: LintIssue[]): string {
   const { fix, headsUp } = checkCounts(issues);
+  return [fix > 0 ? `${fix} to fix` : null, headsUp > 0 ? `${headsUp} heads up` : null].filter(Boolean).join(' · ');
+}
+
+/**
+ * The checks of one preview as a single pill: what is wrong in words, and a chevron that opens the full list in place.
+ * It is vermilion-toned only when something blocks approval; a list of notes alone is calm; with nothing to say it is a
+ * quiet "Checks passed" and not a control.
+ */
+export function ChecksPill({ issues, open, onToggle, controlsId, empty = 'Checks passed' }: { issues: LintIssue[]; open: boolean; onToggle(): void; controlsId: string; empty?: string }) {
+  const { fix } = checkCounts(issues);
   if (issues.length === 0) {
     return (
-      <p className="inline-flex h-7 w-fit items-center gap-1.5 rounded-full bg-success-bg px-3 text-sm font-medium text-success">
+      <p className="inline-flex h-10 items-center gap-1.5 rounded-full bg-success-bg px-3.5 text-sm font-medium text-success">
         <ShieldCheck aria-hidden className="size-4" />
         {empty}
       </p>
     );
   }
+  const Icon = fix > 0 ? CircleAlert : TriangleAlert;
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={controlsId}
+      onClick={onToggle}
+      className={cn(
+        'inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors duration-[120ms]',
+        fix > 0 ? 'bg-danger-bg text-danger hover:bg-danger-bg/70' : 'bg-warning-bg text-warning hover:bg-warning-bg/70',
+      )}
+    >
+      <Icon aria-hidden className="size-4" />
+      {checksSummary(issues)}
+      <span className="sr-only">. {open ? 'Hide the checks' : 'See the checks'}</span>
+      <ChevronDown aria-hidden className={cn('size-3.5 transition-transform duration-[120ms] motion-reduce:transition-none', open && 'rotate-180')} />
+    </button>
+  );
+}
+
+/** The full list under the pill. It stays mounted while closed, so the pill always has something to control. */
+export function ChecksDrawer({ issues, fixes, open, id, empty = 'No problems found for this platform.' }: { issues: LintIssue[]; fixes?: Partial<Record<string, LintFix>>; open: boolean; id: string; empty?: string }) {
+  return (
+    <div id={id} hidden={!open} className="border-b px-3 py-3">
+      <LintList issues={issues} {...(fixes ? { fixes } : {})} empty={empty} />
+    </div>
+  );
+}
+
+/** The pill with its list under it, for a place that has no slim bar (the large overlay). */
+export function ChecksRow({ issues, fixes, empty, defaultOpen = false }: { issues: LintIssue[]; fixes?: Partial<Record<string, LintFix>>; empty?: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
   return (
     <div className="grid gap-2">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        {fix > 0 ? (
-          <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-danger-bg px-3 font-medium text-danger">
-            <CircleAlert aria-hidden className="size-4" />
-            {fix} to fix
-          </span>
-        ) : null}
-        {headsUp > 0 ? (
-          <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-warning-bg px-3 font-medium text-warning">
-            <TriangleAlert aria-hidden className="size-4" />
-            {headsUp} heads up
-          </span>
-        ) : null}
-        <button type="button" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((o) => !o)} className="ml-1 rounded-md py-1 font-medium text-link underline-offset-4 hover:underline">
-          {open ? 'Hide checks' : 'See checks'}
-        </button>
+      <div>
+        <ChecksPill issues={issues} open={open} onToggle={() => setOpen((o) => !o)} controlsId={id} {...(empty ? { empty } : {})} />
       </div>
-      <div id={listId} hidden={!open}>
-        <LintList issues={issues} {...(fixes ? { fixes } : {})} empty={empty} />
-      </div>
+      {issues.length > 0 ? (
+        <div id={id} hidden={!open}>
+          <LintList issues={issues} {...(fixes ? { fixes } : {})} />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -16,6 +16,12 @@ export type PreviewLayout = (typeof PREVIEW_LAYOUTS)[number];
 export const PREVIEW_SIZES = ['compact', 'comfortable', 'large'] as const;
 export type PreviewSize = (typeof PREVIEW_SIZES)[number];
 
+export const PREVIEW_DEVICES = ['desktop', 'mobile'] as const;
+export type PreviewDevice = (typeof PREVIEW_DEVICES)[number];
+
+export const PREVIEW_APPEARANCES = ['light', 'dark'] as const;
+export type PreviewAppearance = (typeof PREVIEW_APPEARANCES)[number];
+
 export const STUDIO_PANELS = ['details', 'history', 'ai'] as const;
 export type StudioPanel = (typeof STUDIO_PANELS)[number];
 
@@ -32,6 +38,9 @@ export interface ViewPrefs {
   collapsedAreas: PublishArea[];
   previewLayout: PreviewLayout;
   previewSize: PreviewSize;
+  /** The width a platform's preview is drawn at, and whether the platform is shown in light or dark. */
+  previewDevice: PreviewDevice;
+  previewAppearance: PreviewAppearance;
   /** The article studio side panel that was open last, or none. */
   studioPanel: StudioPanel | null;
   /** Composer side panes that are folded into a slim bar. */
@@ -47,6 +56,8 @@ export const DEFAULT_VIEW_PREFS: ViewPrefs = {
   collapsedAreas: [],
   previewLayout: 'single',
   previewSize: 'comfortable',
+  previewDevice: 'desktop',
+  previewAppearance: 'light',
   studioPanel: null,
   collapsedPanes: [],
   filtersCollapsed: false,
@@ -80,6 +91,8 @@ export function parseViewPrefs(raw: string | null | undefined): ViewPrefs {
     collapsedAreas: subset(PUBLISH_AREAS, d.collapsedAreas),
     previewLayout: oneOf(PREVIEW_LAYOUTS, d.previewLayout, DEFAULT_VIEW_PREFS.previewLayout),
     previewSize: oneOf(PREVIEW_SIZES, d.previewSize, DEFAULT_VIEW_PREFS.previewSize),
+    previewDevice: oneOf(PREVIEW_DEVICES, d.previewDevice, DEFAULT_VIEW_PREFS.previewDevice),
+    previewAppearance: oneOf(PREVIEW_APPEARANCES, d.previewAppearance, DEFAULT_VIEW_PREFS.previewAppearance),
     studioPanel: typeof panel === 'string' && (STUDIO_PANELS as readonly string[]).includes(panel) ? (panel as StudioPanel) : null,
     collapsedPanes: subset(COMPOSER_PANES, d.collapsedPanes),
     filtersCollapsed: d.filtersCollapsed === true,

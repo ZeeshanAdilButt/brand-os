@@ -2,11 +2,12 @@
 
 import { Columns2, Columns3, GitCompare, Pencil, Square, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { PlatformPreview } from '@/components/publishing/previews/platform-preview';
 import { EmptyState } from '@/components/brand/branch-art';
 import { PreviewScaleContext } from '@/components/publishing/previews/preview-context';
 import { PreviewComparison } from '@/components/publishing/previews/preview-comparison';
+import { ViewSection } from '@/components/publishing/previews/preview-frame';
 import { useViewPrefs } from '@/components/shell/view-prefs';
 import { buttonVariants } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
@@ -17,7 +18,7 @@ import { effectiveLayout, gridClass, SIZE_SCALE } from '@/lib/preview-layout';
 import type { DestinationDTO, PlatformId } from '@/lib/publishing';
 import type { PreviewLayout, PreviewSize } from '@/lib/view-prefs';
 import { cn } from '@/lib/utils';
-import { ChecksRow, NoticeBar } from '../shared';
+import { ChecksDrawer, ChecksPill, NoticeBar } from '../shared';
 import type { PublishApi } from '../use-publish';
 import type { ExpandEntry } from './preview-expand';
 
@@ -146,24 +147,38 @@ export function QuickEdit({ destination, api }: { destination: DestinationDTO; a
   );
 }
 
-/** What one platform's preview shows: its heading, notices, the checks as pills and the preview itself. The single view adds the quick edit. */
+/**
+ * What one platform's preview shows: the preview itself first, with its checks as one pill in the bar above it. The
+ * single view names the platform for screen readers only (the tab already says it) and adds the quick edit; a grid names
+ * each card. A status shows only once the post is past a plain draft.
+ */
 export function PreviewCard({ destination, api, articleId, detailed }: { destination: DestinationDTO; api: PublishApi; articleId: string; detailed: boolean }) {
   const draft = destination.draft;
   const errors = draft?.lint.filter((i) => i.severity === 'error').length ?? 0;
+  const [checksOpen, setChecksOpen] = useState(false);
+  const checksId = useId();
+  const status = draft && draft.status !== 'draft' ? <StatusChip chip={draftChip(destination.platform, draft)} /> : null;
   return (
     <div className="grid min-w-0 content-start gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-lg font-semibold">{destination.info.name}</h3>
-        <StatusChip chip={draftChip(destination.platform, draft)} />
-        {detailed ? (
-          <span className="text-sm text-muted-foreground">{destination.info.state === 'adapter' ? 'Brand OS can publish this after your approval.' : 'You post this one by hand.'}</span>
-        ) : null}
-      </div>
+      {detailed ? (
+        <>
+          <h3 className="sr-only">{destination.info.name}</h3>
+          {status ? <div>{status}</div> : null}
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-lg font-semibold">{destination.info.name}</h3>
+          {status}
+        </div>
+      )}
       <NoticeBar notice={api.notices[destination.platform]} />
       {draft ? (
         <>
-          <ChecksRow issues={draft.lint} empty="No problems found for this platform." />
-          <PlatformPreview input={{ platform: destination.platform, payload: draft.payload, extras: draft.extras, account: draft.account }} />
+          <PlatformPreview
+            input={{ platform: destination.platform, payload: draft.payload, extras: draft.extras, account: draft.account }}
+            leading={<ChecksPill issues={draft.lint} open={checksOpen} onToggle={() => setChecksOpen((o) => !o)} controlsId={checksId} />}
+            below={draft.lint.length > 0 ? <ChecksDrawer issues={draft.lint} open={checksOpen} id={checksId} /> : null}
+          />
           {detailed ? (
             <details className="rounded-xl border bg-surface" open={errors > 0}>
               <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-medium">
@@ -187,9 +202,9 @@ export function PreviewCard({ destination, api, articleId, detailed }: { destina
 }
 
 const LAYOUT_OPTIONS: { value: PreviewLayout; icon: LucideIcon; name: string; title: string }[] = [
-  { value: 'single', icon: Square, name: 'One large', title: 'One large preview, with a tab for each platform' },
-  { value: 'grid2', icon: Columns2, name: '2 columns', title: 'A grid of 2 columns' },
-  { value: 'grid3', icon: Columns3, name: '3 columns', title: 'A grid of 3 columns' },
+  { value: 'single', icon: Square, name: 'Single', title: 'One large preview, with a tab for each platform' },
+  { value: 'grid2', icon: Columns2, name: '2 col', title: 'A grid of 2 columns' },
+  { value: 'grid3', icon: Columns3, name: '3 col', title: 'A grid of 3 columns' },
   { value: 'compare', icon: GitCompare, name: 'Compare', title: 'Compare two platforms side by side' },
 ];
 
@@ -198,6 +213,41 @@ const SIZE_OPTIONS: { value: PreviewSize; label: string; title: string }[] = [
   { value: 'comfortable', label: 'Comfortable', title: 'The usual size' },
   { value: 'large', label: 'Large', title: 'Bigger previews, easier to read' },
 ];
+
+/**
+ * The page's own part of the View panel: how many previews at once, and how large they are. It reads and writes the
+ * saved layout choices, so what was chosen last time is what comes back.
+ */
+export function LayoutAndSize({ ready }: { ready: number }) {
+  const { prefs, update } = useViewPrefs();
+  const layout = effectiveLayout(prefs.previewLayout, ready);
+  return (
+    <>
+      <ViewSection title="Layout">
+        <Segmented
+          label="Preview layout"
+          columns={2}
+          value={layout}
+          onChange={(value) => update({ previewLayout: value })}
+          options={LAYOUT_OPTIONS.map((o) => ({
+            value: o.value,
+            title: o.value === 'compare' && ready < 2 ? 'Prepare at least two previews to compare them' : o.title,
+            disabled: o.value === 'compare' && ready < 2,
+            label: (
+              <>
+                <o.icon aria-hidden className="size-4" />
+                {o.name}
+              </>
+            ),
+          }))}
+        />
+      </ViewSection>
+      <ViewSection title="Size">
+        <Segmented label="Preview size" columns={3} value={prefs.previewSize} onChange={(value) => update({ previewSize: value })} options={SIZE_OPTIONS.map((o) => ({ value: o.value, label: o.label, title: o.title }))} />
+      </ViewSection>
+    </>
+  );
+}
 
 /** Inside the floating window the surface is drawn smaller, because the window has a fixed width. Expand shows it large. */
 export const WINDOW_SCALE = 0.65;
@@ -274,34 +324,6 @@ export function PreviewArea({
   return (
     <PreviewScaleContext.Provider value={windowed ? WINDOW_SCALE : SIZE_SCALE[prefs.previewSize]}>
       <div className="@container grid gap-4">
-        {windowed ? null : (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="flex items-center gap-2">
-              <span className="mono-label text-muted-foreground">Layout</span>
-              <Segmented
-                label="Preview layout"
-                value={layout}
-                onChange={(value) => update({ previewLayout: value })}
-                options={LAYOUT_OPTIONS.map((o) => ({
-                  value: o.value,
-                  title: o.value === 'compare' && entries.length < 2 ? 'Prepare at least two previews to compare them' : o.title,
-                  disabled: o.value === 'compare' && entries.length < 2,
-                  label: (
-                    <>
-                      <o.icon aria-hidden className="size-4" />
-                      <span className="sr-only @lg:not-sr-only">{o.name}</span>
-                    </>
-                  ),
-                }))}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="mono-label text-muted-foreground">Size</span>
-              <Segmented label="Preview size" value={prefs.previewSize} onChange={(value) => update({ previewSize: value })} options={SIZE_OPTIONS.map((o) => ({ value: o.value, label: o.label, title: o.title }))} />
-            </div>
-          </div>
-        )}
-
         {layout === 'single' ? <PreviewTabs chosen={chosen} current={current?.platform ?? null} onActive={onActive} /> : null}
 
         {layout === 'compare' ? (
