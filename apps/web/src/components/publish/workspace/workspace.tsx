@@ -1,15 +1,19 @@
 'use client';
 
-import { ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check, Maximize2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { buttonVariants } from '@/components/ui/button';
+import { useViewPrefs } from '@/components/shell/view-prefs';
+import { useShellLayout } from '@/components/shell/shell-layout';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { CollapsibleArea } from '@/components/ui/collapsible-area';
 import { FormNotice } from '@/components/ui/field';
 import { api as http } from '@/lib/api-client';
 import type { ArticleDTO } from '@/lib/articles';
 import { RECOMMENDED_ORDER, type DestinationDTO, type PlatformId } from '@/lib/publishing';
 import { selectorRows, workspaceProgress, type ArticleOption } from '@/lib/publish-workspace';
 import { articleFacts, recommend } from '@/lib/recommend';
+import { toggled, type PublishArea } from '@/lib/view-prefs';
 import { loadRemembered, saveRemembered } from '@/lib/wizard-state';
 import { cn } from '@/lib/utils';
 import { usePublish, type PublishApi } from '../use-publish';
@@ -27,6 +31,14 @@ export interface WorkspaceArticle {
 }
 
 const LAST_ARTICLE_KEY = 'brand-os.last-article';
+
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+      {n}
+    </span>
+  );
+}
 
 function Area({ n, title, note, children, className }: { n: number; title: string; note?: string; children: ReactNode; className?: string }) {
   return (
@@ -125,6 +137,26 @@ function WorkspaceBody({
   const [active, setActive] = useState<PlatformId | null>(initialPlatform);
   const [remembered, setRemembered] = useState<PlatformId[]>([]);
   const [working, setWorking] = useState<ReadonlySet<PlatformId>>(new Set());
+  const { prefs, update } = useViewPrefs();
+  const [fullView, setFullView] = useState(false);
+  // Full view gives the previews the whole window: the sidebar goes too, and comes back when it ends or the page is left.
+  useShellLayout(fullView, { hideSidebar: true, wide: true });
+  const folded = useMemo(() => new Set(prefs.collapsedAreas), [prefs.collapsedAreas]);
+  const previewsFolded = folded.has('previews') && !fullView;
+  const leftRow = folded.has('article') || folded.has('platforms');
+  const openAreaClass = leftRow ? (previewsFolded ? 'lg:min-w-0 lg:flex-1' : 'lg:w-[22rem] lg:shrink-0') : undefined;
+  const fold = (area: PublishArea, collapsed: boolean) => update({ collapsedAreas: toggled(prefs.collapsedAreas, area, collapsed) });
+
+  useEffect(() => {
+    if (!fullView) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Escape that something else handled (a menu, the expanded preview) is not ours.
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('[role="dialog"]')) return;
+      setFullView(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fullView]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -192,21 +224,63 @@ function WorkspaceBody({
       {!hasText ? <p className="rounded-lg border border-info/25 bg-info-bg px-3 py-2 text-sm">This article has no text yet, so there is nothing to preview. Add some in the studio first.</p> : null}
       {api.loadError ? <FormNotice tone="error">{api.loadError}</FormNotice> : null}
 
-      <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]', loading && 'opacity-60')} aria-busy={loading}>
-        <div className="grid min-w-0 content-start gap-4">
-          <Area n={1} title="Article" note="The article every preview is built from.">
+      <div className={cn('grid grid-cols-1 gap-4', fullView ? '' : previewsFolded ? 'lg:grid-cols-[minmax(0,1fr)_3rem]' : 'lg:grid-cols-[auto_minmax(0,1fr)]', loading && 'opacity-60')} aria-busy={loading}>
+        <div className={cn('grid min-w-0 content-start gap-4', leftRow ? 'lg:flex lg:items-stretch' : !previewsFolded && 'lg:w-[26rem]', fullView && 'hidden lg:hidden')}>
+          <CollapsibleArea
+            title="Article"
+            summary={article.title || 'Untitled article'}
+            badge={<StepBadge n={1} />}
+            note="The article every preview is built from."
+            collapsed={folded.has('article')}
+            onCollapsedChange={(c) => fold('article', c)}
+            className={openAreaClass}
+            collapsedClassName="lg:shrink-0"
+          >
             <ArticlePicker articles={articles} selectedId={article.id} onSelect={onChooseArticle} />
-          </Area>
-          <Area n={2} title="Platforms" note="Tick as many as you like. Each gets a preview at once. Nothing is sent.">
+          </CollapsibleArea>
+          <CollapsibleArea
+            title="Platforms"
+            summary={`${chosen.length} ${chosen.length === 1 ? 'platform' : 'platforms'} selected`}
+            badge={<StepBadge n={2} />}
+            note="Tick as many as you like. Each gets a preview at once. Nothing is sent."
+            collapsed={folded.has('platforms')}
+            onCollapsedChange={(c) => fold('platforms', c)}
+            className={openAreaClass}
+            collapsedClassName="lg:shrink-0"
+          >
             <PlatformSelector rows={rows} selected={selected} busy={working} onToggle={(p) => void toggle(p)} onChooseAll={(list) => void chooseAll(list)} recommendations={recommendations} />
-          </Area>
+          </CollapsibleArea>
         </div>
-        <Area n={3} title="Previews" note="An approximate preview of this article on each platform you chose.">
+        <CollapsibleArea
+          title="Previews"
+          summary={chosen.length === 0 ? 'Nothing to preview yet' : `${prepared} of ${chosen.length} ready`}
+          badge={<StepBadge n={3} />}
+          note="An approximate preview of this article on each platform you chose."
+          side="right"
+          collapsed={previewsFolded}
+          onCollapsedChange={(c) => fold('previews', c)}
+          canCollapse={!fullView}
+          actions={
+            <>
+              {fullView ? <span className="hidden self-center text-xs text-muted-foreground sm:inline">Esc to leave</span> : null}
+              <Button type="button" size="sm" variant={fullView ? 'default' : 'outline'} aria-pressed={fullView} onClick={() => setFullView((v) => !v)} title="Hide the sidebar, Article and Platforms so the previews use the whole width">
+                <Maximize2 aria-hidden />
+                Full view
+              </Button>
+            </>
+          }
+        >
           <PreviewArea api={api} articleId={article.id} chosen={chosen} active={active} onActive={setActive} />
-        </Area>
+        </CollapsibleArea>
       </div>
 
-      <div className="sticky bottom-0 z-20 -mx-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t bg-surface px-5 py-3 shadow-md sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10">
+      <div
+        className={cn(
+          'sticky bottom-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-2 border-t bg-surface py-3 shadow-md',
+          // The bar reaches the page edges: it undoes the padding of the page column it sits in (narrower in full view).
+          fullView ? '-mx-2 px-2 sm:-mx-4 sm:px-4' : '-mx-5 px-5 sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10',
+        )}
+      >
         <p className="min-w-0 flex-1 text-sm" aria-live="polite">
           <span className="font-semibold">
             {chosen.length} {chosen.length === 1 ? 'platform' : 'platforms'} selected
