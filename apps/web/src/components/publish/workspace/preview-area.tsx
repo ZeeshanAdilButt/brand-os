@@ -7,7 +7,7 @@ import { PlatformPreview } from '@/components/publishing/previews/platform-previ
 import { PreviewScaleContext } from '@/components/publishing/previews/preview-context';
 import { PreviewComparison } from '@/components/publishing/previews/preview-comparison';
 import { useViewPrefs } from '@/components/shell/view-prefs';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { StatusChip } from '@/components/ui/status-chip';

@@ -10,7 +10,6 @@ import { Input, Label, Select } from '@/components/ui/field';
 import { StatusChip } from '@/components/ui/status-chip';
 import { directoryChip } from '@/lib/chips';
 import { AREAS, AREA_BLURBS, AREA_LABELS, METHOD_HINTS, METHOD_LABELS, statusLine, type Area, type DirectoryEntry, type DirectoryStatus } from '@/lib/directory';
-import type { Density } from '@/lib/view-prefs';
 import { cn } from '@/lib/utils';
 import { AREA_STYLE } from './area-style';
 import { CategoryColumn, type CategoryOption } from './category-column';

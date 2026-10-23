@@ -104,7 +104,7 @@ export function PreviewFrame({
 
 /** The simulated surface itself: carries the appearance, device and skin as data attributes for the stylesheet. */
 export function Sim({ device, appearance, skin, kind, accent, children, label }: { device: Device; appearance: Appearance; skin: string; kind: 'feed' | 'article'; accent?: string; children: ReactNode; label: string }) {
-  // The size choice scales the whole surface; the maximum width is divided by the same factor so it still fits its column.
+  // The size choice scales the whole surface (CSS zoom); its width limit is a percentage, which zoom resolves in its own units, so it still fits its column.
   const scale = usePreviewScale();
   return (
     <div
@@ -114,7 +114,7 @@ export function Sim({ device, appearance, skin, kind, accent, children, label }:
       data-skin={skin}
       role="group"
       aria-label={label}
-      style={{ width: SIM_WIDTH[kind][device], ...(scale !== 1 ? { zoom: scale, maxWidth: `calc(100% / ${scale})` } : {}), ...(accent ? { ['--sim-accent' as string]: accent } : {}) }}
+      style={{ width: SIM_WIDTH[kind][device], ...(scale !== 1 ? { zoom: scale } : {}), ...(accent ? { ['--sim-accent' as string]: accent } : {}) }}
     >
       {children}
     </div>

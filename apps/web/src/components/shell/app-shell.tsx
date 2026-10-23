@@ -30,7 +30,8 @@ export function AppShell({ children, account }: { children: ReactNode; account?:
   const collapsed = prefs.sidebarCollapsed;
   const apple = useSyncExternalStore(noopSubscribe, isApplePlatform, () => false);
   // The article studio (editor and preview side by side) and the publishing screens (three columns) need the full width; every other page keeps a readable column.
-  const wide = layout.wide || /^\/articles\/[0-9a-f-]{36}(\/publish)?\/?$/i.test(usePathname() ?? '');
+  const pathname = usePathname() ?? '';
+  const wide = layout.wide || /^\/articles\/[0-9a-f-]{36}(\/publish)?\/?$/i.test(pathname);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

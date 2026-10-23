@@ -365,13 +365,13 @@ export function Studio({ initial, providers }: { initial: ArticleDTO; providers:
       if (outcome.ok) setPanel('ai');
       else notify(outcome.error);
     },
-    [createTaskRequest, notify],
+    [createTaskRequest, notify, setPanel],
   );
 
   const openAsk = useCallback(() => {
     setPanel('ai');
     window.setTimeout(() => askRef.current?.focus(), 80);
-  }, []);
+  }, [setPanel]);
 
   async function ask(instruction: string, providerId: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
     const outcome = await createTaskRequest('custom', { instruction, providerId });
