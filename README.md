@@ -20,7 +20,8 @@ Brand OS is a local-first, self-hostable studio for technical writers and engine
 | AI assistance in the studio (local model, your own API key, or Claude Code hand-off), AI task inbox with diffs to accept or reject, agent API with per-user keys, and the `brand-os` MCP server for Claude Code | Built and tested |
 | Technical publishing in the web app: connections, DEV.to and Hashnode adapters, private drafts, hash-bound single-use approval, the approved publish, recovery for an unknown result, and agent and MCP tools that can prepare and ask but never approve | Built and tested against local fake servers. **DEV.to live check pending the owner**; Hashnode is built from the official schema and is live-unverified |
 | One Publishing screen (article, platforms, live previews), a one-at-a-time approval queue, an expert composer, 13 destinations with previews and manual posting, the personal site as a Markdown export or a GitHub pull request, a canonical page check, a directory of every planned platform, and saved integration values for platforms that are not built yet | Built and tested against local fake servers. DEV.to, Hashnode and GitHub are the only destinations that publish through the app; live checks pending the owner |
-| More destinations that publish through the app (OAuth connections come next) | Planned (see [roadmap](#roadmap)) |
+| Connections for every platform in the directory (45): one validated definition each, a Connect drawer with steps, deep links, the access asked for and a Test button, OAuth with PKCE and a code sign-in, renewal under a lock, and a health state in the platform list. Twenty-five platforms are manual with a stated reason, three stay at Set up because their check could not be confirmed | Built and tested against fake servers only. **No connection has been tried against a real account**: that is the owner's step, with their own keys and app registrations |
+| More destinations that publish through the app (connecting is built; sending comes with Phase 2) | Planned (see [roadmap](#roadmap)) |
 | Hosted cloud service, team workspaces | Planned |
 
 Nothing here is a mock-up: unfinished features are hidden or shown as clearly disabled.
@@ -176,9 +177,21 @@ Open **Publishing** (or choose **Publish** on Home or in the studio). One page, 
 
 Then choose **Review and approve**. Each post is shown on its own, with its exact content, and needs its own approval ("Approve and next"). There is no approve all. For platforms the app cannot publish to, copy the post, publish it yourself, and record the link. For the personal site you can download the Markdown file or let the app open a pull request on your repository (Platforms > Integrations has the repository setting); the app never merges it.
 
+### Connect a platform
+
+Open **Platforms > Integrations**. Every platform has a state (Connected, Needs key, Needs reconnect, Set up, Manual or Planned) and one button that opens the Connect drawer. **Connect all that are ready** walks the ones that only need your key or sign-in, one after another.
+
+- **A platform with a key** (DEV.to, Hashnode, Beehiiv, Buffer, Postiz, a GitHub token for your site or releases, Ghost, WordPress, Bluesky, a Discord webhook): follow the steps (each has a link that opens the platform's own page in a new tab), paste the key into the password field and choose **Test and connect**. It is checked with one read-only request, stored encrypted and never shown again. If the platform refuses it, nothing is saved.
+- **A platform you sign in to** (LinkedIn, X, Threads, YouTube): register your own app on the platform once, paste its client ID and secret into **Your app**, add the exact redirect address the drawer shows (locally `http://127.0.0.1:<port>/api/connect/<platform>/callback`), tick any optional access, and choose **Sign in**. GitHub (for your site) and YouTube also offer a **code sign-in**: the drawer shows a short code to type on the platform's page and waits for you.
+- **Mastodon:** enter your instance. Brand OS registers itself there and you approve it.
+- **Manual platforms** (Medium, Substack, Reddit, Hacker News, conferences and others): the drawer says why there is nothing to connect and what to do instead.
+- **Set up needed:** Buttondown, Product Hunt and Slack could not be confirmed against the platform's own documentation, so Brand OS sends nothing to them.
+
+A sign-in lasts as long as the platform says (LinkedIn: 60 days, then you sign in again; the list warns a week ahead). Disconnect deletes the stored secret and, where the platform has an official revoke, revokes the grant too. Each drawer has a "setup guide for your browser agent" you can copy: it lists steps only, and you type every secret yourself. Per-platform scopes, endpoints and what could not be verified are in [INTEGRATIONS.md](INTEGRATIONS.md) section 9. On a hosted server, set `BRAND_OS_OAUTH_<ID>_CLIENT_ID` and `_CLIENT_SECRET` to use Brand OS's own app for a platform.
+
 ### Connect your systems
 
-0. The web app: open **Platforms > Integrations** to connect DEV.to, Hashnode or your site repository (see "Publish to DEV.to" above).
+0. The web app: connect platforms from **Platforms > Integrations** (see "Connect a platform" above; DEV.to, Hashnode and your site repository publish through the app, see "Publish to DEV.to"). Nothing there has been tried against a real account yet.
 1. The Phase 0 command-line tool: open the dashboard (`cph dashboard`) and go to **Connections**.
 2. **DEV.to:** create an API key in your DEV.to settings and paste it into the dashboard card. Never paste keys into chat.
 3. **Buffer (optional, for LinkedIn, X and YouTube):** create a free account, connect the channels, create one API key and paste it into the dashboard card.

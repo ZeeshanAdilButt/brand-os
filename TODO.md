@@ -90,6 +90,18 @@ Day 6 results: `pnpm test` (94 files, 2,180 tests), `pnpm typecheck`, `pnpm buil
 
 Not validated, on purpose or for lack of access: no real platform was called; DEV.to and Hashnode live checks and a real GitHub pull request are pending the owner; OAuth connections for the other platforms are the next task.
 
+### Connections: one framework for every platform (before Day 7)
+- [x] One connector registry: 45 definitions (auth kind, fields with deep links, ordered steps, least-privilege scopes with reasons, one read-only check, token and renewal rules, revoke steps, states), Zod-validated at load; UNVERIFIED items listed and kept at Set up (DECISIONS.md 49)
+- [x] `validate()` for every connectable platform with an injected fetch, tested against fake servers; a test compares each request with its definition
+- [x] Generic OAuth 2 authorization code with PKCE (single-use state bound to the session, expiring, Origin and credential checks, redirect `/api/connect/<platform>/callback`), the owner's own app locally and the host's from the environment when hosted, Mastodon per-instance registration (DECISIONS.md 50)
+- [x] Device flow for GitHub and Google with polling, the code, a countdown and cancel
+- [x] Token renewal under a lease with rotation, tested with concurrent callers (DECISIONS.md 51)
+- [x] Connect drawer, a health state in the platform list, a quiet Reconnect, and the "Connect all that are ready" overview, checked in the browser at 1280px and 375px, light and dark, against a fake X, a fake API-key platform, a fake GitHub device flow and a manual platform
+- [x] Agents, MCP tools and the agent API cannot connect, test, refresh or disconnect anything (tested four ways, DECISIONS.md 52)
+- [x] Migration 0010 (connection health, the renewal lease, sign-in flows) applied on the embedded engine and, with every earlier migration, on a real PostgreSQL 18 server (a throwaway container, removed): four concurrent lease requests gave exactly one winner and three concurrent spends of a flow gave exactly one
+- [ ] **Pending the owner's live checks:** register an app on LinkedIn, X, Threads and YouTube, create keys for the key platforms and run Test once on each (nothing here called a real platform)
+- [ ] Not built, on purpose: sending to LinkedIn, X, Bluesky, Threads, Mastodon and YouTube (Phase 2, Phase 5), a background renewal job, a Telegram bot connector (not in the catalog)
+
 ### Day 7: Phase 1 hardening
 - [ ] End-to-end publishing tests; authorization and tenant isolation; failed and retried publishes; no duplicates; canonical attribution
 - [ ] Local Claude MCP workflows; no-AI mode; imports and rendering; backup and export docs; loading, empty and error states
