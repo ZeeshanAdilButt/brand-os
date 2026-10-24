@@ -9,7 +9,7 @@ import { ghostToken, secretsIn, validatorFor, VALIDATORS, type ValidationInput }
 import { createFakeDevto } from './helpers/fake-devto';
 import { createFakeGithub } from './helpers/fake-github';
 import { createFakeHashnode } from './helpers/fake-hashnode';
-import { createFakeProviders, json, type FakeProviders } from './helpers/fake-providers';
+import { createFakeProviders, json } from './helpers/fake-providers';
 
 // Built at run time: the repository forbids key-shaped literals in tests.
 const W = (...parts: string[]) => parts.join('-');

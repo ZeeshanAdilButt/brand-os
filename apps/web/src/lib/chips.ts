@@ -1,3 +1,4 @@
+import { STATE_LABELS, type ConnectionState } from './connectors/types';
 import type { DirectoryStatus } from './directory';
 import { statusLabel, type DraftStatus, type PlatformId, type PublishedVia } from './publishing';
 
@@ -78,5 +79,23 @@ export function directoryChip(status: DirectoryStatus, roadmap: string | null): 
       return { label: 'Manual only', tone: 'neutral', icon: 'external-link' };
     case 'planned':
       return { label: roadmap && roadmap.startsWith('Phase') ? `Planned: ${roadmap.split(',')[0]}` : 'Planned', tone: 'planned', icon: 'calendar' };
+  }
+}
+
+/** The pill for a connector: the state word the owner asked for, with its own icon and tone. */
+export function connectorChip(state: ConnectionState): Chip {
+  switch (state) {
+    case 'connected':
+      return { label: STATE_LABELS.connected, tone: 'success', icon: 'plug-check' };
+    case 'needs_key':
+      return { label: STATE_LABELS.needs_key, tone: 'attention', icon: 'plug' };
+    case 'needs_reconnect':
+      return { label: STATE_LABELS.needs_reconnect, tone: 'warning', icon: 'refresh' };
+    case 'set_up':
+      return { label: STATE_LABELS.set_up, tone: 'info', icon: 'dashed-circle' };
+    case 'manual':
+      return { label: STATE_LABELS.manual, tone: 'neutral', icon: 'external-link' };
+    case 'planned':
+      return { label: STATE_LABELS.planned, tone: 'planned', icon: 'calendar' };
   }
 }

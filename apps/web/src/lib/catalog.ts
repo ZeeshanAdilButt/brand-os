@@ -374,7 +374,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     connect: {
       openLabel: 'Open the LinkedIn developer portal',
       openUrl: 'https://www.linkedin.com/developers/apps',
-      steps: ['Create an app and associate it with a LinkedIn Page you manage.', 'Add the products “Share on LinkedIn” and “Sign In with LinkedIn using OpenID Connect”.', 'Add the redirect URL below under Auth, then paste the client ID and secret here once the connect framework lands.'],
+      steps: ['Create an app and associate it with a LinkedIn Page you manage.', 'Add the products “Share on LinkedIn” and “Sign In with LinkedIn using OpenID Connect”.', 'Add the redirect URL shown in the Connect drawer under Auth, then paste the client ID and secret there.'],
       oauth: {
         register: ['A LinkedIn developer app linked to a Page you manage', 'Products: Share on LinkedIn; Sign In with LinkedIn using OpenID Connect'],
         scopes: ['openid', 'profile', 'w_member_social'],
@@ -450,7 +450,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     connect: {
       openLabel: 'Open Bluesky app passwords',
       openUrl: 'https://bsky.app/settings/app-passwords',
-      steps: ['Open the page below and choose “Add App Password”.', 'Name it “Brand OS” and copy the password it shows once.', 'Paste it here with your handle once the Bluesky adapter lands.'],
+      steps: ['Open the page below and choose “Add App Password”.', 'Name it “Brand OS” and copy the password it shows once.', 'Paste it in the Connect drawer with your handle. Connecting only checks the password; posting arrives in Phase 2.'],
     },
     manual: {
       openUrl: 'https://bsky.app/',
@@ -480,7 +480,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     connect: {
       openLabel: 'Open Meta for Developers',
       openUrl: 'https://developers.facebook.com/apps/',
-      steps: ['Create an app with the “Access the Threads API” use case.', 'Add your Threads account as a Threads tester and accept the invite in Threads.', 'Add the redirect URL below (Meta usually needs https) and connect once the framework lands.'],
+      steps: ['Create an app with the “Access the Threads API” use case.', 'Add your Threads account as a Threads tester and accept the invite in Threads.', 'Add the redirect URL from the Connect drawer (Meta usually needs https), then connect there.'],
       oauth: {
         register: ['A Meta app with the Threads use case', 'Your own Threads account added as a tester (no App Review for your own use)'],
         scopes: ['threads_basic', 'threads_content_publish'],
@@ -516,7 +516,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     connect: {
       openLabel: 'Open your instance’s developer settings',
       openUrl: 'https://mastodon.social/settings/applications',
-      steps: ['On your instance open Preferences, Development, New application.', 'Give it the scopes below and copy the access token.', 'Add your instance address here once the connect framework lands.'],
+      steps: ['On your instance open Preferences, Development, New application.', 'Give it the scopes below and copy the access token.', 'Enter your instance address in the Connect drawer. Brand OS registers the app on it for you.'],
       oauth: {
         register: ['An application on your own Mastodon instance'],
         scopes: ['write:statuses', 'write:media', 'read:accounts'],

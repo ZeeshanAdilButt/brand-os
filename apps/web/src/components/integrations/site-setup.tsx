@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FormNotice, Input, Select } from '@/components/ui/field';
 import { api } from '@/lib/api-client';
-import type { ConnectionDTO } from '@/lib/publishing';
 import {
   DATE_FORMATS,
   DATE_FORMAT_LABELS,
@@ -19,7 +18,6 @@ import {
   type SitePreset,
   type SiteSettingsDTO,
 } from '@/lib/site-export';
-import { LiveConnection, type ConnectionView } from './live-connection';
 import { Block } from './parts';
 
 const FIELD_LABELS: Record<(typeof SITE_FIELD_KEYS)[number], string> = {
@@ -49,7 +47,7 @@ const SAMPLE = {
  * export needs only these settings. Opening a pull request also needs a fine-grained GitHub token for that one
  * repository. The example below is built from the settings as you edit them.
  */
-export function SiteSetup({ initial, view, onConnection }: { initial: SiteSettingsDTO; view: ConnectionView; onConnection(connection: ConnectionDTO | null): void }) {
+export function SiteSetup({ initial, onSaved }: { initial: SiteSettingsDTO; onSaved?(settings: SiteSettingsDTO): void }) {
   const [settings, setSettings] = useState(initial);
   const [saved, setSaved] = useState(initial.updatedAt !== null);
   const [busy, setBusy] = useState(false);
@@ -94,6 +92,7 @@ export function SiteSetup({ initial, view, onConnection }: { initial: SiteSettin
     if (result.ok) {
       setSettings(result.data);
       setSaved(true);
+      onSaved?.(result.data);
       setNotice({ tone: 'success', text: 'Settings saved. Drafts you already built keep their old layout until you rebuild them.' });
     } else {
       setErrors(result.fields);
@@ -203,14 +202,6 @@ export function SiteSetup({ initial, view, onConnection }: { initial: SiteSettin
           <p className="text-xs text-muted-foreground">Saving sends nothing anywhere.</p>
         </div>
       </form>
-
-      <Block title="GitHub token for pull requests">
-        {!settings.repo || !saved ? (
-          <p className="rounded-lg bg-muted px-3 py-2 text-sm leading-6">Save a repository above first, then connect a token for it. Markdown export works without one.</p>
-        ) : (
-          <LiveConnection view={view} onChange={onConnection} />
-        )}
-      </Block>
     </div>
   );
 }

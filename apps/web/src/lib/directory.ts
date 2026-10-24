@@ -214,12 +214,12 @@ const EXTRAS: Extra[] = [
     area: 'communities',
     summary: 'Chat servers where you may share your work when a channel allows it.',
     url: 'https://discord.com/',
-    method: 'manual_only',
-    plan: 'Prepare a short message and a link to paste into a channel whose rules allow it. You post it.',
+    method: 'api_key',
+    plan: 'A webhook to one channel on a server you manage can be connected. Posting in other people’s servers stays manual: prepare a message and paste it where the rules allow it.',
     roadmap: 'Not scheduled yet',
     restrictions: ['Each server has its own rules about self-promotion. Posting as yourself in other people’s servers is not automated.'],
     cost: 'Free.',
-    unverified: [],
+    unverified: ['Discord’s rate limits for webhook posts were not on the page read.'],
   },
   {
     id: 'slack',
@@ -227,12 +227,12 @@ const EXTRAS: Extra[] = [
     area: 'communities',
     summary: 'Workspaces and community Slacks where a channel may welcome your link.',
     url: 'https://slack.com/',
-    method: 'manual_only',
-    plan: 'Prepare a short message and a link to paste into a channel whose rules allow it. You post it.',
+    method: 'api_key',
+    plan: 'An incoming webhook to a channel in a workspace you manage could be connected, but Slack has no read-only way to check one, so it stays at Set up. Posting in communities you do not run stays manual.',
     roadmap: 'Not scheduled yet',
     restrictions: ['Each workspace sets its own rules. Posting in communities you do not run is not automated.'],
     cost: 'Free.',
-    unverified: [],
+    unverified: ['Slack documents no read-only check for a webhook, so the app cannot confirm one works without posting a message.'],
   },
   // ---- video ----
   {
@@ -527,7 +527,7 @@ function fromExtra(extra: Extra): DirectoryEntry {
     secretLabel: extra.secretLabel ?? '',
     secretHelp: extra.secretHelp ?? '',
     assisted: extra.assisted ?? null,
-    oauth: extra.method === 'oauth' ? { scopes: extra.oauthScopes ?? [], redirectPath: oauthRedirect, register: ['An application registered in the platform’s developer console'], note: 'OAuth connections are coming next.' } : null,
+    oauth: extra.method === 'oauth' ? { scopes: extra.oauthScopes ?? [], redirectPath: oauthRedirect, register: ['An application registered in the platform’s developer console'], note: 'Uses the LinkedIn sign-in.' } : null,
     directoryOnly: extra.directoryOnly ?? false,
   };
 }
