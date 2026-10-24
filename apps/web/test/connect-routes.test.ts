@@ -26,6 +26,7 @@ import { sqlRows } from './helpers';
 import { createFakeProviders, json, type FakeProviders } from './helpers/fake-providers';
 
 const W = (...parts: string[]) => parts.join('-');
+const NOT_A_KEY = ['not', 'a', 'real', 'agent', 'value', '0123456789'].join('_');
 const API_KEY = W('fake', 'beehiiv', 'key', 'routes', '1a2b3c');
 const CLIENT_ID = W('fake', 'client', 'id', 'routes', '77');
 const CLIENT_SECRET = W('fake', 'client', 'secret', 'routes', '88');
@@ -58,7 +59,7 @@ beforeEach(async () => {
 
 const params = (platform: string) => ({ params: Promise.resolve({ platform }) });
 const bearer = (path: string, method = 'POST', payload?: unknown) =>
-  new Request(`${HOSTED_URL}${path}`, { method, headers: { host: new URL(HOSTED_URL).host, authorization: 'Bearer bos_not_a_real_agent_secret_0123456789', origin: HOSTED_URL, 'content-type': 'application/json' }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
+  new Request(`${HOSTED_URL}${path}`, { method, headers: { host: new URL(HOSTED_URL).host, authorization: `Bearer ${NOT_A_KEY}`, origin: HOSTED_URL, 'content-type': 'application/json' }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
 
 describe('the connection routes need a signed-in person', () => {
   it('answers 401 to every route without a session', async () => {
@@ -87,7 +88,7 @@ describe('the connection routes need a signed-in person', () => {
 
 describe('only the browser can connect: an agent credential or a foreign page cannot', () => {
   it('refuses a request that carries an Authorization header, on every route, even with a good session', async () => {
-    const withHeader = (method: string, path: string, payload?: unknown) => h.request(a, method, path, payload, { authorization: 'Bearer bos_not_a_real_agent_secret_0123456789' });
+    const withHeader = (method: string, path: string, payload?: unknown) => h.request(a, method, path, payload, { authorization: `Bearer ${NOT_A_KEY}` });
     const results = await Promise.all([
       handleConnectorsGet(withHeader('GET', '/api/connect'), deps),
       handleConnectFields(withHeader('POST', '/api/connect/beehiiv/fields', { fields: { apiKey: API_KEY } }), 'beehiiv', deps),

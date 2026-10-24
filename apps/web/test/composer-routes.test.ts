@@ -159,17 +159,18 @@ describe('the composer routes are private to each account', () => {
   });
 
   it('saved integration values are never returned, never reach an agent route, and are isolated and wiped by Remove', async () => {
-    const saved = await handleIntegrationSave(h.request(a, 'POST', '/api/integrations/ghost', { kind: 'api_key', secret: SAVED_VALUE }), 'ghost', deps);
+    const body = { kind: 'oauth_client', clientId: `${SAVED_VALUE}-id`, clientSecret: SAVED_VALUE };
+    const saved = await handleIntegrationSave(h.request(a, 'POST', '/api/integrations/x', body), 'x', deps);
     expect(saved.status).toBe(201);
     expect(JSON.stringify(await json(saved))).not.toContain(SAVED_VALUE);
     const listed = JSON.stringify(await json(await handleIntegrationsGet(h.request(a, 'GET', '/api/integrations'), deps)));
     expect(listed).not.toContain(SAVED_VALUE);
-    expect(listed).toContain(SAVED_VALUE.slice(-4));
+    expect(listed).toContain(`${SAVED_VALUE}-id`.slice(-4));
     const others = await json(await handleIntegrationsGet(h.request(b, 'GET', '/api/integrations'), deps));
     expect(others.integrations.every((i: Json) => i.saved.length === 0)).toBe(true);
-    expect((await handleIntegrationRemove(h.request(b, 'DELETE', '/api/integrations/ghost/api_key'), 'ghost', 'api_key', deps)).status).toBe(404);
-    expect((await handleIntegrationRemove(h.request(a, 'DELETE', '/api/integrations/ghost/api_key'), 'ghost', 'api_key', deps)).status).toBe(200);
-    expect((await json(await handleIntegrationsGet(h.request(a, 'GET', '/api/integrations'), deps))).integrations.find((i: Json) => i.platform === 'ghost').saved).toEqual([]);
+    expect((await handleIntegrationRemove(h.request(b, 'DELETE', '/api/integrations/x/oauth_client'), 'x', 'oauth_client', deps)).status).toBe(404);
+    expect((await handleIntegrationRemove(h.request(a, 'DELETE', '/api/integrations/x/oauth_client'), 'x', 'oauth_client', deps)).status).toBe(200);
+    expect((await json(await handleIntegrationsGet(h.request(a, 'GET', '/api/integrations'), deps))).integrations.find((i: Json) => i.platform === 'x').saved).toEqual([]);
   });
 });
 
