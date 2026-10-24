@@ -4,6 +4,7 @@ import type { AppConfig } from '../config';
 import type { UrlImportDeps } from '../import/url';
 import type { AppContext } from '../context';
 import { decryptKey, masterKey, SecretUnavailableError } from '../ai/crypto';
+import { unwrapSecret } from '../connect/bundle';
 import type { PlatformConnection } from '../db/schema';
 import { contentAdapter } from './adapters/content';
 import { DEVTO_DEFAULT_BASE, devtoAdapter } from './adapters/devto';
@@ -87,7 +88,7 @@ export class KeyUnreadableError extends Error {
 /** The key of a connection row in plain text. Throws KeyUnreadableError with a message that says what to do. */
 export function plainSecret(env: PublishEnv, row: Pick<PlatformConnection, 'id' | 'ownerId' | 'encryptedKey'>): string {
   try {
-    return decryptKey(row.encryptedKey, masterKey(env.config), row.ownerId, row.id);
+    return unwrapSecret(decryptKey(row.encryptedKey, masterKey(env.config), row.ownerId, row.id));
   } catch (err) {
     if (err instanceof SecretUnavailableError) throw new KeyUnreadableError(err.message);
     throw err;

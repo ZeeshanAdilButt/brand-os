@@ -9,6 +9,7 @@ import { scopedTasks } from './ai-tasks';
 import { scopedItems, scopedSources } from './knowledge';
 import { scopedIntegrationSecrets } from './integrations';
 import { scopedCanonicalChecks, scopedDestinations, scopedSiteSettings } from './composer';
+import { scopedConnectors } from './connect';
 import { scopedConnections, scopedPlatformDrafts } from './publishing';
 import { scopedPreferences, scopedProfile } from './profile';
 import { makeScope, type DbSource, type Scope } from './scope';
@@ -43,6 +44,7 @@ export function forOwner(ownerId: string, db?: AppDb) {
     providers: scopedProviders(scope),
     tasks: scopedTasks(scope),
     connections: scopedConnections(scope),
+    connectors: scopedConnectors(scope),
     platformDrafts: scopedPlatformDrafts(scope),
     destinations: scopedDestinations(scope),
     integrationSecrets: scopedIntegrationSecrets(scope),
