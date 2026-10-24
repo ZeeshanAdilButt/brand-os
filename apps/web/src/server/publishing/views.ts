@@ -29,6 +29,11 @@ export function toConnectionDTO(row: PublicConnection): ConnectionDTO {
     lastCheckedAt: iso(row.lastCheckedAt),
     lastCheckMessage: row.lastCheckMessage,
     createdAt: row.createdAt.toISOString(),
+    authKind: row.authKind,
+    scopesGranted: row.scopesGranted,
+    tokenExpiresAt: iso(row.tokenExpiresAt),
+    renewable: row.renewable,
+    lastErrorCode: row.lastErrorCode,
   };
 }
 

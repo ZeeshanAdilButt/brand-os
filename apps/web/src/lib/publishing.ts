@@ -5,6 +5,7 @@
  */
 
 import { PLATFORM_IDS, PLATFORMS, RECOMMENDED_ORDER, isPlatformId, isPublishable, isSyndication, type PlatformCapabilities, type PlatformId, type PlatformInfo } from './catalog';
+import type { ConnectorId } from './connectors/ids';
 import type { DraftExtras } from './site-export';
 
 export { PLATFORM_IDS, PLATFORMS, RECOMMENDED_ORDER, isPlatformId, isPublishable, isSyndication };
@@ -203,11 +204,13 @@ export interface ConnectionConfig {
   publicationTitle?: string;
   /** Everything the Hashnode token can publish to, so the person can choose. */
   publications?: { id: string; title: string }[];
+  /** Non-secret values entered for a connector (a handle, a site address, a repository). Secrets are never here. */
+  fields?: Record<string, string>;
 }
 
 export interface ConnectionDTO {
   id: string;
-  platform: PlatformId;
+  platform: ConnectorId;
   status: ConnectionStatus;
   /** Who the platform says the key belongs to. */
   who: string | null;
@@ -217,6 +220,16 @@ export interface ConnectionDTO {
   lastCheckedAt: string | null;
   lastCheckMessage: string | null;
   createdAt: string;
+  /** How it was connected (see AUTH_KINDS), or null for a connection made before the connector framework. */
+  authKind: string | null;
+  /** The scopes the platform said it granted. */
+  scopesGranted: string[];
+  /** When the access token stops working, if the platform says. */
+  tokenExpiresAt: string | null;
+  /** A refresh token is held, so an expired access token is renewed. */
+  renewable: boolean;
+  /** Short code for the last failed check, or null. */
+  lastErrorCode: string | null;
 }
 
 export interface AttemptDTO {

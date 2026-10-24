@@ -1,4 +1,4 @@
-import { PLATFORM_IDS, isPublishable } from '../../lib/catalog';
+import { PLATFORM_IDS, isPlatformId, isPublishable } from '../../lib/catalog';
 import type { PlatformId } from '../../lib/publishing';
 import type { AppConfig } from '../config';
 import type { UrlImportDeps } from '../import/url';
@@ -96,6 +96,7 @@ export function plainSecret(env: PublishEnv, row: Pick<PlatformConnection, 'id' 
 
 /** Everything an adapter call needs, with the key decrypted for this call only. */
 export function contextFor(env: PublishEnv, row: PlatformConnection, secret: string = plainSecret(env, row), site?: AdapterContext['site']): { adapter: PlatformAdapter; ctx: AdapterContext } {
+  if (!isPlatformId(row.platform)) throw new KeyUnreadableError('This connection is not one that publishes.');
   return contextWith(env, row.platform, row.config, secret, site);
 }
 

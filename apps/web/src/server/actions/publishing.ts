@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { PLATFORM_IDS, PLATFORMS, isPublishable, isSyndication } from '../../lib/catalog';
+import { PLATFORM_IDS, PLATFORMS, isPlatformId, isPublishable, isSyndication } from '../../lib/catalog';
 import {
   APPROVAL_TTL_MS,
   STAGEABLE_STATUSES,
@@ -159,6 +159,7 @@ export async function testConnection(owner: OwnerContext, env: PublishEnv, id: u
   const connectionId = parseId(id, 'Connection');
   const row = await owner.data.connections.getWithKey(connectionId);
   if (!row) throw new ActionError('not_found', 'Connection not found');
+  if (!isPlatformId(row.platform)) throw new ActionError('conflict', 'This connection is tested from the Integrations screen.', {}, { code: 'USE_CONNECT' });
   let secret: string;
   try {
     secret = plainSecret(env, row);

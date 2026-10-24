@@ -20,6 +20,11 @@ const connection = (platform: PlatformId = 'devto', over: Partial<ConnectionDTO>
   lastCheckedAt: '2026-10-21T10:00:00.000Z',
   lastCheckMessage: null,
   createdAt: '2026-10-21T09:00:00.000Z',
+  authKind: null,
+  scopesGranted: [],
+  tokenExpiresAt: null,
+  renewable: false,
+  lastErrorCode: null,
   ...over,
 });
 

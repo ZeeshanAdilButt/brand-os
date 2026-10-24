@@ -28,6 +28,7 @@ import {
   type PlatformDraft,
   type PublishAttempt,
 } from '../db/schema';
+import type { ConnectorId } from '../../lib/connectors/ids';
 import { sourceHashOf } from '../publishing/source';
 import { isUniqueViolation, NotFoundError, type Scope } from './scope';
 
@@ -46,6 +47,13 @@ function connectionColumns() {
     config: platformConnections.config,
     lastCheckedAt: platformConnections.lastCheckedAt,
     lastCheckMessage: platformConnections.lastCheckMessage,
+    authKind: platformConnections.authKind,
+    scopesGranted: platformConnections.scopesGranted,
+    tokenExpiresAt: platformConnections.tokenExpiresAt,
+    renewable: platformConnections.renewable,
+    lastErrorCode: platformConnections.lastErrorCode,
+    refreshGeneration: platformConnections.refreshGeneration,
+    refreshLockUntil: platformConnections.refreshLockUntil,
     createdAt: platformConnections.createdAt,
     updatedAt: platformConnections.updatedAt,
   };
@@ -77,7 +85,7 @@ export function scopedConnections(scope: Scope) {
       const [row] = await db.select(publicConnectionColumns).from(platformConnections).where(owned(id));
       return row ?? null;
     },
-    async getByPlatform(platform: PlatformId): Promise<PublicConnection | null> {
+    async getByPlatform(platform: ConnectorId): Promise<PublicConnection | null> {
       const db = await scope.db();
       const [row] = await db
         .select(publicConnectionColumns)

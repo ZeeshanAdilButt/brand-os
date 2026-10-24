@@ -20,6 +20,7 @@ import {
   type RemoteInfo,
   type TagReport,
 } from '../../lib/publishing';
+import { CONNECTOR_IDS } from '../../lib/connectors/ids';
 import { SITE_PRESETS, type SiteMapping } from '../../lib/site-export';
 import {
   CONFIDENCE_LEVELS,
@@ -520,7 +521,8 @@ export const platformConnections = pgTable(
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    platform: text('platform', { enum: PLATFORM_IDS }).notNull(),
+    /** Any directory entry that can be connected (see lib/connectors). The three with a publishing adapter keep a raw key. */
+    platform: text('platform', { enum: CONNECTOR_IDS }).notNull(),
     encryptedKey: text('encrypted_key').notNull(),
     keyLast4: text('key_last4').notNull(),
     status: text('status', { enum: CONNECTION_STATUSES }).notNull().default('unchecked'),
@@ -528,8 +530,23 @@ export const platformConnections = pgTable(
     who: text('who'),
     /** Non-secret settings found by the probe (the Hashnode publication). */
     config: jsonb('config').$type<ConnectionConfig>().notNull().default({}),
+    /** The last time a read-only check ran (success or not). */
     lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
     lastCheckMessage: text('last_check_message'),
+    /** How it was connected: a key, a sign-in, a device code... (see AUTH_KINDS). Null on rows made before the connector framework. */
+    authKind: text('auth_kind'),
+    /** The scopes the platform said it granted. Names only. */
+    scopesGranted: text('scopes_granted').array().notNull().default(sql`'{}'::text[]`),
+    /** When the access token stops working, if the platform says. */
+    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+    /** A refresh token is held (inside the encrypted bundle), so an expired access token is renewed rather than lost. */
+    renewable: boolean('renewable').notNull().default(false),
+    /** A short code for the last failed check: rejected, expired, unreachable, rate_limited... Never a message with a secret. */
+    lastErrorCode: text('last_error_code'),
+    /** Counts every token renewal. A renewal only wins if it saw the generation it started from. */
+    refreshGeneration: integer('refresh_generation').notNull().default(0),
+    /** A renewal in progress holds this lease, so two requests cannot both use a single-use refresh token. */
+    refreshLockUntil: timestamp('refresh_lock_until', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -760,3 +777,46 @@ export const integrationSecrets = pgTable(
 );
 
 export type IntegrationSecret = typeof integrationSecrets.$inferSelect;
+
+/**
+ * A sign-in in progress: an OAuth redirect waiting for its callback, or a device code waiting for the person to enter
+ * it. The state is kept only as a SHA-256 hash and is bound to the session that started it, single use and short lived.
+ * The PKCE verifier and the device code are AES-256-GCM ciphertext bound to this row, like every other secret.
+ */
+export const connectFlows = pgTable(
+  'connect_flows',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    platform: text('platform', { enum: CONNECTOR_IDS }).notNull(),
+    kind: text('kind', { enum: ['oauth', 'device'] }).notNull(),
+    /** SHA-256 of the state value sent to the platform. Null for a device flow. */
+    stateHash: text('state_hash'),
+    /** SHA-256 of the session id that started the flow. A callback from any other session is refused. */
+    sessionHash: text('session_hash').notNull(),
+    redirectUri: text('redirect_uri'),
+    codeVerifierEnc: text('code_verifier_enc'),
+    deviceCodeEnc: text('device_code_enc'),
+    userCode: text('user_code'),
+    verificationUri: text('verification_uri'),
+    intervalSec: integer('interval_sec'),
+    nextPollAt: timestamp('next_poll_at', { withTimezone: true }),
+    scopes: text('scopes').array().notNull().default(sql`'{}'::text[]`),
+    /** The person's own server for a per-instance platform (Mastodon). */
+    instance: text('instance'),
+    status: text('status', { enum: ['pending', 'used', 'cancelled', 'expired', 'failed'] })
+      .notNull()
+      .default('pending'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('connect_flows_owner_status_idx').on(table.ownerId, table.status, table.expiresAt),
+    uniqueIndex('connect_flows_owner_state_idx').on(table.ownerId, table.stateHash).where(sql`${table.stateHash} is not null`),
+  ],
+);
+
+export type ConnectFlow = typeof connectFlows.$inferSelect;
