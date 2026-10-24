@@ -32,6 +32,7 @@ apps/web/                 Next.js (App Router, TypeScript strict, Tailwind, shad
     ai/                   Provider adapters (OpenAI-compatible, Anthropic), key encryption, address rules, the context builder (privacy gate), result application, the event bus
     agent/                Agent key secrets and rate limits, and the views the agent API returns
     publishing/           Platform adapters (DEV.to, Hashnode), the shared request helper, lint, tag rules, hashes, the adapter registry and views
+    connect/              The connection framework: validators, OAuth with PKCE, device flow, renewal under a lease, sealed bundles
   drizzle/                Generated SQL migrations (one set, both drivers)
   seed/                   owner.private.json (gitignored, never committed): the private owner seed
   test/                   Vitest: db, health, tokens, hygiene, auth, isolation, search, seed, source rules
@@ -162,6 +163,21 @@ The catalog (`lib/catalog.ts`, 13 destinations) and the directory (`lib/director
 Screens: **Publishing** (`/publishing`) is one page with the article picker, the platform selector and live previews (`components/publish/workspace`); **Approve** (`/articles/<id>/publish`) is the one-at-a-time queue and the results; the **Composer** (`?view=composer`) is the expert view with the original, every destination and the checks side by side. All three drive the same hook, `usePublish`, which calls the same routes; none of them can approve more than one post (the approve route takes one approval id and only the ticked boxes). Pure logic lives in `lib`: `next-step` (the one next action, computed from real state), `recommend`, `publish-workspace` (article search, selectable rows, progress), `publish-queue`, `wizard-state`, `chips`, `commands`.
 
 The personal site goes through `adapters/github-site.ts`: base sha, target file, a new branch `brand-os/<slug>-<hash8>`, one committed file, one pull request; never the base branch, never a merge. The canonical check reuses the URL import fetcher (`publishing/canonical.ts`).
+
+### Connections: one framework for every platform
+
+`lib/connectors` holds one validated definition per directory entry (45) and the pure state function; `server/connect` holds what runs: `validators.ts` (one free read-only `validate()` per platform, with an injected `fetch`), `oauth.ts` (authorization code with PKCE, the token endpoint, renewal), `device.ts` (the code sign-in), `tokens.ts` (renewal under a lease), `bundle.ts` (what a connection stores, sealed like every other key), `request.ts` (the shared request rules) and `env.ts` (the seams tests replace: network, clock, limits, randomness). `actions/connect.ts` is the only caller, and only for the signed-in owner; `http/connect-handlers.ts` and `app/api/connect/*` are the browser routes.
+
+```
+Connect drawer -> POST /api/connect/<id>/fields   -> validate() -> sealed bundle in platform_connections
+               -> POST /api/connect/<id>/start    -> connect_flows (state hash, session hash, sealed verifier) -> platform
+platform       -> GET  /api/connect/<id>/callback -> spend state once -> exchange code -> validate() -> sealed bundle
+               -> POST /api/connect/<id>/device   -> connect_flows (sealed device code) ... poll at the platform's interval
+Test           -> renew under a lease if needed   -> validate() -> status, who, error code, last checked
+Disconnect     -> official revoke where one exists -> delete the stored secret
+```
+
+Connections and the publishing adapters share `platform_connections`; the three with an adapter keep a plain sealed key, every other connector a sealed bundle (decisions 49 to 53). The OAuth app is the owner's own (`integration_secrets`, kinds `oauth_client` and `device_client`) or, hosted, Brand OS's from the environment. A `connect_flows` row exists only while a sign-in is in progress. Nothing here is reachable from the agent API, an agent key or an MCP tool.
 
 ## Phase 0 and the new stack (two stores)
 

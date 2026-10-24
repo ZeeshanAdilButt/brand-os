@@ -1,6 +1,6 @@
 # Integrations reference
 
-Verified capability reference for the publishing adapters and AI/MCP connections. All facts were checked against vendor pages on **2026-10-21** ("as checked 2026-10-21"). Anything not confirmed on an official source is marked **UNVERIFIED**. Vendor behavior changes fast: re-check before relying on a row, especially Hashnode and Medium.
+Verified capability reference for the publishing adapters and AI/MCP connections. All facts were checked against vendor pages on **2026-10-21** ("as checked 2026-10-21"); section 9, the connection framework, was checked on **2026-10-24**. Anything not confirmed on an official source is marked **UNVERIFIED**. Vendor behavior changes fast: re-check before relying on a row, especially Hashnode and Medium.
 
 This repo is public. Never commit credentials. All examples use placeholders such as `<your-token>`.
 
@@ -455,6 +455,110 @@ Authenticated requests are limited to 5,000 an hour for a personal key (the resp
 - A file path is validated (no `..`, no leading slash, no `.git` segment) and encoded segment by segment.
 - Large files go through the Contents API only up to 1 MB with the default media type; an article is far smaller.
 
+## 9. Connecting platforms: one framework, one registry
+
+Every entry in the platform directory (45) has one definition in `apps/web/src/lib/connectors`, parsed with a Zod schema when the app loads. A definition says how the platform is connected, what the person must supply, the ordered steps with a deep link to the platform's own page, the least access to ask for and why, the one free read-only request that checks the connection, how long a token lasts and how it is renewed, how to take the access away and which states it can show. The server half, `validate()` for each platform, lives in `apps/web/src/server/connect/validators.ts` and takes an injected `fetch`; a test compares the request each one makes with the one its definition describes. Sources were read on each platform's own documentation on **2026-10-24** unless a row says otherwise. Nothing in this section has been tried against a real account: every connector was exercised only against fake servers, so the first live check is the owner's.
+
+### Connection kinds
+
+| Kind | Used by | What the person does |
+|---|---|---|
+| `api_key` | DEV.to, Hashnode, Beehiiv, Buttondown, Product Hunt, Buffer, Postiz | Creates a key on the platform and pastes it |
+| `token_with_scopes` | Personal site, GitHub Releases | Creates a fine-grained GitHub token limited to one repository |
+| `site_credentials` | Ghost, WordPress | Gives their own site address and its credentials |
+| `app_password` | Bluesky | Gives a handle and an app password |
+| `webhook_url` | Discord, Slack | Pastes a webhook address for one channel |
+| `oauth2_code_pkce` | LinkedIn, X, Threads, Mastodon, YouTube (LinkedIn video shares the LinkedIn sign-in) | Registers their own app once, then signs in |
+| `device_flow` | Personal site (GitHub), YouTube, as an alternative to the above | Types a short code on the platform's own page |
+| `manual_only` | Medium, Substack, Reddit, Hacker News, Lobsters, Show HN, other video, nine conference sites, six editorial publications, npm, PyPI, crates.io | Nothing to connect: the app prepares it and the person posts it |
+| `bot_token` | none | Defined in the schema for a chat bot token; no catalog entry uses it (Telegram is not in the catalog) |
+
+### The states
+
+`Connected`, `Needs key`, `Needs reconnect`, `Set up`, `Manual` and `Planned`, computed from facts the server already has (the last check, the token's expiry date, whether the app exists) by `connectionState` in `lib/connectors/state.ts`. A failed check because the platform could not be reached keeps `Connected` with a quiet note; only a refusal (key revoked, token expired, grant lost) becomes `Needs reconnect`. A token with no renewal that expires within seven days shows `Connected` with a Reconnect prompt. An unverified connector shows `Set up` whatever is stored and sends nothing.
+
+### Per platform
+
+The table is generated from the registry. "Verified" means the endpoint and the request were read on the platform's documentation; UNVERIFIED notes are listed in each definition and shown in the drawer under "What was checked".
+
+| Platform | Connection method | Scopes asked (least privilege) | Endpoints used | Verified | Status in the app |
+|---|---|---|---|---|---|
+| DEV.to (`devto`) | API key | Your own account | GET dev.to/api/users/me | Yes, with 1 UNVERIFIED note | Connectable |
+| Hashnode (`hashnode`) | API key | Your own account | POST gql-beta.hashnode.com/ | Yes, with 1 UNVERIFIED note | Connectable |
+| Personal site (`site`) | Token with limited access (or device code) | Contents: read and write, Pull requests: read and write, Metadata: read | GET api.github.com/repos/{repo}; token github.com/login/oauth/access_token; device github.com/login/device/code | Yes, with 1 UNVERIFIED note | Connectable |
+| Medium (`medium`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| Substack (`substack`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| LinkedIn (`linkedin`) | Sign in with the platform (OAuth) | openid, profile, w_member_social (optional) | GET api.linkedin.com/v2/userinfo; authorize www.linkedin.com/oauth/v2/authorization; token www.linkedin.com/oauth/v2/accessToken | Yes, with 4 UNVERIFIED notes | Connectable |
+| X (`x`) | Sign in with the platform (OAuth) | users.read, tweet.read, offline.access, tweet.write (optional), media.write (optional) | GET api.x.com/2/users/me; authorize x.com/i/oauth2/authorize; token api.x.com/2/oauth2/token | Yes, with 3 UNVERIFIED notes | Connectable |
+| Bluesky (`bluesky`) | App password | App password | POST bsky.social/xrpc/com.atproto.server.createSession | Yes, with 3 UNVERIFIED notes | Connectable |
+| Threads (`threads`) | Sign in with the platform (OAuth) | threads_basic, threads_content_publish (optional) | GET graph.threads.com/me?fields=id,username; authorize threads.com/oauth/authorize; token graph.threads.com/oauth/access_token | Yes, with 3 UNVERIFIED notes | Connectable |
+| Mastodon (`mastodon`) | Sign in with the platform (OAuth) | read:accounts, write:statuses (optional), write:media (optional) | POST {instance}/api/v1/apps; authorize {instance}/oauth/authorize; token {instance}/oauth/token; GET {instance}/api/v1/accounts/verify_credentials; revoke {instance}/oauth/revoke | Yes, with 1 UNVERIFIED note | Connectable |
+| Reddit (`reddit`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| Hacker News (`hackernews`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| YouTube (`youtube`) | Sign in with the platform (OAuth) (or device code) | youtube.readonly, youtube.upload (optional) | GET www.googleapis.com/youtube/v3/channels?part=snippet&mine=true; authorize accounts.google.com/o/oauth2/v2/auth; token oauth2.googleapis.com/token; device oauth2.googleapis.com/device/code; revoke oauth2.googleapis.com/revoke | Yes, with 3 UNVERIFIED notes | Connectable |
+| Ghost (`ghost`) | Your site and its credentials | Admin API | GET {siteUrl}/ghost/api/admin/posts/?limit=1 | Yes, with 1 UNVERIFIED note | Connectable |
+| WordPress (`wordpress`) | Your site and its credentials | The permissions of that user | GET {siteUrl}/wp-json/wp/v2/users/me?context=edit | Yes, with 2 UNVERIFIED notes | Connectable |
+| Beehiiv (`beehiiv`) | API key | publications:read | GET api.beehiiv.com/v2/publications | Yes, with 1 UNVERIFIED note | Connectable |
+| Buttondown (`buttondown`) | API key | Your own account | GET api.buttondown.com/v1/newsletters | UNVERIFIED | Set up needed (not connectable) |
+| Lobsters (`lobsters`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| Discord communities (`discord`) | Webhook address | Post to one channel | GET {webhookUrl} | Yes, with 1 UNVERIFIED note | Connectable |
+| Slack communities (`slack`) | Webhook address | incoming-webhook | POST none: the address is checked for its shape and no request is sent | UNVERIFIED | Set up needed (not connectable) |
+| LinkedIn video (`linkedin_video`) | Sign in with the platform (OAuth) (uses the linkedin sign-in) | w_member_social | GET api.linkedin.com/v2/userinfo | Yes, with 1 UNVERIFIED note | Connectable |
+| Other video platforms (`video_other`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| Sessionize (`sessionize`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| PaperCall (`papercall`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| KubeCon + CloudNativeCon (`kubecon`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| SREcon (`srecon`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| FOSDEM (`fosdem`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| DevOpsDays (`devopsdays`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| PlatformCon (`platformcon`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| GopherCon (`gophercon`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| PostgreSQL conferences (`postgres_conferences`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| InfoQ (`infoq`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| CNCF Blog (`cncf_blog`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| DZone (`dzone`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| freeCodeCamp News (`freecodecamp`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| Linux Foundation publications (`lf_publications`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| Technical newsletters (`newsletters`) | Manual only | none | none | Reason UNVERIFIED | Planned (directory only) |
+| GitHub Releases (`github_releases`) | Token with limited access | Contents: read and write, Metadata: read | GET api.github.com/repos/{repo} | Yes, with 1 UNVERIFIED note | Connectable |
+| Product Hunt (`product_hunt`) | API key | public | POST api.producthunt.com/v2/api/graphql | UNVERIFIED | Set up needed (not connectable) |
+| Show HN (`show_hn`) | Manual only | none | none | Reason read on an official page | Manual |
+| npm registry (`npm`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| PyPI (`pypi`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| crates.io (`crates`) | Manual only | none | none | Reason UNVERIFIED | Manual |
+| Buffer (`buffer`) | API key | Your own account | POST api.buffer.com | Yes, with 2 UNVERIFIED notes | Connectable |
+| Postiz (`postiz`) | API key | Your own workspace | GET {baseUrl}/integrations | Yes, with 2 UNVERIFIED notes | Connectable |
+
+### Sign-in details read from the documentation
+
+| Platform | PKCE | App authentication | Token lifetime and renewal |
+|---|---|---|---|
+| X | S256 sent | HTTP Basic for the confidential client (the header scheme is not named on the page: UNVERIFIED) | 2 hours, refresh token (`offline.access`); a returned refresh token replaces the old one in the same step |
+| LinkedIn | Not documented, so none is sent | client secret in the body | 60 days, no programmatic refresh for a self-serve app: reconnect by signing in again |
+| Threads | Not documented, so none is sent | client secret in the body | 1 hour, traded for a 60 day token, renewed with `th_refresh_token` once it is a day old |
+| Mastodon | S256 sent (Mastodon 4.3 and later; ignored by older servers) | client secret in the body | no expiry; revoked with `POST /oauth/revoke` on Disconnect |
+| YouTube | S256 sent | client secret in the body (Google marks it optional for desktop clients) | 1 hour, refresh token that does not change; revoked with `POST /revoke` on Disconnect; a consent screen left in Testing expires refresh tokens after 7 days |
+| GitHub (device code) | not applicable | client id only | an OAuth app token does not expire unless the app opts in |
+| YouTube (device code) | not applicable | client id and secret when polling | read-only YouTube scopes only: Google does not allow `youtube.upload` for a limited-input device |
+
+### What the owner has to do
+
+- **OAuth platforms (LinkedIn, X, Threads, YouTube):** register an app on the platform, paste its client ID and secret into the drawer, and add the exact redirect address the drawer shows. Locally that address is `http://127.0.0.1:<port>/api/connect/<platform>/callback`. LinkedIn asks for an https redirect address and does not say whether http://127.0.0.1 is accepted (UNVERIFIED); Threads documents no rule either way.
+- **Mastodon:** nothing to register. The app calls `POST /api/v1/apps` on the instance, which needs no sign-in, and keeps the client it receives encrypted.
+- **Key platforms:** create the key on the platform's own page (the drawer links to it) and paste it.
+- **Hosted deployments:** set `BRAND_OS_OAUTH_<ID>_CLIENT_ID` and `BRAND_OS_OAUTH_<ID>_CLIENT_SECRET` (and `BRAND_OS_DEVICE_<ID>_...` for a device client) to use Brand OS's own app for a platform, with `<ID>` the upper-case platform id, for example `LINKEDIN`. Only `server/connect/oauth.ts` reads them, and only in hosted mode.
+
+### Not connectable, and why
+
+- **Buttondown:** the header is documented (`Authorization: Token <key>`) but the pages read do not name the API host, so no request is made. UNVERIFIED.
+- **Product Hunt:** a developer token is documented, but the query that returns the token's owner was not on the page read. The API is read-only by default, so launching stays manual. UNVERIFIED.
+- **Slack:** an incoming webhook cannot be checked without posting a message, and the app will not post one to test a connection. UNVERIFIED by design.
+- **Medium, Substack, Reddit, Hacker News, Lobsters and the rest:** no API, no new tokens or no self-serve access. Each definition gives the reason and the manual path. A conference or publication entry shows `Planned` because it is directory only until its roadmap phase.
+
+### Security rules the framework enforces
+
+Secrets are AES-256-GCM ciphertext bound to the owner and the row; tokens are never in a URL, log, error message, MCP result or the agent API; the agent API, MCP tools and agent keys cannot connect, test, refresh or disconnect anything (tests read the route files, the handlers, the key scopes and the MCP tool list); connecting, testing and disconnecting need a signed-in browser session, with the Origin check and a refusal of any request that carries an Authorization header; the sign-in state is random, stored only as a hash, bound to the session that started it, single use and expires after 10 minutes; a token renewal runs under a lease on the connection row so a single-use refresh token is never spent twice; Test and Connect are rate limited per owner and platform (in memory, per process: a multi-instance deployment needs a shared store, Day 27).
+
 ## Open risks and UNVERIFIED items
 
 1. **Hashnode host and Pro scope are moving.** `gql.hashnode.com` now redirects; `gql-beta.hashnode.com` is the official skill's target. The announcement says all API requests need Pro; the skill README says public reads are free. Keep host, and "needs Pro" detection (`FORBIDDEN` message), configurable. Re-introspect the schema on connect.
@@ -480,3 +584,12 @@ Authenticated requests are limited to 5,000 an hour for a personal key (the resp
 
 21. **Day 6, GitHub.** Every call in section 8 is written from the documentation and exercised only against a local fake. No real repository was touched. UNVERIFIED against GitHub itself: the exact message of a 403 for a missing permission (the adapter matches on wording and on the status), the 422 body for "no commits between branches", and `maintainer_can_modify: false` on a repository the key owns.
 22. **Day 6, platform facts for the preview and manual handoff.** Limits quoted in the catalog (character counts for X, Bluesky, Threads, Mastodon and LinkedIn, tag limits, title limits for Hacker News and Reddit, the 150 requests a day for LinkedIn) come from each platform's public documentation as of 2026-10-22 and are shown as approximations. Reddit's self-promotion rules, Hacker News's submission guidelines and Substack's lack of a canonical field are rules of the platforms that can change. Previews are approximate and say so; none claims to be a pixel copy.
+
+23. **Connections, every platform.** No connector has been tried against a real account. Each `validate()` was written from the platform's own documentation and exercised only against a fake server, so the first live check is the owner's (their own keys and their own app registrations).
+24. **Connections, redirect addresses.** LinkedIn documents an https redirect address and does not say whether `http://127.0.0.1` is accepted; Threads documents no rule. A local install may need an https address in front of the app for those two. The Google desktop client page does not describe the path part of a loopback redirect address.
+25. **Connections, X.** The header scheme for a confidential client at the token endpoint is not named on the page read (the app uses HTTP Basic), whether the refresh token changes on each use is not stated (the app stores a new one whenever X returns one), no revoke endpoint was found, and each Test reads the owner's own account, which X lists as a paid read.
+26. **Connections, Bluesky.** The createSession shape comes from the AT Protocol lexicon through a search result; the old docs.bsky.app pages now redirect. Whether app passwords are still offered in late 2026 is not stated on a page read. Only the default host bsky.social is used.
+27. **Connections, Threads.** The token is sent as the `access_token` query parameter because that is the form the documentation shows; the request is made from the server only and its address is never logged. A token left 60 days without a renewal expires for good.
+28. **Connections, YouTube.** The channels.list page read does not name the scopes that allow `mine=true`; `youtube.readonly` is the standard read scope. Google allows only `youtube` and `youtube.readonly` for a limited-input device, so uploading needs the redirect sign-in and a second consent when the video pipeline exists.
+29. **Connections, GitHub.** The device code flow needs an OAuth app, whose `repo` scope covers every repository the person can access, so the fine-grained token stays the recommended way. Whether a GitHub App user token (limitable to one repository) can use the same device flow was not re-read.
+30. **Connections, unconfirmed.** Buttondown (API host), Product Hunt (the viewer query) and Slack (no read-only check) stay at Set up. Beehiiv's plan requirements, Postiz's self-hosted API path, Ghost's `/site/` fields, WordPress.com sign-in and Discord's webhook rate limits were not on the pages read.
