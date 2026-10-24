@@ -213,6 +213,18 @@ describe('testing a connection', () => {
     expect((await testConnector(owner, env, 'beehiiv')).view.state).toBe('connected');
   });
 
+  it('a passing check from the older connection routes clears the failure code too, so the two never disagree', async () => {
+    beehivReplies();
+    await connectWithFields(owner, env, 'beehiiv', { fields: { apiKey: API_KEY } });
+    fake.on('GET', 'https://api.beehiiv.com/v2/publications', { status: 401, body: {} });
+    const refused = await testConnector(owner, env, 'beehiiv');
+    expect(refused.view.state).toBe('needs_reconnect');
+    await owner.data.connections.recordCheck(refused.view.connection!.id, { status: 'connected', who: 'The Notes', message: null });
+    const after = (await listConnectors(owner, env)).find((v) => v.id === 'beehiiv')!;
+    expect(after.connection?.lastErrorCode).toBeNull();
+    expect(after.state).toBe('connected');
+  });
+
   it('is limited per owner and platform', async () => {
     beehivReplies();
     await connectWithFields(owner, env, 'beehiiv', { fields: { apiKey: API_KEY } });

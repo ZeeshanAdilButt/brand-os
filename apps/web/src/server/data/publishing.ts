@@ -127,6 +127,7 @@ export function scopedConnections(scope: Scope) {
             config: input.config,
             lastCheckedAt: now,
             lastCheckMessage: input.message,
+            lastErrorCode: null,
             updatedAt: now,
           },
         })
@@ -143,6 +144,8 @@ export function scopedConnections(scope: Scope) {
           status: check.status,
           ...(check.who === undefined ? {} : { who: check.who }),
           ...(check.config === undefined ? {} : { config: check.config }),
+          // A passing check clears the last failure code the connection framework keeps (Needs reconnect).
+          ...(check.status === 'connected' ? { lastErrorCode: null } : {}),
           lastCheckedAt: now,
           lastCheckMessage: check.message ? check.message.slice(0, 500) : null,
           updatedAt: now,
