@@ -37,8 +37,8 @@ export async function requestDeviceCode(env: ConnectEnv, def: ConnectorDefinitio
   const userCode = typeof parsed.user_code === 'string' ? parsed.user_code : null;
   const verification = [parsed.verification_uri, parsed.verification_url].find((v): v is string => typeof v === 'string');
   if (!deviceCode || !userCode || !verification) throw new ConnectFailure('unexpected', `${def.name} answered the request for a code with something this app could not read.`);
-  // The page the person is sent to must be a plain https address: it becomes a link in the drawer.
-  if (!/^https:\/\/[^\s]+$/.test(verification)) throw new ConnectFailure('unexpected', `${def.name} answered with a verification address this app will not open.`);
+  // The page the person is sent to must be a plain https address (or one on this machine, for a local fake): it becomes a link in the drawer.
+  if (!/^(https:\/\/[^\s]+|http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/[^\s]*)$/.test(verification)) throw new ConnectFailure('unexpected', `${def.name} answered with a verification address this app will not open.`);
   if (!/^[A-Za-z0-9 _-]{4,20}$/.test(userCode)) throw new ConnectFailure('unexpected', `${def.name} answered with a code this app could not read.`);
   const expires = Number(parsed.expires_in);
   const interval = Number(parsed.interval);

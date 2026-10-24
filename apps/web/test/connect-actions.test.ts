@@ -700,6 +700,17 @@ describe('sign in with a code (device flow)', () => {
     await expect(startDevice(owner, env, 'site')).rejects.toMatchObject({ code: 'invalid', message: expect.stringMatching(/Turn on the device flow/) });
   });
 
+  it('refuses a verification address that is not plain https (it becomes a link), and a code that is not a code', async () => {
+    await saveApp(owner, 'site', 'device_client', false);
+    for (const uri of ['javascript:alert(1)', 'http://evil.example.test/device', 'https://exa mple.test/device']) {
+      fake.on('POST', `${GH}/login/device/code`, { body: { device_code: 'd'.repeat(20), user_code: 'ABCD-1234', verification_uri: uri, expires_in: 900, interval: 5 } });
+      await expect(startDevice(owner, env, 'site'), uri).rejects.toMatchObject({ code: 'unavailable' });
+    }
+    fake.on('POST', `${GH}/login/device/code`, { body: { device_code: 'd'.repeat(20), user_code: '<script>', verification_uri: `${GH}/login/device`, expires_in: 900, interval: 5 } });
+    await expect(startDevice(owner, env, 'site')).rejects.toMatchObject({ code: 'unavailable' });
+    expect(await flowRows(A)).toEqual([]);
+  });
+
   it('Google needs the secret when polling, offers only the read-only YouTube scope, and revokes on Disconnect', async () => {
     await saveApp(owner, 'youtube', 'device_client', true);
     fake.on('POST', 'https://oauth2.googleapis.com/device/code', { body: { device_code: W('fake', 'google', 'device', '1'), user_code: 'ABCD-EFGH', verification_url: 'https://www.google.com/device', expires_in: 1800, interval: 5 } });

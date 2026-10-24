@@ -43,14 +43,14 @@ function Row({ view, onOpen }: { view: ConnectorViewDTO; onOpen(id: string): voi
   const Icon = area.icon;
   const primary = view.state === 'needs_key' || view.state === 'needs_reconnect';
   return (
-    <li id={entry.id} className="scroll-mt-24 rounded-xl border bg-surface">
+    <li id={entry.id} className="scroll-mt-24 min-w-0 rounded-xl border bg-surface">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
         <button type="button" onClick={() => onOpen(view.id)} className="flex min-w-0 flex-1 basis-56 items-center gap-3 rounded-lg text-left" aria-label={`${ACTION_LABEL[view.state]}: ${entry.name}`}>
           <span aria-hidden className={cn('grid size-9 shrink-0 place-items-center rounded-lg bg-muted', area.text)}>
             <Icon className="size-4" />
           </span>
-          <span className="min-w-0">
-            <span className="block truncate text-base leading-6 font-semibold">{entry.name}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base leading-6 font-semibold break-words">{entry.name}</span>
             <span className="block text-xs leading-5 text-muted-foreground">
               {AUTH_KIND_LABELS[def.kind]}
               {view.connection?.who ? ` · ${view.connection.who}` : ''}

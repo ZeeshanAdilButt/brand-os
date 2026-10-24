@@ -229,7 +229,7 @@ function Body({ def, view, site, result, onClose, onView, onOpen, next }: Drawer
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {notice ? (
-          <div className="px-5 pt-4 sm:px-6">
+          <div className="sticky top-0 z-10 bg-popover px-5 pt-4 pb-3 sm:px-6">
             <FormNotice tone={notice.tone}>{notice.text}</FormNotice>
             {notice.tone === 'success' && next && view.state === 'connected' ? (
               <Button type="button" className="mt-3" onClick={() => onOpen(next.id)}>
@@ -382,7 +382,7 @@ function Body({ def, view, site, result, onClose, onView, onOpen, next }: Drawer
               {view.legacyKeyHint ? (
                 <p className="text-xs leading-5 text-muted-foreground">
                   A key saved earlier (ends in {view.legacyKeyHint}) is replaced when this connects.{' '}
-                  <button type="button" className="font-medium text-link hover:underline" onClick={() => void removeApp('api_key')}>
+                  <button type="button" className="inline-flex min-h-10 items-center px-1 font-medium text-link hover:underline" onClick={() => void removeApp('api_key')}>
                     Remove it now
                   </button>
                 </p>
@@ -402,7 +402,7 @@ function Body({ def, view, site, result, onClose, onView, onOpen, next }: Drawer
                     {view.app.saved ? (
                       <Callout tone="good">
                         App saved (client ID ends in <span className="font-mono">{view.app.hint}</span>).{' '}
-                        <button type="button" className="font-medium text-link hover:underline" disabled={busy === 'remove-app'} onClick={() => void removeApp('oauth_client')}>
+                        <button type="button" className="inline-flex min-h-10 items-center px-1 font-medium text-link hover:underline" disabled={busy === 'remove-app'} onClick={() => void removeApp('oauth_client')}>
                           Remove
                         </button>
                       </Callout>
@@ -414,7 +414,7 @@ function Body({ def, view, site, result, onClose, onView, onOpen, next }: Drawer
                         <p className="text-sm font-medium">Redirect address to register</p>
                         <div className="flex flex-wrap items-center gap-2">
                           <code className="min-w-0 flex-1 rounded-md bg-muted px-2 py-2 font-mono text-xs break-all">{view.redirectUri}</code>
-                          <CopyButton text={view.redirectUri} />
+                          <CopyButton text={view.redirectUri} size="default" />
                         </div>
                         <p className="text-xs leading-5 text-muted-foreground">{def.oauth.redirectNote}</p>
                       </div>
@@ -478,7 +478,7 @@ function Body({ def, view, site, result, onClose, onView, onOpen, next }: Drawer
                 {view.deviceApp.saved && view.deviceApp.source === 'saved' ? (
                   <Callout tone="good">
                     Device client saved (ends in <span className="font-mono">{view.deviceApp.hint}</span>).{' '}
-                    <button type="button" className="font-medium text-link hover:underline" onClick={() => void removeApp('device_client')}>
+                    <button type="button" className="inline-flex min-h-10 items-center px-1 font-medium text-link hover:underline" onClick={() => void removeApp('device_client')}>
                       Remove
                     </button>
                   </Callout>
@@ -526,7 +526,7 @@ function Body({ def, view, site, result, onClose, onView, onOpen, next }: Drawer
           <Fold title="Show the setup guide">
             <Textarea readOnly value={guide} rows={12} aria-label={`Setup guide for ${def.name}`} className="font-mono text-xs leading-5" />
             <div className="flex flex-wrap items-center gap-2">
-              <CopyButton text={guide} label="Copy the guide" />
+              <CopyButton text={guide} label="Copy the guide" size="default" />
             </div>
             <p className="text-xs leading-5 text-muted-foreground">The guide lists steps only. You type every secret yourself in the fields here: nothing sensitive goes through chat or an agent.</p>
           </Fold>
@@ -555,7 +555,7 @@ function Body({ def, view, site, result, onClose, onView, onOpen, next }: Drawer
             <ul className="grid gap-1 pl-4">
               {def.verification.sources.map((s) => (
                 <li key={s} className="list-disc break-all">
-                  <a href={s} target="_blank" rel="noreferrer noopener" className="text-link hover:underline">
+                  <a href={s} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-10 items-center text-link hover:underline">
                     {s}
                   </a>
                 </li>
@@ -655,7 +655,7 @@ function DeviceCode({ device, id, onView, onNotice, onCancel }: { device: NonNul
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <PlatformLink href={device.verificationUri}>Open {new URL(device.verificationUri).host}</PlatformLink>
-        <CopyButton text={device.userCode} label="Copy the code" />
+        <CopyButton text={device.userCode} label="Copy the code" size="default" />
       </div>
       <p className="text-xs leading-5 text-muted-foreground" aria-live="polite">
         Waiting for you{left !== null ? `. The code lasts ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} more` : ''}.
