@@ -151,6 +151,16 @@ Use the owner's own local coding agent CLI (for example Codex) to improve wordin
 - [ ] Output is a reviewable diff, never auto-applied and never auto-published; no secrets are passed to it
 - [ ] Reserve the seam in the Day 4 provider interface; build the adapter once the interface is stable
 
+## Phase 9: Images, visuals and interactive blocks (after Day 7, alongside Phase 5)
+Write a visual once and give every platform the best version it can show. No AI needed for the default path.
+- [ ] Template cards: cover and social images drawn locally from title, tag and the brand mark, in a few Field Notes styles, cropped per platform and shown in each preview
+- [ ] Bring your own image: file or URL, cropped per platform, with the crop visible in the preview
+- [ ] Diagram blocks from text (Mermaid) and chart blocks from a small data table, rendered to SVG and PNG in the brand colors
+- [ ] Portable block with fallbacks: interactive on the owner's site, embed link where a platform supports embeds, static image, GIF or MP4 elsewhere; each preview says which version it gets and a heads-up check appears when interactivity is lost
+- [ ] Hosting rule: site posts commit the image in the same pull request; platforms that need a public URL use the owner's site or a bucket the owner picks; Brand OS does not host images itself
+- [ ] Verify each platform's current embed and media rules first and record them in INTEGRATIONS.md
+- [ ] Optional AI images through the existing providers, returned as a suggestion in the AI task inbox, never auto-applied, privacy gate applies
+
 ## Standing rules
 - Vertical slices. Finish one real workflow before starting ten.
 - Public actions (publish, email, submit) need explicit per-action approval; every publish goes through an approval gate (the Phase 0 daemon, or the web app's approval model).
