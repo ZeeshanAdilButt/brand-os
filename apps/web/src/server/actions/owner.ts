@@ -12,10 +12,15 @@ export interface OwnerContext {
   readonly ownerId: string;
   readonly actor: 'owner' | 'agent' | 'ai';
   readonly data: OwnerData;
+  /**
+   * The id of the browser session this came from ('local' in local mode, 'none' when there is no session, as for an agent
+   * credential). A sign-in with a platform is bound to it, so a callback from any other session is refused.
+   */
+  readonly sessionId: string;
 }
 
-export function sessionToOwner(user: Pick<SessionUser, 'userId'>, ctx: Pick<AppContext, 'db'>, actor: OwnerContext['actor'] = 'owner'): OwnerContext {
-  return { ownerId: user.userId, actor, data: forOwner(user.userId, ctx.db) };
+export function sessionToOwner(user: Pick<SessionUser, 'userId'> & { sessionId?: string | null }, ctx: Pick<AppContext, 'db'>, actor: OwnerContext['actor'] = 'owner'): OwnerContext {
+  return { ownerId: user.userId, actor, data: forOwner(user.userId, ctx.db), sessionId: user.sessionId ?? 'none' };
 }
 
 /** HTTP status for each kind of action failure. 'limit' is a usage cap the person set; 'unavailable' means a needed setup is missing. */

@@ -1,3 +1,4 @@
+import { connectorFor, hasDeviceFlow, isOAuthConnector } from './connectors';
 import { PLATFORMS, PLATFORM_IDS, publishingState, type PlatformId, type PublishingState } from './catalog';
 
 /**
@@ -596,12 +597,18 @@ export function redirectUrl(entry: DirectoryEntry, appUrl: string): string | nul
   return entry.oauth ? `${appUrl.replace(/\/$/, '')}${entry.oauth.redirectPath}` : null;
 }
 
-/** What kind of secret the Setup card collects for an entry that has no working adapter yet. */
-export type SecretKind = 'api_key' | 'oauth_client';
+/**
+ * What the person saves ahead of connecting: their own OAuth app (`oauth_client`, for the redirect sign-in), their own
+ * device-flow client (`device_client`), or, on a row saved before the connection framework existed, a bare key
+ * (`api_key`, which is no longer accepted: connect the platform instead).
+ */
+export type SecretKind = 'api_key' | 'oauth_client' | 'device_client';
 
 export function setupKinds(entry: DirectoryEntry): SecretKind[] {
-  if (entry.adapter) return [];
-  if (entry.method === 'oauth') return ['oauth_client'];
-  if (entry.method === 'api_key' || entry.method === 'browser_assisted') return ['api_key'];
-  return [];
+  const def = connectorFor(entry.id);
+  if (!def) return [];
+  const kinds: SecretKind[] = [];
+  if (isOAuthConnector(def) && !def.oauth?.perInstance) kinds.push('oauth_client');
+  if (hasDeviceFlow(def)) kinds.push('device_client');
+  return kinds;
 }

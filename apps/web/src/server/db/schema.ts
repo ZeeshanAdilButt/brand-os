@@ -767,7 +767,7 @@ export const integrationSecrets = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     /** An id from the platform directory. */
     platform: text('platform').notNull(),
-    kind: text('kind', { enum: ['api_key', 'oauth_client'] }).notNull(),
+    kind: text('kind', { enum: ['api_key', 'oauth_client', 'device_client'] }).notNull(),
     encrypted: text('encrypted').notNull(),
     hint: text('hint').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
