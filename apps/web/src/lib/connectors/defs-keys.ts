@@ -124,7 +124,7 @@ export const KEY_DEFINITIONS: ConnectorDefinition[] = [
       { name: 'Pull requests: read and write', reason: 'To open the pull request and to look for it later.', required: true },
       { name: 'Metadata: read', reason: 'GitHub adds this to every token. It lets the check read the repository.', required: true },
     ],
-    endpoints: { api: 'https://api.github.com' },
+    endpoints: { api: 'https://api.github.com', device: 'https://github.com/login/device/code', token: 'https://github.com/login/oauth/access_token' },
     validation: { method: 'GET', url: 'https://api.github.com/repos/{repo}', account: 'The repository full name, and whether the token can push', readOnly: true },
     tokens: { lifetime: 'You choose it when you create the token (up to a year, or none).', renewal: 'reconsent', note: 'A fine-grained token expires on the date you set. Make a new one and replace it here.' },
     revoke: {
